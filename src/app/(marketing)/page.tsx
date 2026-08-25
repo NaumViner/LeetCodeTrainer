@@ -7,6 +7,7 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
+import Link from "next/link";
 
 import { Brand } from "@/components/navigation/brand";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +36,8 @@ const learningLoop = [
 const foundationItems = [
   "Strict TypeScript and modular App Router structure",
   "Responsive, accessible design primitives",
-  "Deterministic unit and browser-test foundations",
-  "Environment validation with no required credentials",
+  "Supabase authentication with protected server sessions",
+  "Private learner profiles enforced by database RLS",
 ] as const;
 
 export default function HomePage() {
@@ -61,6 +62,15 @@ export default function HomePage() {
             >
               Foundation
             </a>
+            <Link
+              className="text-muted hover:text-foreground text-sm font-semibold"
+              href="/login"
+            >
+              Sign in
+            </Link>
+            <Link className={buttonVariants({ size: "sm" })} href="/signup">
+              Start preparing
+            </Link>
           </nav>
         </div>
       </header>

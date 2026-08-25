@@ -1,0 +1,2 @@
+-- Phase 2 does not create login credentials or production-like identities.
+-- Reproducible curriculum metadata is introduced in Phase 3.

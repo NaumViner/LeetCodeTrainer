@@ -12,6 +12,7 @@ export default defineConfig({
       ...configDefaults.exclude,
       "academy-bootstrap/**",
       "tests/e2e/**",
+      "tests/integration/**",
     ],
     setupFiles: ["./tests/setup.ts"],
   },

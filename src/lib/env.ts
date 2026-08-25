@@ -12,6 +12,7 @@ const optionalString = z.preprocess(
 export const serverEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: optionalUrl,
   NEXT_PUBLIC_SUPABASE_URL: optionalUrl,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: optionalString,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: optionalString,
   SUPABASE_SERVICE_ROLE_KEY: optionalString,
   AI_PROVIDER: optionalString,

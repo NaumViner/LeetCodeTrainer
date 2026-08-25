@@ -4,10 +4,11 @@ import { Brand } from "@/components/navigation/brand";
 
 type AppShellProps = {
   children: ReactNode;
+  header?: ReactNode;
   navigation: ReactNode;
 };
 
-export function AppShell({ children, navigation }: AppShellProps) {
+export function AppShell({ children, header, navigation }: AppShellProps) {
   return (
     <div className="bg-background min-h-screen">
       <a
@@ -23,8 +24,9 @@ export function AppShell({ children, navigation }: AppShellProps) {
         </nav>
       </aside>
       <div className="lg:pl-64">
-        <div className="bg-surface border-b px-5 py-4 lg:hidden">
-          <Brand />
+        <div className="bg-surface flex min-h-16 items-center justify-between border-b px-5 py-3 sm:px-8">
+          <Brand className="lg:hidden" />
+          <div className="ml-auto">{header}</div>
         </div>
         <main className="mx-auto max-w-7xl p-5 sm:p-8" id="main-content">
           {children}
