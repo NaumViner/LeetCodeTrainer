@@ -92,6 +92,35 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await expect(page.getByText("Lesson completed")).toBeVisible();
     await page.getByRole("link", { name: "Curriculum" }).click();
     await expect(page.getByText("1 of 21 lessons completed")).toBeVisible();
+
+    await page.getByRole("link", { name: "Problems" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Problem library" }),
+    ).toBeVisible();
+    await page.getByLabel("Topic").selectOption("two-pointers");
+    await page.getByLabel("Difficulty").selectOption("hard");
+    await page.getByRole("button", { name: "Apply filters" }).click();
+
+    await expect(page).toHaveURL(/topic=two-pointers/);
+    await expect(page).toHaveURL(/difficulty=hard/);
+    await expect(
+      page.getByRole("heading", { level: 2, name: "1 result" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Trapping Rain Water" }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "View metadata" }).click();
+
+    await expect(page).toHaveURL(/\/problems\/42$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Trapping Rain Water" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open on LeetCode" }),
+    ).toHaveAttribute(
+      "href",
+      "https://leetcode.com/problems/trapping-rain-water/",
+    );
   } finally {
     const status = readLocalStatus();
     const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;

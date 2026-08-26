@@ -130,6 +130,137 @@ export type Database = {
           },
         ];
       };
+      problem_prerequisite_topics: {
+        Row: {
+          problem_id: string;
+          topic_id: string;
+        };
+        Insert: {
+          problem_id: string;
+          topic_id: string;
+        };
+        Update: {
+          problem_id?: string;
+          topic_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "problem_prerequisite_topics_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "problem_prerequisite_topics_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      problem_secondary_topics: {
+        Row: {
+          problem_id: string;
+          topic_id: string;
+        };
+        Insert: {
+          problem_id: string;
+          topic_id: string;
+        };
+        Update: {
+          problem_id?: string;
+          topic_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "problem_secondary_topics_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "problem_secondary_topics_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      problems: {
+        Row: {
+          active: boolean;
+          company_tags: string[];
+          created_at: string;
+          curriculum_level: string;
+          dataset_order: number;
+          difficulty: string;
+          estimated_minutes: number;
+          external_id: string | null;
+          external_url: string | null;
+          id: string;
+          pattern_tags: string[];
+          premium: boolean;
+          primary_topic_id: string;
+          recognition_signals: string[];
+          slug: string;
+          source: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          company_tags?: string[];
+          created_at?: string;
+          curriculum_level: string;
+          dataset_order: number;
+          difficulty: string;
+          estimated_minutes: number;
+          external_id?: string | null;
+          external_url?: string | null;
+          id?: string;
+          pattern_tags?: string[];
+          premium?: boolean;
+          primary_topic_id: string;
+          recognition_signals?: string[];
+          slug: string;
+          source: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          company_tags?: string[];
+          created_at?: string;
+          curriculum_level?: string;
+          dataset_order?: number;
+          difficulty?: string;
+          estimated_minutes?: number;
+          external_id?: string | null;
+          external_url?: string | null;
+          id?: string;
+          pattern_tags?: string[];
+          premium?: boolean;
+          primary_topic_id?: string;
+          recognition_signals?: string[];
+          slug?: string;
+          source?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "problems_primary_topic_id_fkey";
+            columns: ["primary_topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;

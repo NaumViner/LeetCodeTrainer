@@ -24,6 +24,8 @@ Row Level Security is enabled and forced on the profile table. Separate select a
 
 Curriculum metadata is normalized into topics, lessons, and prerequisite edges. Stable reference data is seeded through a migration, while long lesson bodies remain versioned Markdown files under `content/curriculum`. Learner progress is stored separately so static content can evolve without mixing ownership concerns.
 
+Problem metadata follows the same reference-data boundary. A reviewed JSON catalog is transformed by a deterministic generator into a committed migration. The database normalizes topic relationships, while framework-independent filtering stays in `src/features/problems` and route components only handle request parameters and presentation. External problem content remains at its canonical provider URL.
+
 ## Authentication approach
 
 Browser and server clients use `@supabase/ssr`. The Next.js proxy refreshes session cookies and performs optimistic navigation redirects. Protected layouts and Server Actions verify signed claims again before reading or mutating data.
@@ -33,7 +35,7 @@ Email/password auth is operational. Google and GitHub use the same callback hand
 ## Testing
 
 - Vitest: validation and synchronous components
-- Supabase integration tests: trigger behavior, curriculum integrity, RLS isolation, anonymous denial, and persistence across sessions
-- Playwright: real sign-up, onboarding, curriculum navigation, lesson completion, logout/login, responsive behavior, and persistence
+- Supabase integration tests: trigger behavior, curriculum and problem-catalog integrity, RLS isolation, anonymous denial, and persistence across sessions
+- Playwright: real sign-up, onboarding, curriculum navigation, lesson completion, problem filtering, logout/login, responsive behavior, and persistence
 
 Async Server Components are covered through browser tests, matching current Next.js guidance.

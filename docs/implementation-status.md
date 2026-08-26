@@ -74,7 +74,31 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Anonymous clients can read active curriculum metadata but cannot read private progress.
 - A clean database reset recreates the schema, prerequisite graph, and seed content.
 
-## Phases 4–15
+## Phase 4 — Problem library
+
+**Status:** Complete
+
+### Completed
+
+- Metadata-only catalog of 150 active LeetCode problems across 18 curriculum topics
+- Reproducible JSON importer and deterministic SQL seed generator
+- Problem schema covering external identity, canonical URL, difficulty, topics, pattern tags, recognition signals, prerequisites, estimated time, curriculum level, premium status, company tags, ordering, and active status
+- Normalized secondary-topic and prerequisite-topic relationships
+- Read-only public catalog policies with forced Row Level Security
+- Responsive problem library with search, topic, difficulty, curriculum-level, and pattern filters
+- Paginated problem cards and a dedicated metadata/detail page with canonical LeetCode links
+- Explicit legal-content boundary: no statements, examples, constraints, or solutions are stored
+
+### Verification
+
+- A clean database reset imports exactly 150 unique problems across 18 topics.
+- All canonical URLs, identifiers, difficulty values, arrays, and relationship references pass integrity checks.
+- Difficulty distribution is 28 easy, 101 medium, and 21 hard.
+- Anonymous and authenticated learners can read active metadata; browser roles cannot modify it.
+- Unit tests cover catalog validation and combined filters.
+- Desktop and mobile browser tests filter the library and open the expected detail page.
+
+## Phases 5–15
 
 **Status:** Not started
 

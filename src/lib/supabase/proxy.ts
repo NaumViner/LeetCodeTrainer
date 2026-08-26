@@ -4,7 +4,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
 import type { Database } from "@/types/database";
 
-const protectedPrefixes = ["/dashboard", "/learn", "/onboarding", "/settings"];
+const protectedPrefixes = [
+  "/dashboard",
+  "/learn",
+  "/onboarding",
+  "/problems",
+  "/settings",
+];
 const authPaths = new Set(["/login", "/signup"]);
 
 export async function updateSession(request: NextRequest) {

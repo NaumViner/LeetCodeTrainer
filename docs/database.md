@@ -20,6 +20,14 @@ Row Level Security is enabled and forced. Authenticated learners receive only `S
 
 Active curriculum metadata is publicly readable and application roles receive no curriculum write grants. Lesson progress is private: authenticated learners can select, insert, or update only rows whose `user_id` matches `auth.uid()`. The application also derives that ID from verified claims.
 
+## Problem catalog model
+
+`problems` stores metadata and learning annotations only: source identity, canonical external URL, title, difficulty, primary topic, pattern tags, recognition signals, estimated time, curriculum level, premium flag, optional company tags, ordering, and active status. `problem_secondary_topics` and `problem_prerequisite_topics` normalize the many-to-many topic relationships.
+
+The catalog does not store third-party problem statements, examples, constraints, hints, or solutions. Active metadata is publicly readable so signed-out product pages and authenticated learning routes can use the same catalog. Anonymous and authenticated roles receive no write grants, and forced RLS restricts all reads to active records and valid active relationships.
+
+The committed catalog is generated deterministically from `data/problems.json`; see `problem-library.md` for its provenance and update workflow.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.
