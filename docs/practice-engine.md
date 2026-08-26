@@ -35,4 +35,4 @@ pseudocode 0.45 · full solution 0.20 · copied 0.05
 
 Server Actions treat typed arguments as untrusted, validate them with Zod, re-authenticate the learner, and scope every write to the verified user ID. Forced RLS is the final ownership boundary. Database checks prevent an active attempt from carrying a result or completion timestamp, require completed attempts to contain a valid result, and keep timer fields consistent.
 
-Completion currently finalizes the attempt record in one database update. Mastery, review scheduling, mistakes aggregation, daily-plan updates, analytics, and full attempt history are deliberately introduced in their dedicated later phases.
+Completion finalizes the attempt record in one database update. In that same transaction, Phase 6 creates the immutable performance snapshot and updates topic mastery. Review scheduling and daily-plan updates remain reserved for their dedicated phases; mistake aggregation and full attempt history are derived from the completed records without duplicating learner input.

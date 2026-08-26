@@ -1,4 +1,12 @@
-import { BookOpen, Dumbbell, Gauge, LibraryBig, Settings } from "lucide-react";
+import {
+  BookOpen,
+  ChartNoAxesCombined,
+  Dumbbell,
+  Gauge,
+  History,
+  LibraryBig,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
 
 const items = [
@@ -6,6 +14,8 @@ const items = [
   { href: "/learn", icon: BookOpen, label: "Learn" },
   { href: "/practice", icon: Dumbbell, label: "Practice" },
   { href: "/problems", icon: LibraryBig, label: "Problems" },
+  { href: "/progress", icon: ChartNoAxesCombined, label: "Progress" },
+  { href: "/history", icon: History, label: "History" },
   { href: "/settings/profile", icon: Settings, label: "Settings" },
 ] as const;
 

@@ -225,6 +225,8 @@ export async function completeAttemptAction(
   revalidateAttempt(attempt.id);
   revalidatePath("/practice");
   revalidatePath("/dashboard");
+  revalidatePath("/history");
+  revalidatePath("/progress");
   return { data: undefined, status: "success" };
 }
 

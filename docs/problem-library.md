@@ -21,7 +21,7 @@ The database exposes active catalog metadata as public, read-only reference data
 
 After changing the catalog, review the JSON diff, generate the migration, reset the local database, regenerate database types when the schema changed, and run unit, integration, and browser checks. The generated migration must stay committed so local and hosted deployments receive identical data.
 
-Company tags remain empty unless a reliable, reviewable source is provided; the schema and library filter already support them. Attempt data and baseline recommendations now exist in the private practice engine. Attempt-aware library filters, favorites, history, mastery, and review-state filters remain deferred to their dedicated analytics, history, mastery, and review phases.
+Company tags remain empty unless a reliable, reviewable source is provided; the schema and library filter already support them. Attempt data, recommendations, history, and mastery now exist as private learner features. Attempt-aware manual-library filters remain a planned library enhancement; favorites and review-state filters depend on their later dedicated phases.
 
 ## Library behavior
 

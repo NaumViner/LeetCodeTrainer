@@ -192,7 +192,29 @@ test("a learner can onboard, return, and persist lesson progress", async ({
 
     await expect(page.getByText("Attempt saved")).toBeVisible();
     await expect(page.getByText("small hint", { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Get next recommendation" }).click();
+    await page.getByRole("link", { name: "View full analytics" }).click();
+    await expect(page).toHaveURL(/\/history\/[0-9a-f-]{36}$/);
+    await expect(
+      page.getByRole("heading", { name: "Performance snapshot" }),
+    ).toBeVisible();
+    await expect(page.getByText("Moved the wrong boundary")).toBeVisible();
+
+    await page.getByRole("link", { name: "Progress" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Progress and readiness" }),
+    ).toBeVisible();
+    await expect(page.getByText("Topic mastery")).toBeVisible();
+    await expect(page.getByText("Two Pointers")).toBeVisible();
+
+    await page.getByRole("link", { name: "History" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Attempt history" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Trapping Rain Water/ }),
+    ).toBeVisible();
+
+    await page.getByRole("link", { name: "Practice" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: "Recommended next problem" }),
     ).toBeVisible();

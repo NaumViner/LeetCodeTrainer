@@ -125,7 +125,34 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Domain tests cover recommendation priority, legal state transitions, progressive hints, help scores, and timer recovery.
 - Desktop and mobile browser tests complete the full practice workflow and receive the next recommendation.
 
-## Phases 6–15
+## Phase 6 — Analytics and mastery
+
+**Status:** Complete
+
+### Completed
+
+- Configurable multidimensional performance scoring for correctness, independence, recognition, retention evidence, complexity, and speed
+- Immutable 0–1 performance snapshot for every completed attempt
+- Smoothed 0–100 topic mastery with uncertainty priors that prevent one lucky solve from displaying 100
+- Atomic database trigger that completes performance and mastery updates with the attempt transaction
+- Repeat-attempt retention and first-versus-latest improvement evidence
+- Coverage-adjusted overall readiness with an explicit training-estimate disclaimer
+- Progress screen with readiness dimensions, attempt metrics, repeated mistakes, and all core topic rows
+- Topic-level practice mastery integrated into curriculum topic pages
+- Attempt history table and private attempt detail pages with performance, reasoning, reflection, previous attempts, and review placeholder
+- Dashboard readiness, evidence coverage, weakest practiced topic, and recent-attempt summary
+- Responsive Progress and History navigation
+
+### Verification
+
+- Formula tests cover performance weights, help penalties, speed, neutral first-attempt retention, smoothing, readiness coverage, medians, repeat improvement, and repeated mistakes.
+- A first assisted solve creates a 0.92 performance snapshot but only 54.95 topic mastery.
+- A later independent repeat increases retained evidence and smooths mastery to 68.47 rather than jumping to 100.
+- Attempt completion, performance insertion, and mastery updating occur in one database transaction.
+- Anonymous and second-user analytics reads reveal no private records; browser analytics writes are denied.
+- Desktop and mobile browser tests open attempt analytics, overall progress, topic mastery, history, and the next recommendation.
+
+## Phases 7–15
 
 **Status:** Not started
 

@@ -701,10 +701,18 @@ function CompletedAttempt({ attempt }: { attempt: PracticeAttempt }) {
             <p className="text-muted text-sm">Takeaway</p>
             <p className="mt-2 leading-7">{attempt.takeaway}</p>
           </div>
-          <Link className={buttonVariants()} href="/practice">
-            Get next recommendation{" "}
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link className={buttonVariants()} href="/practice">
+              Get next recommendation{" "}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+            <Link
+              className={buttonVariants({ variant: "secondary" })}
+              href={`/history/${attempt.id}`}
+            >
+              View full analytics
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

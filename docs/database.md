@@ -36,6 +36,12 @@ The committed catalog is generated deterministically from `data/problems.json`; 
 
 Both tables use forced Row Level Security. Authenticated learners can access only rows owned by their verified Auth ID; anonymous clients receive no privileges. Insert and update policies also require an active problem, and table constraints enforce timer, phase, completion, array, and field-length invariants.
 
+## Analytics and mastery model
+
+`attempt_performance` is an immutable one-to-one snapshot for each completed attempt. It stores normalized 0–1 correctness, independence, recognition, retention, complexity, speed, and weighted overall performance. `topic_mastery` stores smoothed 0–100 versions of those dimensions plus attempt counts, independent solves, practice timestamps, and the nullable review timestamp reserved for Phase 7.
+
+An `after update` trigger on `attempts` creates the performance row and updates primary-topic mastery in the same database transaction as completion. This prevents an attempt from being saved without its analytics and prevents client code from supplying its own scores. Analytics tables grant authenticated learners read access only to their own rows; all browser writes are revoked and forced RLS remains the final privacy boundary.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.

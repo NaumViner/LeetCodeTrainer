@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BarChart3,
   BookOpen,
   CalendarDays,
   CheckCircle2,
@@ -15,6 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { readinessLevel } from "@/domain/mastery";
+import { formatDuration } from "@/features/analytics/format";
+import { getAnalyticsSnapshot } from "@/features/analytics/queries";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { curriculumProgress } from "@/features/curriculum/model";
 import { getCurriculum } from "@/features/curriculum/queries";
@@ -22,9 +27,10 @@ import { getProfile } from "@/features/profile/queries";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
-  const [profile, curriculum] = await Promise.all([
+  const [profile, curriculum, analytics] = await Promise.all([
     getProfile(user.id),
     getCurriculum(user.id),
+    getAnalyticsSnapshot(user.id),
   ]);
 
   if (!profile?.onboarding_completed) {
@@ -37,6 +43,13 @@ export default async function DashboardPage() {
   const nextLesson =
     nextTopic?.lessons.find((lesson) => !lesson.completed) ??
     nextTopic?.lessons[0];
+  const weakestTopic = analytics.topics
+    .filter((topic) => topic.mastery)
+    .sort(
+      (left, right) =>
+        left.mastery!.overall_score - right.mastery!.overall_score,
+    )[0];
+  const recentAttempt = analytics.attempts[0];
 
   const details = [
     {
@@ -76,6 +89,91 @@ export default async function DashboardPage() {
         eyebrow="Dashboard"
         title={`Welcome${profile.display_name ? `, ${profile.display_name}` : ""}`}
       />
+
+      <section className="grid gap-5 lg:grid-cols-2" id="readiness">
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <p className="text-primary text-sm font-semibold">
+                  Readiness estimate
+                </p>
+                <p className="mt-2 text-4xl font-bold">
+                  {Math.round(analytics.readiness.overall)}
+                </p>
+                <p className="text-muted mt-1 text-sm">
+                  {analytics.metrics.totalAttempts > 0
+                    ? readinessLevel(analytics.readiness.overall)
+                    : "Complete an attempt to establish a baseline"}
+                </p>
+              </div>
+              <div className="bg-primary-soft text-primary rounded-xl p-3">
+                <BarChart3 aria-hidden="true" className="size-5" />
+              </div>
+            </div>
+            <ProgressBar
+              className="mt-6"
+              label="Core-topic evidence"
+              value={analytics.readiness.coverage}
+            />
+            <p className="text-muted mt-4 text-xs">
+              Training estimate, not a prediction of interview outcome.
+            </p>
+            <div className="mt-5">
+              <Link
+                className={buttonVariants({ variant: "secondary" })}
+                href="/progress"
+              >
+                View progress
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <p className="text-primary text-sm font-semibold">
+              Latest evidence
+            </p>
+            {recentAttempt ? (
+              <>
+                <h2 className="mt-2 text-xl font-semibold">
+                  {recentAttempt.problem.title}
+                </h2>
+                <p className="text-muted mt-2 text-sm capitalize">
+                  {recentAttempt.result} ·{" "}
+                  {formatDuration(recentAttempt.duration_seconds)} ·{" "}
+                  {recentAttempt.help_level.replaceAll("_", " ")}
+                </p>
+                {weakestTopic ? (
+                  <p className="bg-surface-subtle mt-5 rounded-lg border p-3 text-sm">
+                    Current weakest practiced topic: {weakestTopic.topic.name} (
+                    {Math.round(weakestTopic.mastery!.overall_score)})
+                  </p>
+                ) : null}
+                <div className="mt-5">
+                  <Link
+                    className={buttonVariants({ variant: "secondary" })}
+                    href={"/history/" + recentAttempt.id}
+                  >
+                    Open attempt detail
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="mt-2 text-xl font-semibold">
+                  No completed attempts yet
+                </h2>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  Your recent attempt, weakest practiced topic, and improvement
+                  evidence will appear here.
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <Card>
         <CardContent className="p-6 sm:p-8">

@@ -6,10 +6,12 @@ import type { Database } from "@/types/database";
 
 const protectedPrefixes = [
   "/dashboard",
+  "/history",
   "/learn",
   "/onboarding",
   "/practice",
   "/problems",
+  "/progress",
   "/settings",
 ];
 const authPaths = new Set(["/login", "/signup"]);

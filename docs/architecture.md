@@ -30,6 +30,10 @@ Practice uses a persisted state machine. Framework-independent transition, recom
 
 The Phase 5 recommendation baseline prioritizes unattempted foundation problems, gives a bonus to topics with completed lessons, gates guided problems behind topic learning, and uses a stable learner-specific tie-breaker. Later mastery and spaced-repetition phases will add weakness, retention, and review urgency without replacing this deterministic boundary.
 
+Attempt completion is also the analytics transaction boundary. An `after update` database trigger derives a frozen performance snapshot from the completed attempt and problem estimate, then smooths it into the learner's primary-topic mastery in the same transaction. Read paths aggregate those private records into readiness, history, topic dashboards, and recent-attempt summaries; they never write scores from the browser.
+
+The TypeScript mastery module mirrors the database formula for independent tests and transparent product behavior. Spaced repetition will build on the nullable review timestamps in Phase 7, while mock-interview execution remains explicitly unmeasured until real interview evidence exists.
+
 ## Authentication approach
 
 Browser and server clients use `@supabase/ssr`. The Next.js proxy refreshes session cookies and performs optimistic navigation redirects. Protected layouts and Server Actions verify signed claims again before reading or mutating data.

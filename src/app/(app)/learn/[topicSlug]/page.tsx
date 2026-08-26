@@ -13,6 +13,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { readinessLevel } from "@/domain/mastery";
+import { getTopicMastery } from "@/features/analytics/queries";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { getCurriculum } from "@/features/curriculum/queries";
 
@@ -29,6 +31,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
   if (!topic) {
     notFound();
   }
+  const mastery = await getTopicMastery(user.id, topic.id);
 
   const prerequisites = topic.prerequisiteTopicIds
     .map((id) => curriculum.find((candidate) => candidate.id === id))
@@ -111,6 +114,48 @@ export default async function TopicPage({ params }: TopicPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-none">
+        <CardContent className="p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-muted text-xs font-semibold tracking-wide uppercase">
+                Practice mastery
+              </p>
+              <h2 className="mt-2 text-xl font-semibold">
+                {mastery
+                  ? `${Math.round(mastery.overall_score)} · ${readinessLevel(mastery.overall_score)}`
+                  : "No attempt evidence yet"}
+              </h2>
+              <p className="text-muted mt-2 text-sm">
+                {mastery
+                  ? `${mastery.total_attempts} attempts · ${mastery.independent_solves} independent solves`
+                  : "Complete a problem in this topic to establish a baseline."}
+              </p>
+            </div>
+            <Link
+              className={buttonVariants({ variant: "secondary" })}
+              href="/progress"
+            >
+              View all analytics
+            </Link>
+          </div>
+          {mastery ? (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ProgressBar
+                label="Recognition"
+                value={mastery.recognition_score}
+              />
+              <ProgressBar
+                label="Independence"
+                value={mastery.independence_score}
+              />
+              <ProgressBar label="Retention" value={mastery.retention_score} />
+              <ProgressBar label="Speed" value={mastery.speed_score} />
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {!topic.prerequisitesComplete ? (
         <div className="bg-primary-soft text-foreground flex gap-3 rounded-xl border p-4 text-sm">

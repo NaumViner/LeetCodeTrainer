@@ -47,6 +47,63 @@ export type Database = {
           },
         ];
       };
+      attempt_performance: {
+        Row: {
+          attempt_id: string;
+          complexity_score: number;
+          correctness_score: number;
+          created_at: string;
+          independence_score: number;
+          overall_score: number;
+          recognition_score: number;
+          retention_score: number;
+          speed_score: number;
+          topic_id: string;
+          user_id: string;
+        };
+        Insert: {
+          attempt_id: string;
+          complexity_score: number;
+          correctness_score: number;
+          created_at?: string;
+          independence_score: number;
+          overall_score: number;
+          recognition_score: number;
+          retention_score: number;
+          speed_score: number;
+          topic_id: string;
+          user_id: string;
+        };
+        Update: {
+          attempt_id?: string;
+          complexity_score?: number;
+          correctness_score?: number;
+          created_at?: string;
+          independence_score?: number;
+          overall_score?: number;
+          recognition_score?: number;
+          retention_score?: number;
+          speed_score?: number;
+          topic_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attempt_performance_attempt_id_fkey";
+            columns: ["attempt_id"];
+            isOneToOne: true;
+            referencedRelation: "attempts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attempt_performance_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       attempts: {
         Row: {
           brute_force_approach: string | null;
@@ -447,6 +504,68 @@ export type Database = {
           weekly_study_minutes?: number;
         };
         Relationships: [];
+      };
+      topic_mastery: {
+        Row: {
+          complexity_score: number;
+          correctness_score: number;
+          created_at: string;
+          independence_score: number;
+          independent_solves: number;
+          last_practiced_at: string | null;
+          next_review_at: string | null;
+          overall_score: number;
+          recognition_score: number;
+          retention_score: number;
+          speed_score: number;
+          topic_id: string;
+          total_attempts: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          complexity_score: number;
+          correctness_score: number;
+          created_at?: string;
+          independence_score: number;
+          independent_solves?: number;
+          last_practiced_at?: string | null;
+          next_review_at?: string | null;
+          overall_score: number;
+          recognition_score: number;
+          retention_score: number;
+          speed_score: number;
+          topic_id: string;
+          total_attempts?: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          complexity_score?: number;
+          correctness_score?: number;
+          created_at?: string;
+          independence_score?: number;
+          independent_solves?: number;
+          last_practiced_at?: string | null;
+          next_review_at?: string | null;
+          overall_score?: number;
+          recognition_score?: number;
+          retention_score?: number;
+          speed_score?: number;
+          topic_id?: string;
+          total_attempts?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "topic_mastery_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       topic_prerequisites: {
         Row: {
