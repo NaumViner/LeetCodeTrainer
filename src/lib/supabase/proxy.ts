@@ -12,6 +12,7 @@ const protectedPrefixes = [
   "/practice",
   "/problems",
   "/progress",
+  "/review",
   "/settings",
 ];
 const authPaths = new Set(["/login", "/signup"]);

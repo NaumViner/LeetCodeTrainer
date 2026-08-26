@@ -218,6 +218,70 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await expect(
       page.getByRole("heading", { level: 1, name: "Recommended next problem" }),
     ).toBeVisible();
+
+    await page.getByRole("link", { name: "Review" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Review queue" }),
+    ).toBeVisible();
+    await expect(page.getByText("Recall the earlier mistake")).toBeVisible();
+    await page.getByRole("button", { name: "Review early" }).click();
+
+    await expect(page).toHaveURL(/\/practice\/[0-9a-f-]{36}$/);
+    await expect(
+      page.getByText("Review session", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Predict first to unlock hints" }),
+    ).toBeDisabled();
+    await page
+      .getByLabel("What pattern would you try first?")
+      .fill("two pointers");
+    await page
+      .getByLabel("What is a brute-force approach?")
+      .fill("Try every pair of boundaries again.");
+    await page
+      .getByLabel("What runtime would brute force require?")
+      .fill("O(n^2)");
+    await page.getByLabel("How confident are you?").selectOption("4");
+    await page
+      .getByRole("button", { name: "Save prediction and plan" })
+      .click();
+    await expect(page.getByText("Previous attempt comparison")).toBeVisible();
+    await expect(page.getByText("Moved the wrong boundary")).toBeVisible();
+    await page.getByRole("button", { name: "Begin coding" }).click();
+    await page
+      .getByLabel("Code snapshot")
+      .fill("function trap(height) { return height.length; }");
+    await page.getByRole("button", { name: "Move to testing" }).click();
+    await page.getByRole("button", { name: "Stop timer and reflect" }).click();
+    await page.getByLabel("Did you solve it?").selectOption("solved");
+    await page
+      .getByLabel("Was your predicted pattern correct?")
+      .selectOption("true");
+    await page.getByLabel("What was the correct pattern?").fill("two pointers");
+    await page.getByLabel("How confident are you now?").selectOption("5");
+    await page.getByLabel("Optimal time complexity").fill("O(n)");
+    await page.getByLabel("Space complexity").fill("O(1)");
+    await page
+      .getByLabel("Is the complexity analysis correct?")
+      .selectOption("true");
+    await page
+      .getByLabel("Biggest mistake (one per line)")
+      .fill("No mistake on recall");
+    await page.getByLabel("Edge case missed (one per line)").fill("None");
+    await page
+      .getByLabel("What should you notice earlier next time?")
+      .fill("State the pointer invariant immediately.");
+    await page.getByRole("button", { name: "Complete attempt" }).click();
+
+    await expect(page.getByText("Next review scheduled")).toBeVisible();
+    await page.getByRole("link", { name: "Back to review queue" }).click();
+    await page.getByRole("link", { name: "Review history" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Review history" }),
+    ).toBeVisible();
+    await expect(page.getByText("Review session")).toBeVisible();
+    await expect(page.getByText("Initial schedule")).toBeVisible();
   } finally {
     const status = readLocalStatus();
     const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;

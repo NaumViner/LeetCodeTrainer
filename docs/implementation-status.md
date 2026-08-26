@@ -152,7 +152,31 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Anonymous and second-user analytics reads reveal no private records; browser analytics writes are denied.
 - Desktop and mobile browser tests open attempt analytics, overall progress, topic mastery, history, and the next recommendation.
 
-## Phases 7–15
+## Phase 7 — Spaced repetition
+
+**Status:** Complete
+
+### Completed
+
+- SM-2-inspired deterministic scheduler using correctness, help, confidence, elapsed time, retention, repeated failure, and bounded easiness
+- Specification-aligned one-day through 30-day interval bands
+- Atomic current problem schedule and immutable schedule-event history on attempt completion
+- Earliest problem review synchronized into topic mastery
+- Learner-timezone Due now, Due today, and Upcoming queue groups
+- Problem redo, pattern recall, complexity recall, and earlier-mistake prompts
+- Dedicated review mode with previous notes hidden until a fresh pattern prediction
+- Earlier-attempt comparison and immediate next-interval confirmation
+- Review history with links to the evidence-producing attempts
+- Dashboard summary and responsive Review navigation
+- Forced-RLS own-row reads, revoked browser writes, and scheduled-problem validation for review mode
+
+### Verification
+
+- Date tests cover failure resets, assistance bands, independent expansion, 30-day capping, and timezone queue boundaries.
+- Database tests prove initial scheduling, strong recalled-review expansion, atomic topic synchronization, immutable history, privacy, and read-only schedules.
+- The full browser flow creates a schedule, starts an early review, unlocks previous evidence after prediction, completes recall, and opens review history.
+
+## Phases 8–15
 
 **Status:** Not started
 

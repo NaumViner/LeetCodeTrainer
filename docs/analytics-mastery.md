@@ -11,7 +11,7 @@ Retention 10% · Complexity 10% · Speed 5%
 
 Correctness maps solved, partial, and failed to 1, 0.5, and 0. Independence uses the centralized help-level scores. Recognition and checked complexity are binary; unchecked complexity is neutral at 0.5. Speed compares elapsed time with the problem's educational time estimate and is multiplied by correctness, so a fast failure receives no speed reward.
 
-The first attempt on a problem uses neutral 0.5 retention because no recall evidence exists. Repeat attempts derive retention from correctness and independence. Phase 7 will add time-aware review evidence without rewriting historical performance snapshots.
+The first attempt on a problem uses neutral 0.5 retention because no recall evidence exists. Repeat attempts derive retention from correctness and independence. Phase 7 uses this frozen retention evidence for time-aware scheduling without rewriting historical performance snapshots.
 
 ## Topic mastery
 
@@ -33,4 +33,4 @@ Performance and mastery tables use forced Row Level Security. Authenticated lear
 
 Overall readiness begins with mean practiced-topic mastery and applies a coverage factor across the 18 core problem topics. This prevents one strong topic from representing broad interview readiness. It is always labeled “Training estimate, not a prediction of interview outcome.” Interview execution remains unmeasured until mock-interview evidence exists.
 
-The progress view derives total attempts, independent solve rate, average and median time, help usage, recognition and complexity accuracy, repeat improvement, repeated mistakes, mastery dimensions, and topic status from stored records. History and attempt detail expose the evidence behind those aggregates. Review success and scheduled retention become available when Phase 7 adds spaced repetition.
+The progress view derives total attempts, independent solve rate, average and median time, help usage, recognition and complexity accuracy, repeat improvement, repeated mistakes, mastery dimensions, and topic status from stored records. History and attempt detail expose the evidence behind those aggregates. Review success and scheduled retention now flow through the spaced-repetition schedule and its immutable event history.

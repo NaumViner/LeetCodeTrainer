@@ -7,10 +7,28 @@ import type { Tables } from "@/types/database";
 export type AttemptRow = Tables<"attempts">;
 export type AttemptHintRow = Tables<"attempt_hints">;
 
+export type PreviousAttemptSummary = Pick<
+  AttemptRow,
+  | "completed_at"
+  | "correct_pattern"
+  | "duration_seconds"
+  | "help_level"
+  | "mistakes"
+  | "result"
+  | "submitted_space_complexity"
+  | "submitted_time_complexity"
+  | "takeaway"
+>;
+
 export type PracticeAttempt = AttemptRow & {
   effectiveDurationSeconds: number;
   hints: AttemptHintRow[];
+  previousAttempt: PreviousAttemptSummary | null;
   problem: Problem;
+  reviewSchedule: Pick<
+    Tables<"problem_reviews">,
+    "interval_days" | "next_review_at" | "repetition"
+  > | null;
 };
 
 export async function getActiveAttempt(userId: string) {
@@ -83,13 +101,42 @@ export async function getPracticeAttempt(
   const problem = catalog.find((item) => item.id === attempt.problem_id);
   if (!problem) return null;
 
-  const { data: hints, error: hintError } = await supabase
-    .from("attempt_hints")
-    .select("*")
-    .eq("attempt_id", attempt.id)
-    .order("ordinal");
+  const [
+    { data: hints, error: hintError },
+    { data: previousAttempt, error: previousError },
+    { data: reviewSchedule, error: reviewError },
+  ] = await Promise.all([
+    supabase
+      .from("attempt_hints")
+      .select("*")
+      .eq("attempt_id", attempt.id)
+      .order("ordinal"),
+    attempt.mode === "review"
+      ? supabase
+          .from("attempts")
+          .select(
+            "completed_at, correct_pattern, duration_seconds, help_level, mistakes, result, submitted_space_complexity, submitted_time_complexity, takeaway",
+          )
+          .eq("user_id", userId)
+          .eq("problem_id", attempt.problem_id)
+          .eq("status", "completed")
+          .neq("id", attempt.id)
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("problem_reviews")
+      .select("interval_days, next_review_at, repetition")
+      .eq("user_id", userId)
+      .eq("problem_id", attempt.problem_id)
+      .maybeSingle(),
+  ]);
 
   if (hintError) throw new Error("Practice hints could not be loaded.");
+  if (previousError)
+    throw new Error("Previous review evidence could not be loaded.");
+  if (reviewError) throw new Error("The review schedule could not be loaded.");
 
   return {
     ...attempt,
@@ -100,6 +147,8 @@ export async function getPracticeAttempt(
       timerStartedAt: attempt.timer_started_at,
     }),
     hints: hints ?? [],
+    previousAttempt,
     problem,
+    reviewSchedule,
   };
 }

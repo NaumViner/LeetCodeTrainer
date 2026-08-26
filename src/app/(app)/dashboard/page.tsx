@@ -7,6 +7,7 @@ import {
   Clock3,
   Code2,
   Dumbbell,
+  RefreshCw,
   Target,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,13 +25,15 @@ import { requireAuthenticatedUser } from "@/features/auth/session";
 import { curriculumProgress } from "@/features/curriculum/model";
 import { getCurriculum } from "@/features/curriculum/queries";
 import { getProfile } from "@/features/profile/queries";
+import { getReviewDashboardSummary } from "@/features/reviews/queries";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
-  const [profile, curriculum, analytics] = await Promise.all([
+  const [profile, curriculum, analytics, reviews] = await Promise.all([
     getProfile(user.id),
     getCurriculum(user.id),
     getAnalyticsSnapshot(user.id),
+    getReviewDashboardSummary(user.id, new Date()),
   ]);
 
   if (!profile?.onboarding_completed) {
@@ -260,6 +263,38 @@ export default async function DashboardPage() {
       </section>
 
       <section id="practice">
+        <Card>
+          <CardContent className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="bg-primary-soft text-primary rounded-xl p-3">
+                <RefreshCw aria-hidden="true" className="size-5" />
+              </div>
+              <div>
+                <p className="text-primary text-sm font-semibold">
+                  Spaced repetition
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">
+                  {reviews.dueNow > 0
+                    ? `${reviews.dueNow} ${reviews.dueNow === 1 ? "review" : "reviews"} due now`
+                    : reviews.total > 0
+                      ? "Your next reviews are scheduled"
+                      : "Build your first review queue"}
+                </h2>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  Recall the pattern before notes and adapt the next interval
+                  from your result, help, confidence, time, and retention.
+                </p>
+              </div>
+            </div>
+            <Link className={buttonVariants()} href="/review">
+              Open review queue
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section id="practice-recommendation">
         <Card>
           <CardContent className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">

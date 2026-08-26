@@ -359,6 +359,56 @@ export type Database = {
           },
         ];
       };
+      problem_reviews: {
+        Row: {
+          created_at: string;
+          easiness_factor: number;
+          failure_streak: number;
+          interval_days: number;
+          last_performance_score: number;
+          last_reviewed_at: string | null;
+          next_review_at: string;
+          problem_id: string;
+          repetition: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          easiness_factor?: number;
+          failure_streak?: number;
+          interval_days: number;
+          last_performance_score: number;
+          last_reviewed_at?: string | null;
+          next_review_at: string;
+          problem_id: string;
+          repetition?: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          easiness_factor?: number;
+          failure_streak?: number;
+          interval_days?: number;
+          last_performance_score?: number;
+          last_reviewed_at?: string | null;
+          next_review_at?: string;
+          problem_id?: string;
+          repetition?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "problem_reviews_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       problem_secondary_topics: {
         Row: {
           problem_id: string;
@@ -504,6 +554,81 @@ export type Database = {
           weekly_study_minutes?: number;
         };
         Relationships: [];
+      };
+      review_events: {
+        Row: {
+          attempt_id: string;
+          attempt_mode: string;
+          created_at: string;
+          easiness_factor: number;
+          failure_streak: number;
+          help_level: string;
+          id: string;
+          interval_days: number;
+          next_review_at: string;
+          performance_score: number;
+          previous_interval_days: number | null;
+          problem_id: string;
+          quality_score: number;
+          repetition: number;
+          result: string;
+          reviewed_at: string;
+          user_id: string;
+        };
+        Insert: {
+          attempt_id: string;
+          attempt_mode: string;
+          created_at?: string;
+          easiness_factor: number;
+          failure_streak: number;
+          help_level: string;
+          id?: string;
+          interval_days: number;
+          next_review_at: string;
+          performance_score: number;
+          previous_interval_days?: number | null;
+          problem_id: string;
+          quality_score: number;
+          repetition: number;
+          result: string;
+          reviewed_at: string;
+          user_id: string;
+        };
+        Update: {
+          attempt_id?: string;
+          attempt_mode?: string;
+          created_at?: string;
+          easiness_factor?: number;
+          failure_streak?: number;
+          help_level?: string;
+          id?: string;
+          interval_days?: number;
+          next_review_at?: string;
+          performance_score?: number;
+          previous_interval_days?: number | null;
+          problem_id?: string;
+          quality_score?: number;
+          repetition?: number;
+          result?: string;
+          reviewed_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "review_events_attempt_id_fkey";
+            columns: ["attempt_id"];
+            isOneToOne: true;
+            referencedRelation: "attempts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "review_events_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       topic_mastery: {
         Row: {

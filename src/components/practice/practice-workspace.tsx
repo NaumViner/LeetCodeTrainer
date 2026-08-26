@@ -125,7 +125,9 @@ export function PracticeWorkspace({ attempt }: { attempt: PracticeAttempt }) {
     <div className="space-y-6">
       <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-primary text-sm font-semibold">Practice attempt</p>
+          <p className="text-primary text-sm font-semibold">
+            {attempt.mode === "review" ? "Review session" : "Practice attempt"}
+          </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">
             {attempt.problem.title}
           </h1>
@@ -319,11 +321,19 @@ export function PracticeWorkspace({ attempt }: { attempt: PracticeAttempt }) {
               </div>
               <Button
                 className="mt-4 w-full"
-                disabled={isPending || hints.length >= 6}
+                disabled={
+                  isPending ||
+                  hints.length >= 6 ||
+                  (attempt.mode === "review" && phase === "pre_attempt")
+                }
                 onClick={revealHint}
                 variant="secondary"
               >
-                {hints.length >= 6 ? "All hints revealed" : "Reveal next hint"}
+                {hints.length >= 6
+                  ? "All hints revealed"
+                  : attempt.mode === "review" && phase === "pre_attempt"
+                    ? "Predict first to unlock hints"
+                    : "Reveal next hint"}
               </Button>
             </CardContent>
           </Card>
@@ -362,7 +372,9 @@ function PreAttemptStep({
       <CardContent className="p-6 sm:p-8">
         <h2 className="text-xl font-semibold">Predict before you code</h2>
         <p className="text-muted mt-2 text-sm leading-6">
-          Open the original problem, then capture your first independent read.
+          {attempt.mode === "review"
+            ? "Recall the pattern and brute-force baseline before earlier notes become visible."
+            : "Open the original problem, then capture your first independent read."}
         </p>
         <form className="mt-6 space-y-5" onSubmit={submit}>
           <Field label="What pattern would you try first?">
@@ -439,6 +451,49 @@ function PlanningStep({
             </dd>
           </div>
         </dl>
+        {attempt.mode === "review" && attempt.previousAttempt ? (
+          <div className="bg-surface-subtle mt-6 rounded-xl border p-5">
+            <p className="text-primary text-xs font-semibold tracking-wide uppercase">
+              Previous attempt comparison
+            </p>
+            <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+              <Summary
+                label="Earlier result"
+                value={attempt.previousAttempt.result ?? "Completed"}
+              />
+              <Summary
+                label="Earlier help"
+                value={attempt.previousAttempt.help_level.replaceAll("_", " ")}
+              />
+              <Summary
+                label="Correct pattern"
+                value={
+                  attempt.previousAttempt.correct_pattern ?? "Not recorded"
+                }
+              />
+              <Summary
+                label="Earlier time"
+                value={formatDuration(attempt.previousAttempt.duration_seconds)}
+              />
+            </dl>
+            <div className="mt-4 border-t pt-4 text-sm">
+              <p className="text-muted">Earlier takeaway</p>
+              <p className="mt-1 leading-6">
+                {attempt.previousAttempt.takeaway ?? "Not recorded"}
+              </p>
+              {attempt.previousAttempt.mistakes.length ? (
+                <>
+                  <p className="text-muted mt-4">Mistakes to recall</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    {attempt.previousAttempt.mistakes.map((mistake) => (
+                      <li key={mistake}>{mistake}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <p className="bg-primary-soft mt-6 rounded-lg border p-4 text-sm leading-6">
           State the invariant, the data you maintain, and why each update moves
           toward the answer. Say it aloud before implementation.
@@ -701,9 +756,29 @@ function CompletedAttempt({ attempt }: { attempt: PracticeAttempt }) {
             <p className="text-muted text-sm">Takeaway</p>
             <p className="mt-2 leading-7">{attempt.takeaway}</p>
           </div>
+          {attempt.reviewSchedule ? (
+            <div className="bg-primary-soft mt-6 rounded-xl border p-4">
+              <p className="text-sm font-semibold">Next review scheduled</p>
+              <p className="text-muted mt-1 text-sm">
+                In {attempt.reviewSchedule.interval_days}{" "}
+                {attempt.reviewSchedule.interval_days === 1 ? "day" : "days"}
+                {" · "}
+                {new Intl.DateTimeFormat("en", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                }).format(new Date(attempt.reviewSchedule.next_review_at))}
+              </p>
+            </div>
+          ) : null}
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link className={buttonVariants()} href="/practice">
-              Get next recommendation{" "}
+            <Link
+              className={buttonVariants()}
+              href={attempt.mode === "review" ? "/review" : "/practice"}
+            >
+              {attempt.mode === "review"
+                ? "Back to review queue"
+                : "Get next recommendation"}{" "}
               <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
             <Link

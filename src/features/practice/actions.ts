@@ -227,6 +227,8 @@ export async function completeAttemptAction(
   revalidatePath("/dashboard");
   revalidatePath("/history");
   revalidatePath("/progress");
+  revalidatePath("/review");
+  revalidatePath("/review/history");
   return { data: undefined, status: "success" };
 }
 

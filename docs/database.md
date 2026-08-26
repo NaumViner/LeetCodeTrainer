@@ -38,9 +38,15 @@ Both tables use forced Row Level Security. Authenticated learners can access onl
 
 ## Analytics and mastery model
 
-`attempt_performance` is an immutable one-to-one snapshot for each completed attempt. It stores normalized 0–1 correctness, independence, recognition, retention, complexity, speed, and weighted overall performance. `topic_mastery` stores smoothed 0–100 versions of those dimensions plus attempt counts, independent solves, practice timestamps, and the nullable review timestamp reserved for Phase 7.
+`attempt_performance` is an immutable one-to-one snapshot for each completed attempt. It stores normalized 0–1 correctness, independence, recognition, retention, complexity, speed, and weighted overall performance. `topic_mastery` stores smoothed 0–100 versions of those dimensions plus attempt counts, independent solves, practice timestamps, and the earliest scheduled problem review for the topic.
 
 An `after update` trigger on `attempts` creates the performance row and updates primary-topic mastery in the same database transaction as completion. This prevents an attempt from being saved without its analytics and prevents client code from supplying its own scores. Analytics tables grant authenticated learners read access only to their own rows; all browser writes are revoked and forced RLS remains the final privacy boundary.
+
+## Spaced repetition model
+
+`problem_reviews` stores the current learner-problem schedule: repetition, interval, bounded easiness, last review, next review, last performance, and failure streak. `review_events` stores the immutable evidence behind every schedule change and points to its completed attempt.
+
+The review trigger follows the performance trigger in deterministic name order. It uses the completed attempt plus its frozen performance snapshot, updates the current schedule, appends an event, and synchronizes the topic review timestamp before the completion transaction commits. Browser roles can read only their own review rows and receive no write grants. Review-mode attempt insertion additionally requires an existing schedule owned by the learner.
 
 ## Migration workflow
 

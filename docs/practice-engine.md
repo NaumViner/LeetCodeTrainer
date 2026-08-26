@@ -14,7 +14,7 @@ The practice route always resumes an active attempt before offering another reco
 
 Phase 5 uses deterministic scoring rather than random selection. It prioritizes problems with fewer completed attempts, keeps foundation work available, requires completed learning in a topic before guided work from that topic, favors topics with completed lessons, orders by curriculum level and dataset position, and uses a small stable learner-specific tie-breaker.
 
-This baseline intentionally does not claim mastery or retention knowledge. Phase 6 will add performance and weakness signals; Phase 7 will add review urgency and spaced repetition.
+This baseline remains intentionally separate from the mastery and review scheduler. Phase 8 will combine weakness, retention, review urgency, balance, and difficulty adaptation into the next recommendation engine.
 
 ## Timer
 
@@ -35,4 +35,6 @@ pseudocode 0.45 · full solution 0.20 · copied 0.05
 
 Server Actions treat typed arguments as untrusted, validate them with Zod, re-authenticate the learner, and scope every write to the verified user ID. Forced RLS is the final ownership boundary. Database checks prevent an active attempt from carrying a result or completion timestamp, require completed attempts to contain a valid result, and keep timer fields consistent.
 
-Completion finalizes the attempt record in one database update. In that same transaction, Phase 6 creates the immutable performance snapshot and updates topic mastery. Review scheduling and daily-plan updates remain reserved for their dedicated phases; mistake aggregation and full attempt history are derived from the completed records without duplicating learner input.
+Completion finalizes the attempt record in one database update. In that same transaction, Phase 6 creates the immutable performance snapshot and updates topic mastery, then Phase 7 adapts the problem's review schedule and appends its immutable schedule event. Mistake aggregation and full attempt history remain derived from completed records without duplicating learner input.
+
+Review mode uses the same persisted state machine. It withholds hints and previous-attempt notes until the learner saves a fresh pattern prediction, then exposes the earlier result, assistance, time, pattern, takeaway, and mistakes for comparison.

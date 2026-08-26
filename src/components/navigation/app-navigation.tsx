@@ -5,6 +5,7 @@ import {
   Gauge,
   History,
   LibraryBig,
+  RefreshCw,
   Settings,
 } from "lucide-react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ const items = [
   { href: "/dashboard", icon: Gauge, label: "Dashboard" },
   { href: "/learn", icon: BookOpen, label: "Learn" },
   { href: "/practice", icon: Dumbbell, label: "Practice" },
+  { href: "/review", icon: RefreshCw, label: "Review" },
   { href: "/problems", icon: LibraryBig, label: "Problems" },
   { href: "/progress", icon: ChartNoAxesCombined, label: "Progress" },
   { href: "/history", icon: History, label: "History" },
