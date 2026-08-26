@@ -30,6 +30,7 @@ function readLocalStatus(): LocalStatus {
 test("a learner can onboard, return, and persist lesson progress", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   const email = `browser-${randomUUID()}@example.com`;
   const password = "BrowserFlow123";
 
@@ -121,6 +122,80 @@ test("a learner can onboard, return, and persist lesson progress", async ({
       "href",
       "https://leetcode.com/problems/trapping-rain-water/",
     );
+
+    await page.getByRole("link", { name: "Practice this problem" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Selected problem" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Start practice attempt" }).click();
+    await expect(page).toHaveURL(/\/practice\/[0-9a-f-]{36}$/);
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await page
+      .getByLabel("What pattern would you try first?")
+      .fill("two pointers");
+    await page
+      .getByLabel("What is a brute-force approach?")
+      .fill("Try every pair of boundaries.");
+    await page
+      .getByLabel("What runtime would brute force require?")
+      .fill("O(n^2)");
+    await page.getByLabel("How confident are you?").selectOption("3");
+    await page
+      .getByRole("button", { name: "Save prediction and plan" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Turn the idea into steps" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Begin coding" }).click();
+    await page
+      .getByLabel("Code snapshot")
+      .fill("function trap(height) { return 0; }");
+    await page.getByRole("button", { name: "Save draft" }).click();
+    await page.getByRole("button", { name: "Reveal next hint" }).click();
+    await expect(page.getByText("Socratic question")).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Implement independently" }),
+    ).toBeVisible();
+    await expect(page.getByText("Socratic question")).toBeVisible();
+    await page.getByRole("button", { name: "Move to testing" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Test before judging the result" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Stop timer and reflect" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Log an honest reflection" }),
+    ).toBeVisible();
+
+    await page.getByLabel("Did you solve it?").selectOption("partial");
+    await page
+      .getByLabel("Was your predicted pattern correct?")
+      .selectOption("true");
+    await page.getByLabel("What was the correct pattern?").fill("two pointers");
+    await page.getByLabel("How confident are you now?").selectOption("4");
+    await page.getByLabel("Optimal time complexity").fill("O(n)");
+    await page.getByLabel("Space complexity").fill("O(1)");
+    await page
+      .getByLabel("Is the complexity analysis correct?")
+      .selectOption("true");
+    await page
+      .getByLabel("Biggest mistake (one per line)")
+      .fill("Moved the wrong boundary");
+    await page
+      .getByLabel("Edge case missed (one per line)")
+      .fill("Empty input");
+    await page
+      .getByLabel("What should you notice earlier next time?")
+      .fill("Track the bounded side before moving a pointer.");
+    await page.getByRole("button", { name: "Complete attempt" }).click();
+
+    await expect(page.getByText("Attempt saved")).toBeVisible();
+    await expect(page.getByText("small hint", { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Get next recommendation" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Recommended next problem" }),
+    ).toBeVisible();
   } finally {
     const status = readLocalStatus();
     const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;

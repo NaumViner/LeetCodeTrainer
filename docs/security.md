@@ -7,6 +7,7 @@
 - Redirect destinations are restricted to relative application paths to prevent open redirects.
 - Curriculum records are read-only to browser roles. Lesson content paths are database-constrained and resolved inside the dedicated curriculum directory.
 - Problem records are metadata-only and read-only to browser roles. Canonical outbound URLs are constrained to HTTPS and opened with safe external-link attributes.
-- Integration tests create two real users and prove cross-user profile and lesson-progress operations fail; they also prove anonymous private-data reads fail and catalog writes are denied.
+- Practice Server Actions authenticate on every call, validate all client input, and constrain mutations by both attempt ID and verified user ID. Database checks prevent inconsistent timer and completion states.
+- Attempts and hint history are private learner-owned data protected by forced RLS. Integration tests create two real users and prove cross-user profile, lesson-progress, attempt, and hint operations fail; they also prove anonymous private-data reads fail and catalog writes are denied.
 
 Before a hosted release, apply migrations to the intended Supabase project, confirm RLS remains enabled, rotate any keys exposed outside approved secret storage, configure allowed redirect URLs, and run the integration and browser suites against a safe non-production environment.

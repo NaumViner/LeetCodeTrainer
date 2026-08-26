@@ -1,9 +1,10 @@
-import { BookOpen, Gauge, LibraryBig, Settings } from "lucide-react";
+import { BookOpen, Dumbbell, Gauge, LibraryBig, Settings } from "lucide-react";
 import Link from "next/link";
 
 const items = [
   { href: "/dashboard", icon: Gauge, label: "Dashboard" },
   { href: "/learn", icon: BookOpen, label: "Learn" },
+  { href: "/practice", icon: Dumbbell, label: "Practice" },
   { href: "/problems", icon: LibraryBig, label: "Problems" },
   { href: "/settings/profile", icon: Settings, label: "Settings" },
 ] as const;

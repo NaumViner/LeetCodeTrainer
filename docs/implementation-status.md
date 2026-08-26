@@ -98,7 +98,34 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Unit tests cover catalog validation and combined filters.
 - Desktop and mobile browser tests filter the library and open the expected detail page.
 
-## Phases 5–15
+## Phase 5 — Practice engine
+
+**Status:** Complete
+
+### Completed
+
+- Deterministic next-problem recommendation with unattempted-problem priority, curriculum gating, completed-topic preference, and stable learner-specific tie-breaking
+- One persisted active attempt per learner with ordered pre-attempt, planning, coding, testing, reflection, and completed phases
+- Pre-attempt pattern prediction, brute-force reasoning, runtime estimate, and confidence capture
+- Refresh-safe start, pause, and reset timer backed by server timestamps and accumulated duration
+- Six progressive hint levels with centralized independence scores and automatic help-level tracking
+- Testing checklist plus persisted code snapshots, complexity analysis, result, mistakes, missed edge cases, takeaway, and confidence-after reflection
+- Completed-attempt summary and automatic handoff to the next recommendation
+- Practice entry points from the dashboard, navigation, and any problem detail page
+- Responsive, accessible practice workspace with labeled controls and visible workflow state
+
+### Verification
+
+- A clean database reset creates the attempt schema and all constraints.
+- A learner cannot create more than one active attempt.
+- Timer, planning, code, phase, and hints persist across a full page refresh.
+- Revealing a hint automatically updates the attempt's highest assistance level.
+- Anonymous and second-user reads and mutations are denied by database policy.
+- Structured completion persists the final result and reflection consistently.
+- Domain tests cover recommendation priority, legal state transitions, progressive hints, help scores, and timer recovery.
+- Desktop and mobile browser tests complete the full practice workflow and receive the next recommendation.
+
+## Phases 6–15
 
 **Status:** Not started
 

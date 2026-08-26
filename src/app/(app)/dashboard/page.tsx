@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock3,
   Code2,
+  Dumbbell,
   Target,
 } from "lucide-react";
 import Link from "next/link";
@@ -154,6 +155,34 @@ export default async function DashboardPage() {
               }
             >
               {nextLesson ? "Open next lesson" : "View curriculum"}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section id="practice">
+        <Card>
+          <CardContent className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="bg-primary-soft text-primary rounded-xl p-3">
+                <Dumbbell aria-hidden="true" className="size-5" />
+              </div>
+              <div>
+                <p className="text-primary text-sm font-semibold">
+                  Practice independently
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">
+                  Get your next recommended problem
+                </h2>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  Predict the pattern, use a refresh-safe timer, request
+                  progressive hints, and save a structured reflection.
+                </p>
+              </div>
+            </div>
+            <Link className={buttonVariants()} href="/practice">
+              Start practice
               <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           </CardContent>

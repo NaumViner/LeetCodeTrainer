@@ -45,15 +45,23 @@ export default async function ProblemPage({ params }: ProblemPageProps) {
 
       <PageHeader
         actions={
-          <a
-            className={buttonVariants()}
-            href={problem.external_url ?? "#"}
-            rel="noreferrer"
-            target="_blank"
-          >
-            Open on LeetCode
-            <ExternalLink aria-hidden="true" className="size-4" />
-          </a>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              className={buttonVariants()}
+              href={"/practice?problem=" + problem.external_id}
+            >
+              Practice this problem
+            </Link>
+            <a
+              className={buttonVariants({ variant: "secondary" })}
+              href={problem.external_url ?? "#"}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open on LeetCode
+              <ExternalLink aria-hidden="true" className="size-4" />
+            </a>
+          </div>
         }
         description="Use the recognition signals to predict the pattern before opening the original prompt."
         eyebrow={"Problem #" + problem.external_id}

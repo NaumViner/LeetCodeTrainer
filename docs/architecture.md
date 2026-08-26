@@ -26,6 +26,10 @@ Curriculum metadata is normalized into topics, lessons, and prerequisite edges. 
 
 Problem metadata follows the same reference-data boundary. A reviewed JSON catalog is transformed by a deterministic generator into a committed migration. The database normalizes topic relationships, while framework-independent filtering stays in `src/features/problems` and route components only handle request parameters and presentation. External problem content remains at its canonical provider URL.
 
+Practice uses a persisted state machine. Framework-independent transition, recommendation, hint, help-score, and elapsed-time rules live in `src/domain/practice.ts`. Server Actions authenticate every mutation, validate untrusted input, derive ownership from signed claims, and write through learner-scoped RLS policies. The interactive workspace owns only browser behavior such as the visible timer and form state; the database remains the refresh-safe source of truth.
+
+The Phase 5 recommendation baseline prioritizes unattempted foundation problems, gives a bonus to topics with completed lessons, gates guided problems behind topic learning, and uses a stable learner-specific tie-breaker. Later mastery and spaced-repetition phases will add weakness, retention, and review urgency without replacing this deterministic boundary.
+
 ## Authentication approach
 
 Browser and server clients use `@supabase/ssr`. The Next.js proxy refreshes session cookies and performs optimistic navigation redirects. Protected layouts and Server Actions verify signed claims again before reading or mutating data.
@@ -35,7 +39,7 @@ Email/password auth is operational. Google and GitHub use the same callback hand
 ## Testing
 
 - Vitest: validation and synchronous components
-- Supabase integration tests: trigger behavior, curriculum and problem-catalog integrity, RLS isolation, anonymous denial, and persistence across sessions
-- Playwright: real sign-up, onboarding, curriculum navigation, lesson completion, problem filtering, logout/login, responsive behavior, and persistence
+- Supabase integration tests: trigger behavior, curriculum and problem-catalog integrity, attempt persistence, RLS isolation, anonymous denial, and cross-user protection
+- Playwright: real sign-up, onboarding, curriculum navigation, lesson completion, problem filtering, complete practice attempts, logout/login, responsive behavior, and persistence
 
 Async Server Components are covered through browser tests, matching current Next.js guidance.

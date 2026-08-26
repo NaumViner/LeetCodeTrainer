@@ -28,6 +28,14 @@ The catalog does not store third-party problem statements, examples, constraints
 
 The committed catalog is generated deterministically from `data/problems.json`; see `problem-library.md` for its provenance and update workflow.
 
+## Practice model
+
+`attempts` stores one learner's complete practice record: problem and mode, workflow phase, status, timer state, result, highest help level, pre-attempt reasoning, confidence, code snapshot, complexity analysis, mistakes, missed edge cases, takeaway, and timestamps. A partial unique index permits only one active attempt per learner, which gives `/practice` an unambiguous resume target.
+
+`attempt_hints` stores the ordered progressive hints revealed during an attempt. A database trigger raises the parent attempt's assistance level whenever a hint is inserted, so help tracking cannot be forgotten by a UI path.
+
+Both tables use forced Row Level Security. Authenticated learners can access only rows owned by their verified Auth ID; anonymous clients receive no privileges. Insert and update policies also require an active problem, and table constraints enforce timer, phase, completion, array, and field-length invariants.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.

@@ -9,6 +9,148 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      attempt_hints: {
+        Row: {
+          attempt_id: string;
+          content: string;
+          created_at: string;
+          help_level: string;
+          id: string;
+          ordinal: number;
+          title: string;
+        };
+        Insert: {
+          attempt_id: string;
+          content: string;
+          created_at?: string;
+          help_level: string;
+          id?: string;
+          ordinal: number;
+          title: string;
+        };
+        Update: {
+          attempt_id?: string;
+          content?: string;
+          created_at?: string;
+          help_level?: string;
+          id?: string;
+          ordinal?: number;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attempt_hints_attempt_id_fkey";
+            columns: ["attempt_id"];
+            isOneToOne: false;
+            referencedRelation: "attempts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      attempts: {
+        Row: {
+          brute_force_approach: string | null;
+          brute_force_complexity: string | null;
+          code_snapshot: string | null;
+          completed_at: string | null;
+          complexity_correct: boolean | null;
+          confidence_after: number | null;
+          confidence_before: number | null;
+          correct_pattern: string | null;
+          created_at: string;
+          duration_seconds: number;
+          edge_cases_missed: string[];
+          help_level: string;
+          id: string;
+          mistakes: string[];
+          mode: string;
+          phase: string;
+          predicted_pattern: string | null;
+          problem_id: string;
+          recognized_pattern_correctly: boolean | null;
+          result: string | null;
+          started_at: string;
+          status: string;
+          submitted_space_complexity: string | null;
+          submitted_time_complexity: string | null;
+          takeaway: string | null;
+          timer_running: boolean;
+          timer_started_at: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          brute_force_approach?: string | null;
+          brute_force_complexity?: string | null;
+          code_snapshot?: string | null;
+          completed_at?: string | null;
+          complexity_correct?: boolean | null;
+          confidence_after?: number | null;
+          confidence_before?: number | null;
+          correct_pattern?: string | null;
+          created_at?: string;
+          duration_seconds?: number;
+          edge_cases_missed?: string[];
+          help_level?: string;
+          id?: string;
+          mistakes?: string[];
+          mode?: string;
+          phase?: string;
+          predicted_pattern?: string | null;
+          problem_id: string;
+          recognized_pattern_correctly?: boolean | null;
+          result?: string | null;
+          started_at?: string;
+          status?: string;
+          submitted_space_complexity?: string | null;
+          submitted_time_complexity?: string | null;
+          takeaway?: string | null;
+          timer_running?: boolean;
+          timer_started_at?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          brute_force_approach?: string | null;
+          brute_force_complexity?: string | null;
+          code_snapshot?: string | null;
+          completed_at?: string | null;
+          complexity_correct?: boolean | null;
+          confidence_after?: number | null;
+          confidence_before?: number | null;
+          correct_pattern?: string | null;
+          created_at?: string;
+          duration_seconds?: number;
+          edge_cases_missed?: string[];
+          help_level?: string;
+          id?: string;
+          mistakes?: string[];
+          mode?: string;
+          phase?: string;
+          predicted_pattern?: string | null;
+          problem_id?: string;
+          recognized_pattern_correctly?: boolean | null;
+          result?: string | null;
+          started_at?: string;
+          status?: string;
+          submitted_space_complexity?: string | null;
+          submitted_time_complexity?: string | null;
+          takeaway?: string | null;
+          timer_running?: boolean;
+          timer_started_at?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attempts_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       lesson_prerequisites: {
         Row: {
           lesson_id: string;
