@@ -6,15 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { recommendProblem } from "@/domain/practice";
+import {
+  recommendProblem,
+  type RecommendationAttempt,
+} from "@/domain/recommendation";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { startPracticeAttemptAction } from "@/features/practice/actions";
 import {
   getActiveAttempt,
-  getAttemptSummaries,
   getCompletedLessonTopicIds,
+  getRecommendationEvidence,
 } from "@/features/practice/queries";
 import { getProblemCatalog } from "@/features/problems/queries";
+import { startReviewAttemptAction } from "@/features/reviews/actions";
 
 type PracticePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -27,9 +31,10 @@ export default async function PracticePage({
   const activeAttempt = await getActiveAttempt(user.id);
   if (activeAttempt) redirect("/practice/" + activeAttempt.id);
 
-  const [catalog, attempts, completedTopicIds, params] = await Promise.all([
+  const now = new Date();
+  const [catalog, evidence, completedTopicIds, params] = await Promise.all([
     getProblemCatalog(),
-    getAttemptSummaries(user.id),
+    getRecommendationEvidence(user.id, now),
     getCompletedLessonTopicIds(user.id),
     searchParams,
   ]);
@@ -37,19 +42,46 @@ export default async function PracticePage({
   const selected = requestedExternalId
     ? catalog.find((problem) => problem.external_id === requestedExternalId)
     : undefined;
+  const catalogById = new Map(catalog.map((problem) => [problem.id, problem]));
   const recommendation = recommendProblem(
     catalog.map((problem) => ({
-      curriculumLevel: problem.curriculum_level,
+      curriculumLevel: problem.curriculum_level as
+        "foundation" | "guided" | "independent" | "interview" | "timed",
       datasetOrder: problem.dataset_order,
+      difficulty: problem.difficulty as "easy" | "hard" | "medium",
       id: problem.id,
+      prerequisiteTopicIds: problem.prerequisiteTopics.map((topic) => topic.id),
       primaryTopicId: problem.primary_topic_id,
     })),
-    attempts,
-    completedTopicIds,
-    user.id,
+    {
+      attempts: evidence.attempts.flatMap((attempt) => {
+        const attemptedProblem = catalogById.get(attempt.problem_id);
+        if (!attemptedProblem || !attempt.completed_at || !attempt.result) {
+          return [];
+        }
+        return [
+          {
+            completedAt: attempt.completed_at,
+            difficulty: attemptedProblem.difficulty as
+              "easy" | "hard" | "medium",
+            helpLevel: attempt.help_level as RecommendationAttempt["helpLevel"],
+            problemId: attempt.problem_id,
+            primaryTopicId: attemptedProblem.primary_topic_id,
+            result: attempt.result as "failed" | "partial" | "solved",
+          },
+        ];
+      }),
+      completedTopicIds,
+      dueProblemIds: evidence.dueProblemIds,
+      interviewDate: evidence.interviewDate,
+      now,
+      topicEvidence: evidence.topicEvidence,
+      userId: user.id,
+    },
   );
   const problem =
-    selected ?? catalog.find((item) => item.id === recommendation?.id);
+    selected ??
+    catalog.find((item) => item.id === recommendation?.candidate.id);
 
   if (!problem) {
     throw new Error("No active practice problem is available.");
@@ -58,8 +90,8 @@ export default async function PracticePage({
   return (
     <div className="space-y-8">
       <PageHeader
-        description="Work through a persisted planning, coding, testing, and reflection loop. Your session survives refreshes."
-        eyebrow="Practice engine"
+        description="The next problem adapts to your mastery, curriculum readiness, review urgency, recent work, and frustration signals."
+        eyebrow="Adaptive practice"
         title={selected ? "Selected problem" : "Recommended next problem"}
       />
 
@@ -72,6 +104,11 @@ export default async function PracticePage({
                 difficulty={problem.difficulty as "easy" | "hard" | "medium"}
               />
               <Badge variant="primary">{problem.primaryTopic.name}</Badge>
+              {!selected && recommendation ? (
+                <Badge variant="success">
+                  Adaptive score {Math.round(recommendation.breakdown.total)}
+                </Badge>
+              ) : null}
             </div>
             <h2 className="mt-5 text-2xl font-semibold">{problem.title}</h2>
             <p className="text-muted mt-3 leading-7">
@@ -84,10 +121,19 @@ export default async function PracticePage({
                 <Badge key={signal}>{signal}</Badge>
               ))}
             </div>
-            <form action={startPracticeAttemptAction} className="mt-7">
+            <form
+              action={
+                !selected && evidence.dueProblemIds.has(problem.id)
+                  ? startReviewAttemptAction
+                  : startPracticeAttemptAction
+              }
+              className="mt-7"
+            >
               <input name="problemId" type="hidden" value={problem.id} />
               <Button size="lg" type="submit">
-                Start practice attempt
+                {!selected && evidence.dueProblemIds.has(problem.id)
+                  ? "Start scheduled review"
+                  : "Start practice attempt"}
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Button>
             </form>
@@ -96,30 +142,37 @@ export default async function PracticePage({
 
         <Card className="shadow-none">
           <CardContent className="p-6">
-            <h2 className="font-semibold">Practice mode</h2>
+            <h2 className="font-semibold">
+              {selected ? "Practice mode" : "Why this problem"}
+            </h2>
             <ul className="text-muted mt-4 space-y-4 text-sm leading-6">
-              <li className="flex gap-3">
-                <BrainCircuit
-                  aria-hidden="true"
-                  className="text-primary mt-1 size-4 shrink-0"
-                />
-                Pattern prediction before implementation
-              </li>
-              <li className="flex gap-3">
-                <Clock3
-                  aria-hidden="true"
-                  className="text-primary mt-1 size-4 shrink-0"
-                />
-                Start, pause, reset, and refresh-safe timer
-              </li>
-              <li className="flex gap-3">
-                <Lightbulb
-                  aria-hidden="true"
-                  className="text-primary mt-1 size-4 shrink-0"
-                />
-                Progressive hints with automatic help tracking
-              </li>
+              {(selected
+                ? [
+                    "Pattern prediction before implementation",
+                    "Start, pause, reset, and refresh-safe timer",
+                    "Progressive hints with automatic help tracking",
+                  ]
+                : (recommendation?.reasons ?? [])
+              ).map((reason, index) => {
+                const Icon =
+                  [BrainCircuit, Clock3, Lightbulb][index] ?? BrainCircuit;
+                return (
+                  <li className="flex gap-3" key={reason}>
+                    <Icon
+                      aria-hidden="true"
+                      className="text-primary mt-1 size-4 shrink-0"
+                    />
+                    {reason}
+                  </li>
+                );
+              })}
             </ul>
+            {!selected ? (
+              <p className="bg-surface-subtle text-muted mt-5 rounded-lg border p-3 text-xs leading-5">
+                Prerequisites are enforced. Recent topics, repeated problems,
+                and failure streaks receive explicit penalties.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

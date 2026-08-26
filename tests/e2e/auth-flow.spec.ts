@@ -218,6 +218,10 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await expect(
       page.getByRole("heading", { level: 1, name: "Recommended next problem" }),
     ).toBeVisible();
+    await expect(page.getByText(/Adaptive score \d+/)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Why this problem" }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: "Review" }).click();
     await expect(

@@ -10,11 +10,13 @@ PRE_ATTEMPT → PLANNING → CODING → TESTING → REFLECTION → COMPLETED
 
 The practice route always resumes an active attempt before offering another recommendation. Every transition saves its durable fields, so refreshing or changing devices does not discard the session.
 
-## Recommendation baseline
+## Adaptive recommendation
 
-Phase 5 uses deterministic scoring rather than random selection. It prioritizes problems with fewer completed attempts, keeps foundation work available, requires completed learning in a topic before guided work from that topic, favors topics with completed lessons, orders by curriculum level and dataset position, and uses a small stable learner-specific tie-breaker.
+Phase 8 scores eligible problems from learner mastery, due reviews, completed learning, prerequisites, recent topics, prior problem attempts, difficulty evidence, repeated failure, and interview date. Foundation remains available, while guided, independent, timed, and interview work require progressively stronger evidence.
 
-This baseline remains intentionally separate from the mastery and review scheduler. Phase 8 will combine weakness, retention, review urgency, balance, and difficulty adaptation into the next recommendation engine.
+Recent topic and problem penalties prevent repetitive loops. Repeated unsuccessful work backs down to an easy related recovery problem instead of escalating difficulty. A due selected problem starts through review mode. Near-equal leaders use a stable learner-day choice so refreshes do not reshuffle the page.
+
+The practice page shows the adaptive prioritization score and plain-language reasons. This number is not a mastery percentage; it only explains relative selection for the current evidence.
 
 ## Timer
 

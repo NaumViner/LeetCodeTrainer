@@ -176,7 +176,30 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Database tests prove initial scheduling, strong recalled-review expansion, atomic topic synchronization, immutable history, privacy, and read-only schedules.
 - The full browser flow creates a schedule, starts an early review, unlocks previous evidence after prediction, completes recall, and opens review history.
 
-## Phases 8–15
+## Phase 8 — Adaptive recommendations
+
+**Status:** Complete
+
+### Completed
+
+- Explainable score breakdown for weakness, due review, curriculum and prerequisite fit, topic balance, difficulty, interview urgency, novelty, recency, repetition, and frustration
+- Progressive curriculum gates from foundation through guided, independent, timed, and interview levels
+- Smoothed-mastery weakness weighting and completed-lesson awareness
+- Five-attempt topic-balance window and immediate problem-repeat minimization
+- Difficulty promotion from easy to hard only when mastery and independent evidence support it
+- Easy recovery behavior after repeated topic failures and escalating same-problem frustration penalties
+- Due-problem handoff into the dedicated review workflow
+- Stable daily controlled selection among at most five near-equal leaders
+- Server-only aggregation of private attempts, mastery, reviews, lessons, and interview date
+- Practice-page adaptive score, learner-facing reasons, and safeguard disclosure
+
+### Verification
+
+- Synthetic histories cover weak versus strong topics, recent-topic avoidance, repeat minimization, prerequisite denial, due reviews, failure recovery, strong-evidence promotion, and stable controlled selection.
+- Strict types and lint prove the domain boundary accepts normalized evidence rather than database rows.
+- Desktop and mobile browser tests display the adaptive score and reasons after real learner history exists.
+
+## Phases 9–15
 
 **Status:** Not started
 

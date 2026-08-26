@@ -45,18 +45,57 @@ export async function getActiveAttempt(userId: string) {
   return data;
 }
 
-export async function getAttemptSummaries(userId: string) {
+export async function getRecommendationEvidence(userId: string, now: Date) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("attempts")
-    .select("problem_id, status")
-    .eq("user_id", userId);
+  const [
+    { data: attempts, error: attemptError },
+    { data: mastery, error: masteryError },
+    { data: reviews, error: reviewError },
+    { data: profile, error: profileError },
+  ] = await Promise.all([
+    supabase
+      .from("attempts")
+      .select("problem_id, completed_at, help_level, result")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .order("completed_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("topic_mastery")
+      .select("topic_id, overall_score, independent_solves")
+      .eq("user_id", userId),
+    supabase
+      .from("problem_reviews")
+      .select("problem_id, next_review_at")
+      .eq("user_id", userId)
+      .lte("next_review_at", now.toISOString()),
+    supabase
+      .from("profiles")
+      .select("interview_date")
+      .eq("id", userId)
+      .maybeSingle(),
+  ]);
 
-  if (error) throw new Error("Practice history could not be loaded.");
-  return (data ?? []).map((attempt) => ({
-    problemId: attempt.problem_id,
-    status: attempt.status,
-  }));
+  if (attemptError || masteryError || reviewError || profileError) {
+    throw new Error("Adaptive recommendation evidence could not be loaded.");
+  }
+  return {
+    attempts: (attempts ?? []).filter(
+      (attempt) => attempt.completed_at && attempt.result,
+    ),
+    dueProblemIds: new Set((reviews ?? []).map((review) => review.problem_id)),
+    interviewDate: profile?.interview_date ?? null,
+    topicEvidence: new Map(
+      (mastery ?? []).map((topic) => [
+        topic.topic_id,
+        {
+          independentSolves: topic.independent_solves,
+          overallScore: topic.overall_score,
+          topicId: topic.topic_id,
+        },
+      ]),
+    ),
+  };
 }
 
 export async function getCompletedLessonTopicIds(userId: string) {

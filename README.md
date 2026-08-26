@@ -4,7 +4,7 @@ An adaptive technical-interview learning platform focused on independent problem
 
 ## Current status
 
-Phases 1–7 are complete: the repository foundation, authentication, learner profiles, persistent 21-topic curriculum, searchable 150-problem library, resumable practice engine, evidence-based mastery analytics, and spaced repetition are implemented and tested. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
+Phases 1–8 are complete: the repository foundation, authentication, learner profiles, persistent 21-topic curriculum, searchable 150-problem library, resumable practice engine, evidence-based mastery analytics, spaced repetition, and adaptive recommendations are implemented and tested. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
 
 ## Stack
 
@@ -13,7 +13,7 @@ Phases 1–7 are complete: the repository foundation, authentication, learner pr
 - Supabase PostgreSQL, Auth, and Row Level Security
 - Markdown curriculum rendered safely with React
 - Reproducible, metadata-only problem catalog
-- Deterministic recommendations and persisted practice attempts
+- Explainable adaptive recommendations and persisted practice attempts
 - Atomic performance snapshots, topic mastery, progress, and history
 - Deterministic review scheduling, due queue, review mode, and schedule history
 - Vitest, React Testing Library, and Playwright
@@ -51,7 +51,7 @@ npm run db:types    # regenerate TypeScript database types
 
 Problem metadata is generated from `data/problems.json`. After reviewing catalog changes, rebuild its seed migration with `npm run data:problems:generate`. The optional `npm run data:problems:sync` command refreshes public metadata from the documented upstream sources and requires network access.
 
-See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), and [security.md](docs/security.md) for the model and deployment notes.
+See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), [adaptive-recommendations.md](docs/adaptive-recommendations.md), and [security.md](docs/security.md) for the model and deployment notes.
 
 ## Quality checks
 

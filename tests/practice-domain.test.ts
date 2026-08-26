@@ -5,42 +5,9 @@ import {
   canTransitionAttempt,
   effectiveDurationSeconds,
   HELP_LEVEL_SCORES,
-  recommendProblem,
 } from "@/domain/practice";
 
 describe("practice domain", () => {
-  it("recommends an unattempted, unlocked foundation problem deterministically", () => {
-    const candidates = [
-      {
-        curriculumLevel: "foundation",
-        datasetOrder: 1,
-        id: "attempted",
-        primaryTopicId: "arrays",
-      },
-      {
-        curriculumLevel: "foundation",
-        datasetOrder: 2,
-        id: "recommended",
-        primaryTopicId: "arrays",
-      },
-      {
-        curriculumLevel: "guided",
-        datasetOrder: 3,
-        id: "advanced",
-        primaryTopicId: "trees",
-      },
-    ];
-
-    expect(
-      recommendProblem(
-        candidates,
-        [{ problemId: "attempted", status: "completed" }],
-        new Set(["arrays"]),
-        "learner-1",
-      )?.id,
-    ).toBe("recommended");
-  });
-
   it("allows only the current or next attempt phase", () => {
     expect(canTransitionAttempt("planning", "coding")).toBe(true);
     expect(canTransitionAttempt("coding", "coding")).toBe(true);
