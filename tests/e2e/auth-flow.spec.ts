@@ -27,7 +27,7 @@ function readLocalStatus(): LocalStatus {
   return JSON.parse(output) as LocalStatus;
 }
 
-test("a learner can sign up, finish onboarding, log out, and return", async ({
+test("a learner can onboard, return, and persist lesson progress", async ({
   page,
 }) => {
   const email = `browser-${randomUUID()}@example.com`;
@@ -62,6 +62,36 @@ test("a learner can sign up, finish onboarding, log out, and return", async ({
     await expect(
       page.getByRole("heading", { name: "Welcome, Browser Learner" }),
     ).toBeVisible();
+
+    await page.getByRole("link", { name: "Learn" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Your curriculum" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open topic" })).toHaveCount(
+      21,
+    );
+    await page.getByRole("link", { name: "Open topic" }).first().click();
+
+    await expect(page).toHaveURL(/\/learn\/interview-fundamentals$/);
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Interview Fundamentals",
+      }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Start lesson" }).click();
+    await expect(
+      page.getByRole("heading", {
+        name: "The interview problem-solving loop",
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Mark lesson complete" }).click();
+    await expect(page.getByText("Lesson completed")).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByText("Lesson completed")).toBeVisible();
+    await page.getByRole("link", { name: "Curriculum" }).click();
+    await expect(page.getByText("1 of 21 lessons completed")).toBeVisible();
   } finally {
     const status = readLocalStatus();
     const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;

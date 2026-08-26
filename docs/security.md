@@ -5,6 +5,7 @@
 - Authorization is enforced in PostgreSQL with forced RLS and repeated at protected server boundaries for defense in depth.
 - Identity always comes from verified Supabase claims, never from form input or a URL parameter.
 - Redirect destinations are restricted to relative application paths to prevent open redirects.
-- Integration tests create two real users and prove cross-user reads and updates fail; they also prove anonymous reads fail.
+- Curriculum records are read-only to browser roles. Lesson content paths are database-constrained and resolved inside the dedicated curriculum directory.
+- Integration tests create two real users and prove cross-user profile and lesson-progress operations fail; they also prove anonymous private-data reads fail.
 
 Before a hosted release, apply migrations to the intended Supabase project, confirm RLS remains enabled, rotate any keys exposed outside approved secret storage, configure allowed redirect URLs, and run the integration and browser suites against a safe non-production environment.

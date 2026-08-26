@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-25
+Last updated: 2026-08-26
 
 ## Phase 1 — Repository foundation
 
@@ -50,7 +50,31 @@ Lint, strict TypeScript, unit/component tests, desktop/mobile browser checks, th
 
 Hosted Supabase deployment is environment-specific and is not linked from the repository. Apply the committed migration to the selected project, set the public URL/key, and configure OAuth provider secrets there. No credentials are committed.
 
-## Phases 3–15
+## Phase 3 — Curriculum
+
+**Status:** Complete
+
+### Completed
+
+- Twenty-one ordered topics grouped across curriculum stages
+- Normalized topic and lesson prerequisite graphs
+- Twenty-one versioned Markdown lessons with objectives, recognition signals, mistakes, complexity guidance, and practice mapping
+- Full starter modules for Big-O, Arrays & Hashing, Two Pointers, Sliding Window, Stack, Binary Search, Linked List, Trees, Backtracking, and Graphs
+- Learner-owned lesson completion records protected by forced Row Level Security
+- Curriculum overview, topic, and lesson screens with progress, prerequisite guidance, and responsive navigation
+- Dashboard continuation card and persistent lesson completion action
+- Safe, directory-constrained Markdown loading and React rendering
+
+### Verification
+
+- A learner can open all 21 topics and their seeded lessons.
+- Completing the first lesson updates topic and overall curriculum progress.
+- Completion persists after a full browser refresh.
+- Another learner cannot read, insert, or update the owner's lesson progress.
+- Anonymous clients can read active curriculum metadata but cannot read private progress.
+- A clean database reset recreates the schema, prerequisite graph, and seed content.
+
+## Phases 4–15
 
 **Status:** Not started
 

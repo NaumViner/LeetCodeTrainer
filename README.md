@@ -4,13 +4,14 @@ An adaptive technical-interview learning platform focused on independent problem
 
 ## Current status
 
-Phases 1 and 2 are complete: the repository foundation, local Supabase database, authentication, protected learner profiles, and onboarding workflow are implemented and tested. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
+Phases 1–3 are complete: the repository foundation, authentication, learner profiles, and the persistent 21-topic curriculum are implemented and tested. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
 
 ## Stack
 
 - Next.js 16 App Router and React 19
 - Strict TypeScript and Tailwind CSS 4
 - Supabase PostgreSQL, Auth, and Row Level Security
+- Markdown curriculum rendered safely with React
 - Vitest, React Testing Library, and Playwright
 - ESLint and Prettier
 
@@ -44,7 +45,7 @@ npm run db:reset    # rebuild the local database from migrations and seed
 npm run db:types    # regenerate TypeScript database types
 ```
 
-See [database.md](docs/database.md), [authentication.md](docs/authentication.md), and [security.md](docs/security.md) for the model and deployment notes.
+See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), and [security.md](docs/security.md) for the model and deployment notes.
 
 ## Quality checks
 
@@ -65,14 +66,14 @@ The integration and browser authentication tests require the local Supabase serv
 ```text
 src/
   app/          Routes, layouts, Server Actions, and route states
-  components/   Reusable UI, navigation, auth, and profile components
+  components/   Reusable UI, navigation, auth, profile, and lesson components
   features/     Feature validation and server-side orchestration
   lib/          Shared infrastructure and Supabase clients
   types/        Generated database types
 tests/          Unit, integration, and browser tests
 supabase/       Local configuration, migrations, and seed entry point
-docs/           Architecture, security, and implementation status
-content/        Curriculum content added from Phase 3
+docs/           Architecture, curriculum, security, and implementation status
+content/        Versioned Markdown curriculum lessons
 data/           Reproducible seed data added from Phase 3 onward
 ```
 

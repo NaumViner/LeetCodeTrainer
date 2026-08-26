@@ -28,6 +28,12 @@ export function AppShell({ children, header, navigation }: AppShellProps) {
           <Brand className="lg:hidden" />
           <div className="ml-auto">{header}</div>
         </div>
+        <nav
+          aria-label="Mobile application navigation"
+          className="bg-surface overflow-x-auto border-b px-3 py-2 lg:hidden"
+        >
+          {navigation}
+        </nav>
         <main className="mx-auto max-w-7xl p-5 sm:p-8" id="main-content">
           {children}
         </main>

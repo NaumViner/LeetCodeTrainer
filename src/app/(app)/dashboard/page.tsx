@@ -1,4 +1,6 @@
 import {
+  ArrowRight,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -13,15 +15,27 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireAuthenticatedUser } from "@/features/auth/session";
+import { curriculumProgress } from "@/features/curriculum/model";
+import { getCurriculum } from "@/features/curriculum/queries";
 import { getProfile } from "@/features/profile/queries";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
-  const profile = await getProfile(user.id);
+  const [profile, curriculum] = await Promise.all([
+    getProfile(user.id),
+    getCurriculum(user.id),
+  ]);
 
   if (!profile?.onboarding_completed) {
     redirect("/onboarding");
   }
+
+  const learningProgress = curriculumProgress(curriculum);
+  const nextTopic =
+    curriculum.find((topic) => topic.progressPercent < 100) ?? curriculum[0];
+  const nextLesson =
+    nextTopic?.lessons.find((lesson) => !lesson.completed) ??
+    nextTopic?.lessons[0];
 
   const details = [
     {
@@ -57,7 +71,7 @@ export default async function DashboardPage() {
             Edit profile
           </Link>
         }
-        description="Your account and private learner profile are connected. Curriculum begins in Phase 3."
+        description="Continue your ordered curriculum and build each pattern from recognition to independent use."
         eyebrow="Dashboard"
         title={`Welcome${profile.display_name ? `, ${profile.display_name}` : ""}`}
       />
@@ -105,13 +119,43 @@ export default async function DashboardPage() {
       </Card>
 
       <section id="curriculum">
-        <Card className="shadow-none">
-          <CardContent className="p-6">
-            <h2 className="font-semibold">Next: curriculum and first lesson</h2>
-            <p className="text-muted mt-2 text-sm leading-6">
-              Phase 3 will connect topic prerequisites, lessons, and persistent
-              learning progress to this profile.
-            </p>
+        <Card>
+          <CardContent className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="bg-primary-soft text-primary rounded-xl p-3">
+                <BookOpen aria-hidden="true" className="size-5" />
+              </div>
+              <div>
+                <p className="text-primary text-sm font-semibold">
+                  Continue learning
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">
+                  {nextTopic?.name ?? "Explore the curriculum"}
+                </h2>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  {nextLesson
+                    ? nextLesson.title +
+                      " · " +
+                      nextLesson.estimated_minutes +
+                      " minutes"
+                    : learningProgress.completedLessons + " lessons completed"}
+                </p>
+                <p className="text-muted mt-1 text-xs">
+                  Overall: {Math.round(learningProgress.percent)}%
+                </p>
+              </div>
+            </div>
+            <Link
+              className={buttonVariants()}
+              href={
+                nextTopic && nextLesson
+                  ? "/learn/" + nextTopic.slug + "/" + nextLesson.slug
+                  : "/learn"
+              }
+            >
+              {nextLesson ? "Open next lesson" : "View curriculum"}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
           </CardContent>
         </Card>
       </section>
