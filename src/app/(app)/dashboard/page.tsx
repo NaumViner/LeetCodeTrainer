@@ -3,6 +3,7 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
+  CalendarCheck2,
   CheckCircle2,
   Clock3,
   Code2,
@@ -14,16 +15,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { defaultDailyMinutes, localDateKey } from "@/domain/daily-plan";
 import { readinessLevel } from "@/domain/mastery";
 import { formatDuration } from "@/features/analytics/format";
 import { getAnalyticsSnapshot } from "@/features/analytics/queries";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { curriculumProgress } from "@/features/curriculum/model";
 import { getCurriculum } from "@/features/curriculum/queries";
+import { generateDailyPlanAction } from "@/features/daily-plan/actions";
+import { dailyPlanProgress, getDailyPlan } from "@/features/daily-plan/queries";
 import { getProfile } from "@/features/profile/queries";
 import { getReviewDashboardSummary } from "@/features/reviews/queries";
 
@@ -39,6 +43,8 @@ export default async function DashboardPage() {
   if (!profile?.onboarding_completed) {
     redirect("/onboarding");
   }
+  const localDate = localDateKey(new Date(), profile.timezone);
+  const dailyPlan = await getDailyPlan(user.id, localDate);
 
   const learningProgress = curriculumProgress(curriculum);
   const nextTopic =
@@ -92,6 +98,77 @@ export default async function DashboardPage() {
         eyebrow="Dashboard"
         title={`Welcome${profile.display_name ? `, ${profile.display_name}` : ""}`}
       />
+
+      <section id="today-plan">
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="bg-primary-soft text-primary rounded-xl p-3">
+                  <CalendarCheck2 aria-hidden="true" className="size-5" />
+                </div>
+                <div>
+                  <p className="text-primary text-sm font-semibold">
+                    Today’s plan
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold">
+                    {dailyPlan
+                      ? dailyPlan.status === "completed"
+                        ? "Today's preparation is complete"
+                        : `${dailyPlanProgress(dailyPlan).completed} of ${dailyPlan.items.length} tasks complete`
+                      : "Turn your available time into a focused plan"}
+                  </h2>
+                  <p className="text-muted mt-2 text-sm leading-6">
+                    {dailyPlan
+                      ? `${dailyPlan.items.reduce((total, item) => total + item.estimated_minutes, 0)} planned minutes across review, learning, practice, and reflection.`
+                      : "Prioritize due work, continue the curriculum, practice adaptively, and finish with reflection."}
+                  </p>
+                </div>
+              </div>
+              {dailyPlan ? (
+                <Link className={buttonVariants()} href="/plan">
+                  Open today’s plan
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              ) : (
+                <form action={generateDailyPlanAction}>
+                  <input
+                    name="availableMinutes"
+                    type="hidden"
+                    value={defaultDailyMinutes(profile.weekly_study_minutes)}
+                  />
+                  <Button type="submit">
+                    Generate today’s plan
+                    <ArrowRight aria-hidden="true" className="size-4" />
+                  </Button>
+                </form>
+              )}
+            </div>
+            {dailyPlan ? (
+              <div className="mt-6 border-t pt-5">
+                <ProgressBar
+                  label="Plan completion"
+                  value={dailyPlanProgress(dailyPlan).percent}
+                />
+                <ul className="mt-5 grid gap-3 md:grid-cols-3">
+                  {dailyPlan.items.slice(0, 3).map((item) => (
+                    <li
+                      className="bg-surface-subtle rounded-lg border p-3 text-sm"
+                      key={item.id}
+                    >
+                      <p className="truncate font-medium">{item.title}</p>
+                      <p className="text-muted mt-1 text-xs">
+                        {item.estimated_minutes} min ·{" "}
+                        {item.completed ? "Complete" : "Not started"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="grid gap-5 lg:grid-cols-2" id="readiness">
         <Card>

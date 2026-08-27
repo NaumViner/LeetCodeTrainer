@@ -208,6 +208,101 @@ export type Database = {
           },
         ];
       };
+      daily_plan_items: {
+        Row: {
+          action_path: string;
+          completed: boolean;
+          completed_at: string | null;
+          created_at: string;
+          daily_plan_id: string;
+          entity_id: string | null;
+          estimated_minutes: number;
+          id: string;
+          position: number;
+          priority: number;
+          reason: string;
+          title: string;
+          type: string;
+          updated_at: string;
+        };
+        Insert: {
+          action_path: string;
+          completed?: boolean;
+          completed_at?: string | null;
+          created_at?: string;
+          daily_plan_id: string;
+          entity_id?: string | null;
+          estimated_minutes: number;
+          id?: string;
+          position: number;
+          priority: number;
+          reason: string;
+          title: string;
+          type: string;
+          updated_at?: string;
+        };
+        Update: {
+          action_path?: string;
+          completed?: boolean;
+          completed_at?: string | null;
+          created_at?: string;
+          daily_plan_id?: string;
+          entity_id?: string | null;
+          estimated_minutes?: number;
+          id?: string;
+          position?: number;
+          priority?: number;
+          reason?: string;
+          title?: string;
+          type?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "daily_plan_items_daily_plan_id_fkey";
+            columns: ["daily_plan_id"];
+            isOneToOne: false;
+            referencedRelation: "daily_plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      daily_plans: {
+        Row: {
+          available_minutes: number;
+          created_at: string;
+          generated_at: string;
+          generation: number;
+          id: string;
+          local_date: string;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          available_minutes: number;
+          created_at?: string;
+          generated_at?: string;
+          generation?: number;
+          id?: string;
+          local_date: string;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          available_minutes?: number;
+          created_at?: string;
+          generated_at?: string;
+          generation?: number;
+          id?: string;
+          local_date?: string;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       lesson_prerequisites: {
         Row: {
           lesson_id: string;
@@ -766,7 +861,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      replace_daily_plan: {
+        Args: {
+          p_available_minutes: number;
+          p_items: Json;
+          p_local_date: string;
+        };
+        Returns: string;
+      };
+      set_daily_plan_item_completed: {
+        Args: { p_completed: boolean; p_item_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

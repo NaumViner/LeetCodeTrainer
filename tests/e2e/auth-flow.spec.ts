@@ -286,6 +286,29 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     ).toBeVisible();
     await expect(page.getByText("Review session")).toBeVisible();
     await expect(page.getByText("Initial schedule")).toBeVisible();
+
+    await page.getByRole("link", { name: "Today" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Today's plan" }),
+    ).toBeVisible();
+    await page.getByLabel("Available today").selectOption("75");
+    await page.getByRole("button", { name: "Generate today's plan" }).click();
+    await expect(page.getByText("Version 1")).toBeVisible();
+    await expect(page.getByText(/\d+ planned minutes/)).toBeVisible();
+    await page.getByRole("button", { name: "Mark complete" }).first().click();
+    await expect(page.getByText(/1 of \d+ tasks completed/)).toBeVisible();
+
+    await page.getByLabel("Available today").selectOption("60");
+    await page.getByRole("button", { name: "Regenerate plan" }).click();
+    await expect(page.getByText("Version 2")).toBeVisible();
+    await page.getByRole("button", { name: "Mark complete" }).first().click();
+    await expect(page.getByText(/1 of \d+ tasks completed/)).toBeVisible();
+
+    await page.getByRole("link", { name: "Dashboard" }).first().click();
+    await expect(page.getByText(/1 of \d+ tasks complete/)).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open today’s plan" }),
+    ).toBeVisible();
   } finally {
     const status = readLocalStatus();
     const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;

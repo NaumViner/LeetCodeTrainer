@@ -6,18 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import {
-  recommendProblem,
-  type RecommendationAttempt,
-} from "@/domain/recommendation";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { startPracticeAttemptAction } from "@/features/practice/actions";
-import {
-  getActiveAttempt,
-  getCompletedLessonTopicIds,
-  getRecommendationEvidence,
-} from "@/features/practice/queries";
-import { getProblemCatalog } from "@/features/problems/queries";
+import { getActiveAttempt } from "@/features/practice/queries";
+import { getAdaptiveRecommendationSnapshot } from "@/features/practice/recommendation";
 import { startReviewAttemptAction } from "@/features/reviews/actions";
 
 type PracticePageProps = {
@@ -32,53 +24,15 @@ export default async function PracticePage({
   if (activeAttempt) redirect("/practice/" + activeAttempt.id);
 
   const now = new Date();
-  const [catalog, evidence, completedTopicIds, params] = await Promise.all([
-    getProblemCatalog(),
-    getRecommendationEvidence(user.id, now),
-    getCompletedLessonTopicIds(user.id),
+  const [snapshot, params] = await Promise.all([
+    getAdaptiveRecommendationSnapshot(user.id, now),
     searchParams,
   ]);
+  const { catalog, evidence, recommendation } = snapshot;
   const requestedExternalId = scalar(params.problem);
   const selected = requestedExternalId
     ? catalog.find((problem) => problem.external_id === requestedExternalId)
     : undefined;
-  const catalogById = new Map(catalog.map((problem) => [problem.id, problem]));
-  const recommendation = recommendProblem(
-    catalog.map((problem) => ({
-      curriculumLevel: problem.curriculum_level as
-        "foundation" | "guided" | "independent" | "interview" | "timed",
-      datasetOrder: problem.dataset_order,
-      difficulty: problem.difficulty as "easy" | "hard" | "medium",
-      id: problem.id,
-      prerequisiteTopicIds: problem.prerequisiteTopics.map((topic) => topic.id),
-      primaryTopicId: problem.primary_topic_id,
-    })),
-    {
-      attempts: evidence.attempts.flatMap((attempt) => {
-        const attemptedProblem = catalogById.get(attempt.problem_id);
-        if (!attemptedProblem || !attempt.completed_at || !attempt.result) {
-          return [];
-        }
-        return [
-          {
-            completedAt: attempt.completed_at,
-            difficulty: attemptedProblem.difficulty as
-              "easy" | "hard" | "medium",
-            helpLevel: attempt.help_level as RecommendationAttempt["helpLevel"],
-            problemId: attempt.problem_id,
-            primaryTopicId: attemptedProblem.primary_topic_id,
-            result: attempt.result as "failed" | "partial" | "solved",
-          },
-        ];
-      }),
-      completedTopicIds,
-      dueProblemIds: evidence.dueProblemIds,
-      interviewDate: evidence.interviewDate,
-      now,
-      topicEvidence: evidence.topicEvidence,
-      userId: user.id,
-    },
-  );
   const problem =
     selected ??
     catalog.find((item) => item.id === recommendation?.candidate.id);

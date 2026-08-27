@@ -55,7 +55,7 @@ export async function getRecommendationEvidence(userId: string, now: Date) {
   ] = await Promise.all([
     supabase
       .from("attempts")
-      .select("problem_id, completed_at, help_level, result")
+      .select("problem_id, completed_at, duration_seconds, help_level, result")
       .eq("user_id", userId)
       .eq("status", "completed")
       .order("completed_at", { ascending: false })

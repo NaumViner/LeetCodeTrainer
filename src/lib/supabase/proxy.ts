@@ -9,6 +9,7 @@ const protectedPrefixes = [
   "/history",
   "/learn",
   "/onboarding",
+  "/plan",
   "/practice",
   "/problems",
   "/progress",

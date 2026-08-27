@@ -199,7 +199,31 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Strict types and lint prove the domain boundary accepts normalized evidence rather than database rows.
 - Desktop and mobile browser tests display the adaptive score and reasons after real learner history exists.
 
-## Phases 9–15
+## Phase 9 — Daily plan
+
+**Status:** Complete
+
+### Completed
+
+- Deterministic three-to-six task generator using available time, local date, due reviews, curriculum position, adaptive problems, same-day workload, and interview date
+- Default 20/25/45/10 review, learning, problem-solving, and reflection allocation
+- Interview-date allocation adjustment without bypassing readiness gates
+- Five-minute task allocation that remains inside the available daily budget
+- Ordered overdue review, prerequisite-ready lesson, adaptive problem, and reflection composition
+- Learner-timezone daily identity and weekly-study-time default
+- Atomic persisted plan generation with advisory locking and immutable expired versions
+- Secure item completion, reopening, automatic parent completion, and regeneration
+- Dedicated responsive Today page and navigation
+- Dashboard plan generation, progress, task preview, and handoff
+- Forced-RLS own-row reads with revoked direct browser writes
+
+### Verification
+
+- Unit scenarios cover balanced plans, short days, same-day workload, interview urgency, time budgets, and timezone dates.
+- Database tests prove atomic generation, versioned regeneration, completion/reopening, ownership isolation, anonymous denial, and revoked direct mutations.
+- Desktop and mobile browser tests generate, complete, regenerate, and reopen the persisted plan from the dashboard.
+
+## Phases 10–15
 
 **Status:** Not started
 

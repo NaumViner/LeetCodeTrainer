@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  CalendarCheck2,
   ChartNoAxesCombined,
   Dumbbell,
   Gauge,
@@ -12,6 +13,7 @@ import Link from "next/link";
 
 const items = [
   { href: "/dashboard", icon: Gauge, label: "Dashboard" },
+  { href: "/plan", icon: CalendarCheck2, label: "Today" },
   { href: "/learn", icon: BookOpen, label: "Learn" },
   { href: "/practice", icon: Dumbbell, label: "Practice" },
   { href: "/review", icon: RefreshCw, label: "Review" },

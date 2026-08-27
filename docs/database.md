@@ -48,6 +48,12 @@ An `after update` trigger on `attempts` creates the performance row and updates 
 
 The review trigger follows the performance trigger in deterministic name order. It uses the completed attempt plus its frozen performance snapshot, updates the current schedule, appends an event, and synchronizes the topic review timestamp before the completion transaction commits. Browser roles can read only their own review rows and receive no write grants. Review-mode attempt insertion additionally requires an existing schedule owned by the learner.
 
+## Daily-plan model
+
+`daily_plans` stores the learner's local date, available minutes, generation number, generated timestamp, and active/completed/expired status. A partial unique index permits one active version per learner and date. `daily_plan_items` stores three to six ordered lesson, problem, review, mock-interview, or reflection tasks with source entity, scheduled minutes, priority, action path, reason, and completion timestamp.
+
+Authenticated security-definer functions replace a plan and toggle one item. Replacement serializes concurrent generation with a learner-date advisory lock, expires the old active version, validates the item count and budget, verifies lesson/problem references, and inserts the new version in one transaction. Item completion verifies ownership and rejects expired versions before recalculating parent completion. Browser roles receive only own-row select access and no direct write grants.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.
