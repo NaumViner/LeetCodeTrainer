@@ -48,10 +48,16 @@ export async function loginAction(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarding_completed")
+    .select("diagnostic_completed, onboarding_completed")
     .single();
 
-  redirect(profile?.onboarding_completed ? "/dashboard" : "/onboarding");
+  redirect(
+    !profile?.onboarding_completed
+      ? "/onboarding"
+      : profile.diagnostic_completed
+        ? "/dashboard"
+        : "/diagnostic",
+  );
 }
 
 export async function signupAction(

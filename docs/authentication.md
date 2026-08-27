@@ -4,6 +4,8 @@
 
 Email/password sign-up, login, and logout are fully implemented. New users receive a profile automatically and are sent to onboarding; returning learners go to the dashboard. Logout uses local scope so it ends the current browser session without unexpectedly revoking every device.
 
+After profile setup, new learners continue to the initial diagnostic. Returning learners with an unfinished diagnostic resume it, while completed learners go directly to the dashboard. Diagnostic completion and placement columns are excluded from browser profile-update privileges and can only be set by trusted grading.
+
 Google and GitHub OAuth entry points are present but disabled in local Supabase configuration. To enable one, configure its client ID and secret in the Supabase environment, enable the provider, and register `/auth/callback` for the deployment URL.
 
 ## Session handling

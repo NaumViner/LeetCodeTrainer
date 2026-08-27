@@ -43,6 +43,9 @@ export default async function DashboardPage() {
   if (!profile?.onboarding_completed) {
     redirect("/onboarding");
   }
+  if (!profile.diagnostic_completed) {
+    redirect("/diagnostic");
+  }
   const localDate = localDateKey(new Date(), profile.timezone);
   const dailyPlan = await getDailyPlan(user.id, localDate);
 
@@ -182,9 +185,10 @@ export default async function DashboardPage() {
                   {Math.round(analytics.readiness.overall)}
                 </p>
                 <p className="text-muted mt-1 text-sm">
-                  {analytics.metrics.totalAttempts > 0
-                    ? readinessLevel(analytics.readiness.overall)
-                    : "Complete an attempt to establish a baseline"}
+                  {readinessLevel(analytics.readiness.overall)}
+                  {analytics.metrics.totalAttempts === 0
+                    ? " · diagnostic baseline"
+                    : null}
                 </p>
               </div>
               <div className="bg-primary-soft text-primary rounded-xl p-3">
@@ -246,8 +250,9 @@ export default async function DashboardPage() {
                   No completed attempts yet
                 </h2>
                 <p className="text-muted mt-2 text-sm leading-6">
-                  Your recent attempt, weakest practiced topic, and improvement
-                  evidence will appear here.
+                  Your diagnostic established a starting baseline. Your first
+                  structured attempt will add independence, timing, and
+                  reflection evidence.
                 </p>
               </>
             )}
@@ -261,7 +266,7 @@ export default async function DashboardPage() {
             <div>
               <Badge variant="success">
                 <CheckCircle2 aria-hidden="true" className="size-3.5" />
-                Profile saved
+                Diagnostic: {profile.diagnostic_level?.replaceAll("_", " ")}
               </Badge>
               <h2 className="mt-4 text-xl font-semibold">
                 Your preparation baseline

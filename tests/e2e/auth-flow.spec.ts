@@ -47,6 +47,44 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await page.getByLabel("Timezone").fill("Asia/Jerusalem");
     await page.getByRole("button", { name: "Create my plan" }).click();
 
+    await expect(page).toHaveURL(/\/diagnostic$/);
+    await expect(
+      page.getByRole("heading", { name: "Find the right place to begin." }),
+    ).toBeVisible();
+    await page.getByLabel("O(n²)").check();
+    await page.getByLabel("A hash map").check();
+    await page.getByLabel("A base case that stops recursion").check();
+    await page.getByLabel("Inorder").check();
+    await page.getByLabel("A visited set").check();
+    await page.getByLabel("Hash set").check();
+    await page.getByLabel("Sliding window").check();
+    await page.getByLabel("BFS").check();
+    await page.getByRole("button", { name: "Continue to coding" }).click();
+
+    await expect(page.getByText("intermediate coding tier")).toBeVisible();
+    await page
+      .getByLabel(
+        "Compare the midpoint, then discard only the half that cannot contain the target.",
+      )
+      .check();
+    await page
+      .getByLabel(
+        "Return 0 for null; otherwise return 1 + max(depth(left), depth(right)).",
+      )
+      .check();
+    await page.getByRole("button", { name: "Finish diagnostic" }).click();
+
+    await expect(page).toHaveURL(/\/diagnostic\/results$/);
+    await expect(
+      page.getByRole("heading", {
+        name: "Your starting level is independent practice.",
+      }),
+    ).toBeVisible();
+    await expect(page.getByText("Initial topic evidence")).toBeVisible();
+    await page
+      .getByRole("link", { name: "Open personalized dashboard" })
+      .click();
+
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(
       page.getByRole("heading", { name: "Welcome, Browser Learner" }),

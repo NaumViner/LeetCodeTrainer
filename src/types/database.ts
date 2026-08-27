@@ -303,6 +303,147 @@ export type Database = {
         };
         Relationships: [];
       };
+      diagnostic_attempts: {
+        Row: {
+          assigned_coding_question_ids: string[];
+          coding_score: number | null;
+          coding_tier: string;
+          completed_at: string | null;
+          concept_score: number;
+          created_at: string;
+          id: string;
+          overall_score: number | null;
+          pattern_score: number;
+          placement_level: string | null;
+          started_at: string;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          assigned_coding_question_ids: string[];
+          coding_score?: number | null;
+          coding_tier: string;
+          completed_at?: string | null;
+          concept_score: number;
+          created_at?: string;
+          id?: string;
+          overall_score?: number | null;
+          pattern_score: number;
+          placement_level?: string | null;
+          started_at?: string;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          assigned_coding_question_ids?: string[];
+          coding_score?: number | null;
+          coding_tier?: string;
+          completed_at?: string | null;
+          concept_score?: number;
+          created_at?: string;
+          id?: string;
+          overall_score?: number | null;
+          pattern_score?: number;
+          placement_level?: string | null;
+          started_at?: string;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      diagnostic_question_keys: {
+        Row: {
+          active: boolean;
+          correct_answer: string;
+          difficulty: number;
+          question_id: string;
+          section: string;
+          topic_id: string;
+        };
+        Insert: {
+          active?: boolean;
+          correct_answer: string;
+          difficulty: number;
+          question_id: string;
+          section: string;
+          topic_id: string;
+        };
+        Update: {
+          active?: boolean;
+          correct_answer?: string;
+          difficulty?: number;
+          question_id?: string;
+          section?: string;
+          topic_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_question_keys_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      diagnostic_responses: {
+        Row: {
+          correct: boolean;
+          created_at: string;
+          diagnostic_attempt_id: string;
+          id: string;
+          question_id: string;
+          section: string;
+          selected_answer: string;
+          topic_id: string;
+        };
+        Insert: {
+          correct: boolean;
+          created_at?: string;
+          diagnostic_attempt_id: string;
+          id?: string;
+          question_id: string;
+          section: string;
+          selected_answer: string;
+          topic_id: string;
+        };
+        Update: {
+          correct?: boolean;
+          created_at?: string;
+          diagnostic_attempt_id?: string;
+          id?: string;
+          question_id?: string;
+          section?: string;
+          selected_answer?: string;
+          topic_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_responses_diagnostic_attempt_id_fkey";
+            columns: ["diagnostic_attempt_id"];
+            isOneToOne: false;
+            referencedRelation: "diagnostic_attempts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "diagnostic_responses_question_id_fkey";
+            columns: ["question_id"];
+            isOneToOne: false;
+            referencedRelation: "diagnostic_question_keys";
+            referencedColumns: ["question_id"];
+          },
+          {
+            foreignKeyName: "diagnostic_responses_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       lesson_prerequisites: {
         Row: {
           lesson_id: string;
@@ -608,6 +749,9 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string;
+          diagnostic_completed: boolean;
+          diagnostic_completed_at: string | null;
+          diagnostic_level: string | null;
           display_name: string | null;
           experience_level: string;
           id: string;
@@ -622,6 +766,9 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          diagnostic_completed?: boolean;
+          diagnostic_completed_at?: string | null;
+          diagnostic_level?: string | null;
           display_name?: string | null;
           experience_level?: string;
           id: string;
@@ -636,6 +783,9 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          diagnostic_completed?: boolean;
+          diagnostic_completed_at?: string | null;
+          diagnostic_level?: string | null;
           display_name?: string | null;
           experience_level?: string;
           id?: string;
@@ -730,6 +880,8 @@ export type Database = {
           complexity_score: number;
           correctness_score: number;
           created_at: string;
+          diagnostic_initialized_at: string | null;
+          diagnostic_score: number | null;
           independence_score: number;
           independent_solves: number;
           last_practiced_at: string | null;
@@ -747,6 +899,8 @@ export type Database = {
           complexity_score: number;
           correctness_score: number;
           created_at?: string;
+          diagnostic_initialized_at?: string | null;
+          diagnostic_score?: number | null;
           independence_score: number;
           independent_solves?: number;
           last_practiced_at?: string | null;
@@ -764,6 +918,8 @@ export type Database = {
           complexity_score?: number;
           correctness_score?: number;
           created_at?: string;
+          diagnostic_initialized_at?: string | null;
+          diagnostic_score?: number | null;
           independence_score?: number;
           independent_solves?: number;
           last_practiced_at?: string | null;
@@ -861,6 +1017,11 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      begin_diagnostic: { Args: { p_answers: Json }; Returns: string };
+      complete_diagnostic: {
+        Args: { p_answers: Json; p_attempt_id: string };
+        Returns: undefined;
+      };
       replace_daily_plan: {
         Args: {
           p_available_minutes: number;

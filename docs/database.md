@@ -42,6 +42,8 @@ Both tables use forced Row Level Security. Authenticated learners can access onl
 
 An `after update` trigger on `attempts` creates the performance row and updates primary-topic mastery in the same database transaction as completion. This prevents an attempt from being saved without its analytics and prevents client code from supplying its own scores. Analytics tables grant authenticated learners read access only to their own rows; all browser writes are revoked and forced RLS remains the final privacy boundary.
 
+`diagnostic_question_keys` stores the private grading key and grants browser roles no access. `diagnostic_attempts` stores one initial assessment per learner, including the frozen adaptive coding assignment and section scores. `diagnostic_responses` stores question-level evidence. Two authenticated security-definer functions validate and grade raw option tokens; finalization atomically updates the attempt, protected profile placement fields, and diagnostic-provenance columns on `topic_mastery`.
+
 ## Spaced repetition model
 
 `problem_reviews` stores the current learner-problem schedule: repetition, interval, bounded easiness, last review, next review, last performance, and failure streak. `review_events` stores the immutable evidence behind every schedule change and points to its completed attempt.

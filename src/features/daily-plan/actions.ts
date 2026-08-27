@@ -29,6 +29,7 @@ export async function generateDailyPlanAction(formData: FormData) {
   const user = await requireAuthenticatedUser();
   const profile = await getProfile(user.id);
   if (!profile?.onboarding_completed) redirect("/onboarding");
+  if (!profile.diagnostic_completed) redirect("/diagnostic");
 
   const availableInput = formData.get("availableMinutes");
   const availableMinutes = availableMinutesSchema.safeParse(

@@ -14,7 +14,7 @@ export default async function OnboardingPage() {
   }
 
   if (profile.onboarding_completed) {
-    redirect("/dashboard");
+    redirect(profile.diagnostic_completed ? "/dashboard" : "/diagnostic");
   }
 
   return (
@@ -25,7 +25,7 @@ export default async function OnboardingPage() {
       </h1>
       <p className="text-muted mt-3 max-w-2xl leading-7">
         These details determine curriculum pacing and daily study time. The
-        diagnostic comes next.
+        diagnostic comes next and adapts the starting level.
       </p>
       <Card className="mt-8 shadow-none">
         <CardContent className="p-6 sm:p-8">

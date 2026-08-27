@@ -34,7 +34,7 @@ export async function saveProfileAction(
 
   const user = await requireAuthenticatedUser();
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .update({
       display_name: result.data.displayName,
@@ -47,7 +47,9 @@ export async function saveProfileAction(
       timezone: result.data.timezone,
       weekly_study_minutes: result.data.weeklyStudyHours * 60,
     })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select("diagnostic_completed")
+    .single();
 
   if (error) {
     return {
@@ -56,5 +58,5 @@ export async function saveProfileAction(
     };
   }
 
-  redirect("/dashboard");
+  redirect(profile.diagnostic_completed ? "/dashboard" : "/diagnostic");
 }

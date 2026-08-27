@@ -13,5 +13,6 @@
 - Problem schedules and review history are generated in the same trusted completion transaction. Forced RLS permits only own-row reads, browser writes are revoked, and review-mode attempts require a learner-owned scheduled problem.
 - Adaptive recommendation evidence is assembled only on the authenticated server from learner-scoped attempts, mastery, reviews, lesson progress, and profile data. The browser cannot supply ownership, mastery, due state, or scoring inputs.
 - Daily plans and items are private, read-only tables for browser roles. Narrow authenticated database functions validate ownership, dates, time budgets, source entities, and completion fields; regeneration preserves expired versions instead of accepting arbitrary row updates.
+- Diagnostic answer keys have no browser read grants. Narrow authenticated functions validate complete question sets, grade option tokens, freeze adaptive coding assignments, initialize bounded mastery, and set protected completion fields; attempts and responses permit own-row reads only.
 
 Before a hosted release, apply migrations to the intended Supabase project, confirm RLS remains enabled, rotate any keys exposed outside approved secret storage, configure allowed redirect URLs, and run the integration and browser suites against a safe non-production environment.

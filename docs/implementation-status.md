@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-26
+Last updated: 2026-08-27
 
 ## Phase 1 — Repository foundation
 
@@ -223,7 +223,33 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Database tests prove atomic generation, versioned regeneration, completion/reopening, ownership isolation, anonymous denial, and revoked direct mutations.
 - Desktop and mobile browser tests generate, complete, regenerate, and reopen the persisted plan from the dashboard.
 
-## Phases 10–15
+## Phase 10 — Diagnostic
+
+**Status:** Complete
+
+### Completed
+
+- Profile setup handoff into a required initial diagnostic before the personalized dashboard
+- Five-question concept quiz covering complexity, arrays/maps, recursion, trees, and graphs
+- Three synthetic pattern-recognition prompts
+- Deterministic foundation, intermediate, and advanced coding banks
+- Adaptive one-, two-, or three-problem assignment using graded responses and declared experience
+- Beginner difficulty guard that prevents an advanced assignment from response score alone
+- Private persisted attempts and individual response evidence
+- Database-owned answer keys and authoritative transactional grading
+- Concept, pattern, coding, overall, and starting-level results
+- Conservative per-topic mastery initialization with explicit diagnostic provenance
+- Protected profile diagnostic status that browser clients cannot forge
+- Resume-safe coding stage and dedicated responsive result screen
+- Diagnostic baseline integration with dashboard readiness and weakest-topic evidence
+
+### Verification
+
+- Unit scenarios cover required topic coverage, beginner protection, each adaptive tier, question counts, and placement thresholds.
+- Database tests prove exact-answer-set validation, private answer keys, adaptive assignment, atomic completion, mastery initialization, protected profile fields, ownership isolation, anonymous denial, and revoked direct writes.
+- Desktop and mobile browser tests complete profile setup, both diagnostic stages, results, dashboard handoff, and the full later learning journey.
+
+## Phases 11–15
 
 **Status:** Not started
 

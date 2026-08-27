@@ -32,6 +32,7 @@ export default async function PlanPage() {
   const user = await requireAuthenticatedUser();
   const profile = await getProfile(user.id);
   if (!profile?.onboarding_completed) redirect("/onboarding");
+  if (!profile.diagnostic_completed) redirect("/diagnostic");
   const localDate = localDateKey(new Date(), profile.timezone);
   const plan = await getDailyPlan(user.id, localDate);
   const defaultMinutes =
