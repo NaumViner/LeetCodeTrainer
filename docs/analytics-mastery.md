@@ -31,6 +31,8 @@ Performance and mastery tables use forced Row Level Security. Authenticated lear
 
 ## Readiness and analytics
 
-Overall readiness begins with mean practiced-topic mastery and applies a coverage factor across the 18 core problem topics. This prevents one strong topic from representing broad interview readiness. It is always labeled “Training estimate, not a prediction of interview outcome.” Interview execution remains unmeasured until mock-interview evidence exists.
+Overall readiness begins with mean topic mastery and applies a coverage factor across the 18 core problem topics. This prevents one strong topic from representing broad interview readiness. Once completed mock-interview scorecards exist, their average contributes 20% of readiness and appears as a separate interview-execution dimension; before that, the original mastery estimate is unchanged. It is always labeled “Training estimate, not a prediction of interview outcome.”
+
+Mock-interview completion also smooths correctness, independence, recognition, complexity, speed, and overall performance into the problem's primary topic. Weak interview evidence can therefore lower topic mastery and naturally raise that topic in later adaptive recommendations.
 
 The progress view derives total attempts, independent solve rate, average and median time, help usage, recognition and complexity accuracy, repeat improvement, repeated mistakes, mastery dimensions, and topic status from stored records. History and attempt detail expose the evidence behind those aggregates. Review success and scheduled retention now flow through the spaced-repetition schedule and its immutable event history.

@@ -565,6 +565,167 @@ export type Database = {
           },
         ];
       };
+      mock_interview_scorecards: {
+        Row: {
+          approach_quality: number;
+          clarification: number;
+          code_quality: number;
+          communication: number;
+          complexity_reasoning: number;
+          correctness: number;
+          created_at: string;
+          improvements: string[];
+          independence: number;
+          mock_interview_id: string;
+          optimization: number;
+          overall_score: number;
+          problem_understanding: number;
+          strengths: string[];
+          testing: number;
+          topic_id: string;
+          user_id: string;
+        };
+        Insert: {
+          approach_quality: number;
+          clarification: number;
+          code_quality: number;
+          communication: number;
+          complexity_reasoning: number;
+          correctness: number;
+          created_at?: string;
+          improvements?: string[];
+          independence: number;
+          mock_interview_id: string;
+          optimization: number;
+          overall_score: number;
+          problem_understanding: number;
+          strengths?: string[];
+          testing: number;
+          topic_id: string;
+          user_id: string;
+        };
+        Update: {
+          approach_quality?: number;
+          clarification?: number;
+          code_quality?: number;
+          communication?: number;
+          complexity_reasoning?: number;
+          correctness?: number;
+          created_at?: string;
+          improvements?: string[];
+          independence?: number;
+          mock_interview_id?: string;
+          optimization?: number;
+          overall_score?: number;
+          problem_understanding?: number;
+          strengths?: string[];
+          testing?: number;
+          topic_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_scorecards_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: true;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mock_interview_scorecards_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mock_interviews: {
+        Row: {
+          brute_force_notes: string | null;
+          clarification_notes: string | null;
+          code_snapshot: string | null;
+          completed_at: string | null;
+          created_at: string;
+          difficulty_mode: string;
+          duration_minutes: number;
+          elapsed_seconds: number;
+          examples_notes: string | null;
+          id: string;
+          optimization_notes: string | null;
+          phase: string;
+          problem_id: string;
+          result: string | null;
+          retrospective: string | null;
+          started_at: string;
+          status: string;
+          submitted_space_complexity: string | null;
+          submitted_time_complexity: string | null;
+          testing_notes: string | null;
+          timer_running: boolean;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          brute_force_notes?: string | null;
+          clarification_notes?: string | null;
+          code_snapshot?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          difficulty_mode: string;
+          duration_minutes: number;
+          elapsed_seconds?: number;
+          examples_notes?: string | null;
+          id?: string;
+          optimization_notes?: string | null;
+          phase?: string;
+          problem_id: string;
+          result?: string | null;
+          retrospective?: string | null;
+          started_at?: string;
+          status?: string;
+          submitted_space_complexity?: string | null;
+          submitted_time_complexity?: string | null;
+          testing_notes?: string | null;
+          timer_running?: boolean;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          brute_force_notes?: string | null;
+          clarification_notes?: string | null;
+          code_snapshot?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          difficulty_mode?: string;
+          duration_minutes?: number;
+          elapsed_seconds?: number;
+          examples_notes?: string | null;
+          id?: string;
+          optimization_notes?: string | null;
+          phase?: string;
+          problem_id?: string;
+          result?: string | null;
+          retrospective?: string | null;
+          started_at?: string;
+          status?: string;
+          submitted_space_complexity?: string | null;
+          submitted_time_complexity?: string | null;
+          testing_notes?: string | null;
+          timer_running?: boolean;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interviews_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       problem_prerequisite_topics: {
         Row: {
           problem_id: string;
@@ -884,7 +1045,9 @@ export type Database = {
           diagnostic_score: number | null;
           independence_score: number;
           independent_solves: number;
+          last_interviewed_at: string | null;
           last_practiced_at: string | null;
+          mock_interview_count: number;
           next_review_at: string | null;
           overall_score: number;
           recognition_score: number;
@@ -903,7 +1066,9 @@ export type Database = {
           diagnostic_score?: number | null;
           independence_score: number;
           independent_solves?: number;
+          last_interviewed_at?: string | null;
           last_practiced_at?: string | null;
+          mock_interview_count?: number;
           next_review_at?: string | null;
           overall_score: number;
           recognition_score: number;
@@ -922,7 +1087,9 @@ export type Database = {
           diagnostic_score?: number | null;
           independence_score?: number;
           independent_solves?: number;
+          last_interviewed_at?: string | null;
           last_practiced_at?: string | null;
+          mock_interview_count?: number;
           next_review_at?: string | null;
           overall_score?: number;
           recognition_score?: number;
@@ -1017,10 +1184,44 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      abandon_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: undefined;
+      };
+      advance_mock_interview: {
+        Args: {
+          p_elapsed_seconds: number;
+          p_mock_interview_id: string;
+          p_payload: Json;
+          p_target_phase: string;
+        };
+        Returns: undefined;
+      };
       begin_diagnostic: { Args: { p_answers: Json }; Returns: string };
       complete_diagnostic: {
         Args: { p_answers: Json; p_attempt_id: string };
         Returns: undefined;
+      };
+      complete_mock_interview: {
+        Args: {
+          p_code_quality_rating: number;
+          p_communication_rating: number;
+          p_complexity_rating: number;
+          p_elapsed_seconds: number;
+          p_independence_rating: number;
+          p_mock_interview_id: string;
+          p_result: string;
+          p_retrospective: string;
+        };
+        Returns: undefined;
+      };
+      mock_interview_evidence_score: {
+        Args: {
+          p_developing_lines: number;
+          p_strong_lines: number;
+          p_value: string;
+        };
+        Returns: number;
       };
       replace_daily_plan: {
         Args: {
@@ -1033,6 +1234,14 @@ export type Database = {
       set_daily_plan_item_completed: {
         Args: { p_completed: boolean; p_item_id: string };
         Returns: undefined;
+      };
+      start_mock_interview: {
+        Args: {
+          p_difficulty_mode: string;
+          p_duration_minutes: number;
+          p_problem_id: string;
+        };
+        Returns: string;
       };
     };
     Enums: {

@@ -20,7 +20,7 @@ weakness + due review + curriculum fit + prerequisite fit
 - recent topic - repeated problem - frustration
 ```
 
-Weakness uses smoothed topic mastery rather than a single result. Due reviews receive a strong positive signal. Curriculum fit compares the candidate level with the learner's current evidence. Topic balance rewards topics absent from the five most recent attempts. Novelty rewards unseen problems, while recent and repeated-problem penalties prevent immediate loops.
+Weakness uses smoothed topic mastery rather than a single result. Completed mock interviews update that same mastery record, so interview weaknesses automatically affect later recommendations. Due reviews receive a strong positive signal. Curriculum fit compares the candidate level with the learner's current evidence. Topic balance rewards topics absent from the five most recent attempts. Novelty rewards unseen problems, while recent and repeated-problem penalties prevent immediate loops.
 
 Difficulty moves from easy/guided work toward independent, timed, and interview work only as mastery and independent solves increase. Two recent unsuccessful attempts in a topic force easy recovery preference and penalize medium or hard work. Repeated failures on the same problem add a separate penalty so the learner is not trapped on it.
 

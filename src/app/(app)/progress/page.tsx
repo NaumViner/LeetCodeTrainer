@@ -1,5 +1,6 @@
 import {
   Activity,
+  BriefcaseBusiness,
   BrainCircuit,
   Clock3,
   Gauge,
@@ -36,7 +37,7 @@ export default async function ProgressPage() {
         title="Progress and readiness"
       />
 
-      {analytics.metrics.totalAttempts === 0 ? (
+      {analytics.topics.every((topic) => !topic.mastery) ? (
         <EmptyState
           action={
             <Link className={buttonVariants()} href="/practice">
@@ -90,14 +91,22 @@ export default async function ProgressPage() {
                   value={analytics.readiness.complexity}
                 />
                 <div className="sm:col-span-2">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-medium">Interview execution</span>
-                    <span className="text-muted">Not measured yet</span>
-                  </div>
-                  <p className="text-muted mt-2 text-xs">
-                    Mock-interview evidence is introduced in its dedicated
-                    phase.
-                  </p>
+                  {analytics.readiness.interviewExecution === null ? (
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium">Interview execution</span>
+                      <Link
+                        className="text-primary font-semibold"
+                        href="/interviews"
+                      >
+                        Run first mock interview
+                      </Link>
+                    </div>
+                  ) : (
+                    <ProgressBar
+                      label="Interview execution"
+                      value={analytics.readiness.interviewExecution}
+                    />
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -128,6 +137,11 @@ export default async function ProgressPage() {
               icon={<Gauge className="size-5" />}
               label="Recognition accuracy"
               value={`${analytics.metrics.patternAccuracy}%`}
+            />
+            <MetricCard
+              icon={<BriefcaseBusiness className="size-5" />}
+              label="Mock interviews"
+              value={String(analytics.mockInterviewCount)}
             />
             <MetricCard
               label="Complexity accuracy"

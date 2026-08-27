@@ -23,20 +23,33 @@ export type TopicAnalytics = {
 
 export async function getAnalyticsSnapshot(userId: string) {
   const supabase = await createClient();
-  const [attemptsResult, performanceResult, masteryResult, catalog] =
-    await Promise.all([
-      supabase
-        .from("attempts")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("status", "completed")
-        .order("completed_at", { ascending: false }),
-      supabase.from("attempt_performance").select("*").eq("user_id", userId),
-      supabase.from("topic_mastery").select("*").eq("user_id", userId),
-      getProblemCatalog(),
-    ]);
+  const [
+    attemptsResult,
+    performanceResult,
+    masteryResult,
+    interviewResult,
+    catalog,
+  ] = await Promise.all([
+    supabase
+      .from("attempts")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .order("completed_at", { ascending: false }),
+    supabase.from("attempt_performance").select("*").eq("user_id", userId),
+    supabase.from("topic_mastery").select("*").eq("user_id", userId),
+    supabase
+      .from("mock_interview_scorecards")
+      .select("overall_score")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    getProblemCatalog(),
+  ]);
   const error =
-    attemptsResult.error ?? performanceResult.error ?? masteryResult.error;
+    attemptsResult.error ??
+    performanceResult.error ??
+    masteryResult.error ??
+    interviewResult.error;
   if (error) throw new Error("Learning analytics could not be loaded.");
 
   const problemsById = new Map(catalog.map((problem) => [problem.id, problem]));
@@ -98,7 +111,12 @@ export async function getAnalyticsSnapshot(userId: string) {
   return {
     attempts,
     metrics,
-    readiness: overallReadiness(masteries, coreTopics.length),
+    mockInterviewCount: interviewResult.data?.length ?? 0,
+    readiness: overallReadiness(
+      masteries,
+      coreTopics.length,
+      (interviewResult.data ?? []).map((item) => item.overall_score),
+    ),
     topics,
   };
 }

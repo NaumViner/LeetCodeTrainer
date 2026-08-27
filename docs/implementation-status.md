@@ -249,7 +249,30 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Database tests prove exact-answer-set validation, private answer keys, adaptive assignment, atomic completion, mastery initialization, protected profile fields, ownership isolation, anonymous denial, and revoked direct writes.
 - Desktop and mobile browser tests complete profile setup, both diagnostic stages, results, dashboard handoff, and the full later learning journey.
 
-## Phases 11–15
+## Phase 11 — Mock interviews
+
+**Status:** Complete
+
+### Completed
+
+- Adaptive or fixed-difficulty interview setup with 30-, 45-, and 60-minute options
+- Mandatory unpausable, refresh-safe timer with overtime visibility
+- Active-session topic and pattern hiding with hints disabled
+- Persisted intro, clarification, examples, brute-force, optimization, implementation, testing, complexity, and retrospective state machine
+- One active learning mode per learner, protected against concurrent practice/interview starts
+- Ten-criterion 1–5 scorecard with deterministic overall score, strengths, and actionable improvements
+- Completed and abandoned interview history with post-interview topic reveal
+- Interview-execution readiness dimension and topic-mastery feedback into adaptive recommendations
+- Forced-RLS private sessions and scorecards with narrow authenticated mutation functions
+- Responsive setup, workspace, scorecard, history, dashboard, progress, and navigation integration
+
+### Verification
+
+- Unit tests cover phase transitions, timer recovery, score calculation, and feedback selection.
+- Database tests prove ordered persistence, one active session, practice/interview exclusion, transactional scorecard and mastery updates, ownership isolation, anonymous denial, and revoked direct writes.
+- The browser journey completes setup, all interview phases, retrospective, scorecard, history, and progress feedback.
+
+## Phases 12–15
 
 **Status:** Not started
 

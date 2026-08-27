@@ -56,6 +56,12 @@ The review trigger follows the performance trigger in deterministic name order. 
 
 Authenticated security-definer functions replace a plan and toggle one item. Replacement serializes concurrent generation with a learner-date advisory lock, expires the old active version, validates the item count and budget, verifies lesson/problem references, and inserts the new version in one transaction. Item completion verifies ownership and rejects expired versions before recalculating parent completion. Browser roles receive only own-row select access and no direct write grants.
 
+## Mock-interview model
+
+`mock_interviews` stores one structured interview session with a required 30-, 45-, or 60-minute timer, adaptive or explicit difficulty, ordered phase, notes, code, complexity analysis, retrospective, and result. A partial unique index permits one active interview per learner. A shared advisory lock and attempt-insert trigger prevent an active practice attempt and active interview from overlapping, including concurrent starts.
+
+`mock_interview_scorecards` stores the immutable ten-criterion rubric and overall score. Authenticated database functions start, advance, complete, or abandon only the caller's interview. Completion validates every phase, calculates the scorecard from persisted evidence plus explicit retrospective ratings, and smooths the result into the problem topic's mastery. Both tables use forced RLS, allow only own-row reads, and revoke direct browser writes.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.

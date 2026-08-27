@@ -347,6 +347,70 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await expect(
       page.getByRole("link", { name: "Open today’s plan" }),
     ).toBeVisible();
+
+    await page.getByRole("link", { name: "Interview", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Run a realistic mock interview" }),
+    ).toBeVisible();
+    await page.getByLabel("Duration").selectOption("30");
+    await page.getByLabel("Difficulty").selectOption("easy");
+    await page.getByRole("button", { name: "Start mock interview" }).click();
+
+    await expect(page).toHaveURL(/\/interviews\/[0-9a-f-]{36}$/);
+    await expect(page.getByText("Topic hidden", { exact: true })).toBeVisible();
+    await expect(page.getByText("Time remaining")).toBeVisible();
+    await page.getByRole("button", { name: "Begin clarification" }).click();
+    await page
+      .getByLabel("Clarifying questions and assumptions")
+      .fill("What are the constraints?\nCan values repeat?");
+    await page.getByRole("button", { name: "Continue to examples" }).click();
+    await page
+      .getByLabel("Examples and expected behavior")
+      .fill("Normal input\nEmpty input\nDuplicate values");
+    await page.getByRole("button", { name: "Continue to brute force" }).click();
+    await page
+      .getByLabel("Brute-force reasoning")
+      .fill("Try each candidate.\nCheck correctness.\nIdentify repeated work.");
+    await page
+      .getByRole("button", { name: "Continue to optimization" })
+      .click();
+    await page
+      .getByLabel("Optimized approach and invariant")
+      .fill(
+        "Maintain the required state.\nUpdate it once per input.\nPreserve the invariant.",
+      );
+    await page.getByRole("button", { name: "Begin implementation" }).click();
+    await page
+      .getByLabel("Code snapshot")
+      .fill("function solve(input) {\n  return input.length;\n}");
+    await page.getByRole("button", { name: "Move to testing" }).click();
+    await page
+      .getByLabel("Tests and traces")
+      .fill("Empty input\nOne element\nDuplicates\nLarge input");
+    await page.getByRole("button", { name: "Continue to complexity" }).click();
+    await page.getByLabel("Time complexity").fill("O(n)");
+    await page.getByLabel("Space complexity").fill("O(1)");
+    await page.getByRole("button", { name: "Stop timer and reflect" }).click();
+    await page.getByLabel("Outcome").selectOption("partial");
+    await page
+      .getByLabel("What went well, what broke down, and what will you change?")
+      .fill(
+        "I should validate the invariant against edge cases before coding.",
+      );
+    await page.getByRole("button", { name: "Generate scorecard" }).click();
+
+    await expect(page).toHaveURL(/\/interviews\/[0-9a-f-]{36}\/scorecard$/);
+    await expect(
+      page.getByRole("heading", { name: "Interview rubric" }),
+    ).toBeVisible();
+    await expect(page.getByText("Topic revealed")).toBeVisible();
+    await page.getByRole("link", { name: "View interview history" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Mock interview history" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /Scorecard/ })).toBeVisible();
+    await page.getByRole("link", { name: "Progress" }).click();
+    await expect(page.getByText("Interview execution")).toBeVisible();
   } finally {
     const status = readLocalStatus();
     const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;

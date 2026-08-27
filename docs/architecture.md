@@ -36,7 +36,9 @@ Daily planning composes the curriculum, review queue, and adaptive ranking throu
 
 Attempt completion is also the analytics transaction boundary. An `after update` database trigger derives a frozen performance snapshot from the completed attempt and problem estimate, then smooths it into the learner's primary-topic mastery in the same transaction. Read paths aggregate those private records into readiness, history, topic dashboards, and recent-attempt summaries; they never write scores from the browser.
 
-The TypeScript mastery and review modules mirror the database formulas for independent tests and transparent product behavior. A second completion trigger reads the frozen attempt performance, adapts the learner-problem review schedule, appends immutable schedule history, and synchronizes the topic's earliest review date in the same transaction. Mock-interview execution remains explicitly unmeasured until real interview evidence exists.
+The TypeScript mastery and review modules mirror the database formulas for independent tests and transparent product behavior. A second completion trigger reads the frozen attempt performance, adapts the learner-problem review schedule, appends immutable schedule history, and synchronizes the topic's earliest review date in the same transaction.
+
+Mock interviews use a separate persisted state machine so practice assistance cannot leak into an interview. The browser receives only topic-free problem metadata during an active session. Narrow database functions serialize starts, enforce ordered phase transitions, stop the timer at retrospective, create the ten-criterion scorecard, and smooth interview evidence into topic mastery. Readiness blends completed interview execution only after scorecard evidence exists.
 
 ## Authentication approach
 

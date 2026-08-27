@@ -2,6 +2,7 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  BriefcaseBusiness,
   CalendarDays,
   CalendarCheck2,
   CheckCircle2,
@@ -398,6 +399,35 @@ export default async function DashboardPage() {
             </div>
             <Link className={buttonVariants()} href="/practice">
               Start practice
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section id="mock-interview">
+        <Card>
+          <CardContent className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="bg-primary-soft text-primary rounded-xl p-3">
+                <BriefcaseBusiness aria-hidden="true" className="size-5" />
+              </div>
+              <div>
+                <p className="text-primary text-sm font-semibold">
+                  Interview execution
+                </p>
+                <h2 className="mt-1 text-xl font-semibold">
+                  Practice under realistic constraints
+                </h2>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  Work through clarification, examples, optimization, coding,
+                  testing, and complexity with a hidden topic and mandatory
+                  timer.
+                </p>
+              </div>
+            </div>
+            <Link className={buttonVariants()} href="/interviews">
+              Start mock interview
               <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           </CardContent>

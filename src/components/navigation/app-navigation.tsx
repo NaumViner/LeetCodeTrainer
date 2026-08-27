@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BriefcaseBusiness,
   CalendarCheck2,
   ChartNoAxesCombined,
   Dumbbell,
@@ -17,6 +18,7 @@ const items = [
   { href: "/learn", icon: BookOpen, label: "Learn" },
   { href: "/practice", icon: Dumbbell, label: "Practice" },
   { href: "/review", icon: RefreshCw, label: "Review" },
+  { href: "/interviews", icon: BriefcaseBusiness, label: "Interview" },
   { href: "/problems", icon: LibraryBig, label: "Problems" },
   { href: "/progress", icon: ChartNoAxesCombined, label: "Progress" },
   { href: "/history", icon: History, label: "History" },

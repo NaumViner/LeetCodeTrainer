@@ -12,6 +12,7 @@ export type MasterySnapshot = {
 export function overallReadiness(
   masteries: MasterySnapshot[],
   totalCoreTopics: number,
+  interviewScores: number[] = [],
 ) {
   if (masteries.length === 0 || totalCoreTopics <= 0) {
     return {
@@ -37,12 +38,22 @@ export function overallReadiness(
   };
   const coverage = Math.min(1, masteries.length / totalCoreTopics);
   const coverageFactor = 0.55 + 0.45 * Math.sqrt(coverage);
+  const baseOverall = dimensions.corePatterns * coverageFactor;
+  const interviewExecution = interviewScores.length
+    ? average(interviewScores)
+    : null;
 
   return {
     ...dimensions,
     coverage: round(coverage * 100, 1),
-    interviewExecution: null,
-    overall: round(dimensions.corePatterns * coverageFactor, 1),
+    interviewExecution:
+      interviewExecution === null ? null : round(interviewExecution, 1),
+    overall: round(
+      interviewExecution === null
+        ? baseOverall
+        : baseOverall * 0.8 + interviewExecution * 0.2,
+      1,
+    ),
   };
 }
 
