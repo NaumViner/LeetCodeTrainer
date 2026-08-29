@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PracticeWorkspace } from "@/components/practice/practice-workspace";
 import { requireAuthenticatedUser } from "@/features/auth/session";
+import { isAiCoachEnabled } from "@/features/ai-coach/config";
 import { getPracticeAttempt } from "@/features/practice/queries";
 
 type AttemptPageProps = {
@@ -16,5 +17,7 @@ export default async function AttemptPage({ params }: AttemptPageProps) {
   const attempt = await getPracticeAttempt(user.id, attemptId);
   if (!attempt) notFound();
 
-  return <PracticeWorkspace attempt={attempt} />;
+  return (
+    <PracticeWorkspace aiCoachEnabled={isAiCoachEnabled()} attempt={attempt} />
+  );
 }

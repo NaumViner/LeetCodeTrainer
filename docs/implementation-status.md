@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-27
+Last updated: 2026-08-29
 
 ## Phase 1 — Repository foundation
 
@@ -272,7 +272,34 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Database tests prove ordered persistence, one active session, practice/interview exclusion, transactional scorecard and mastery updates, ownership isolation, anonymous denial, and revoked direct writes.
 - The browser journey completes setup, all interview phases, retrospective, scorecard, history, and progress feedback.
 
-## Phases 12–15
+## Phase 12 — AI learning coach
+
+**Status:** In progress — Phase 12A complete
+
+### Completed in Phase 12A
+
+- Provider-independent five-operation learning-coach interface, separate from realtime interviewing
+- Feature-flagged OpenAI Responses adapter with configurable model and server-only key
+- Strict structured-output schemas with Zod validation, one safe retry, timeout, output cap, and graceful fallback
+- Minimum-context assembly with hashed learner safety identifiers
+- AI-enhanced progressive hints that preserve all existing help-level accounting
+- Persisted pattern analysis with feedback, one Socratic question, and a concrete next step
+- Private request reservations, rolling 20-request daily limit, provider/model identity, status, and token counters
+- Fully operational deterministic practice experience when AI is disabled or unavailable
+
+### Remaining for Phase 12B
+
+- Complexity feedback
+- Post-attempt analysis
+- Review-card drafting and review-flow integration
+
+### Verification
+
+- Provider tests prove structured Responses requests, output validation, retry limits, and failure behavior.
+- Database tests prove private usage records, revoked direct writes, token persistence, and rolling request-limit enforcement.
+- Existing practice and browser workflows continue to operate with the feature disabled.
+
+## Phases 13–15
 
 **Status:** Not started
 

@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { fallbackPatternEvaluation } from "@/features/ai-coach/fallback";
+import type { CoachEvaluation } from "@/features/ai-coach/model";
+import {
+  buildCoachContext,
+  createLearningCoachProvider,
+  runCoachInteraction,
+} from "@/features/ai-coach/service";
 import {
   buildProgressiveHint,
   canTransitionAttempt,
@@ -153,7 +160,7 @@ export async function requestAttemptHintAction(
     };
   }
 
-  const hint = buildProgressiveHint(
+  const fallbackHint = buildProgressiveHint(
     {
       patternTags: attempt.problem.pattern_tags,
       primaryTopic: attempt.problem.primaryTopic.name,
@@ -161,6 +168,31 @@ export async function requestAttemptHintAction(
     },
     nextOrdinal,
   );
+  let hint = fallbackHint;
+  if (createLearningCoachProvider()) {
+    const context = await buildCoachContext(user.id, attempt);
+    try {
+      const coached = await runCoachInteraction({
+        attemptId: attempt.id,
+        fallback: { content: fallbackHint.content, title: fallbackHint.title },
+        interactionType: "hint",
+        operation: (provider) =>
+          provider.generateHint({
+            ...context,
+            hintLevel: fallbackHint.helpLevel,
+            ordinal: fallbackHint.ordinal,
+          }),
+      });
+      hint = { ...fallbackHint, ...coached.data };
+    } catch (error) {
+      if (error instanceof Error && error.message === "AI_COACH_LIMIT") {
+        return {
+          message: "Your 20 AI coach requests for the last 24 hours are used.",
+          status: "error",
+        };
+      }
+    }
+  }
   const supabase = await createClient();
   const { data: savedHint, error } = await supabase
     .from("attempt_hints")
@@ -177,6 +209,53 @@ export async function requestAttemptHintAction(
   if (error || !savedHint) return saveError();
   revalidateAttempt(attempt.id);
   return { data: savedHint, status: "success" };
+}
+
+export async function requestPatternAnalysisAction(
+  attemptId: string,
+): Promise<
+  PracticeActionResult<CoachEvaluation & { source: "ai" | "fallback" }>
+> {
+  const parsedId = attemptIdSchema.safeParse(attemptId);
+  if (!parsedId.success) return invalidInput();
+  const user = await requireAuthenticatedUser();
+  const attempt = await getPracticeAttempt(user.id, parsedId.data);
+  if (
+    !attempt ||
+    attempt.status !== "started" ||
+    !attempt.predicted_pattern ||
+    attempt.phase === "pre_attempt"
+  ) {
+    return unavailableAttempt();
+  }
+  if (!createLearningCoachProvider()) {
+    return {
+      message: "The AI coach is not configured for this environment.",
+      status: "error",
+    };
+  }
+  const context = await buildCoachContext(user.id, attempt);
+  try {
+    const result = await runCoachInteraction({
+      attemptId: attempt.id,
+      fallback: fallbackPatternEvaluation(),
+      interactionType: "pattern_analysis",
+      operation: (provider) => provider.evaluatePattern(context),
+    });
+    revalidateAttempt(attempt.id);
+    return {
+      data: { ...result.data, source: result.source },
+      status: "success",
+    };
+  } catch (error) {
+    return {
+      message:
+        error instanceof Error && error.message === "AI_COACH_LIMIT"
+          ? "Your 20 AI coach requests for the last 24 hours are used."
+          : "Pattern analysis could not be started.",
+      status: "error",
+    };
+  }
 }
 
 export async function completeAttemptAction(

@@ -62,6 +62,12 @@ Authenticated security-definer functions replace a plan and toggle one item. Rep
 
 `mock_interview_scorecards` stores the immutable ten-criterion rubric and overall score. Authenticated database functions start, advance, complete, or abandon only the caller's interview. Completion validates every phase, calculates the scorecard from persisted evidence plus explicit retrospective ratings, and smooths the result into the problem topic's mastery. Both tables use forced RLS, allow only own-row reads, and revoke direct browser writes.
 
+## AI-coach usage model
+
+`ai_coach_interactions` records one provider reservation, status, validated structured response, provider/model identity, and token counters for each optional coaching request. A learner-scoped advisory lock and database reservation function enforce 20 requests in any rolling 24-hour window before an external call begins. A separate completion function accepts bounded counters and response JSON only for the caller's pending reservation.
+
+The table uses forced RLS and own-row reads. Direct browser inserts, updates, and deletes are revoked. Pending reservations continue to count if an application process is interrupted, preventing retries or crashes from bypassing the request budget.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.

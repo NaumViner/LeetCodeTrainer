@@ -18,4 +18,11 @@ describe("parseServerEnv", () => {
       AI_API_KEY: undefined,
     });
   });
+
+  it("parses the server-only AI coach feature flag", () => {
+    expect(parseServerEnv({ AI_COACH_ENABLED: "true" })).toMatchObject({
+      AI_COACH_ENABLED: true,
+    });
+    expect(() => parseServerEnv({ AI_COACH_ENABLED: "yes" })).toThrow();
+  });
 });

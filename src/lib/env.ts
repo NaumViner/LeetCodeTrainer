@@ -8,6 +8,17 @@ const optionalString = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.string().min(1).optional(),
 );
+const optionalBoolean = z.preprocess(
+  (value) =>
+    value === "" || value === undefined
+      ? undefined
+      : value === "true"
+        ? true
+        : value === "false"
+          ? false
+          : value,
+  z.boolean().optional(),
+);
 
 export const serverEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: optionalUrl,
@@ -18,6 +29,7 @@ export const serverEnvSchema = z.object({
   AI_PROVIDER: optionalString,
   AI_MODEL: optionalString,
   AI_API_KEY: optionalString,
+  AI_COACH_ENABLED: optionalBoolean,
   REALTIME_AI_PROVIDER: optionalString,
   REALTIME_AI_MODEL: optionalString,
   REALTIME_AI_API_KEY: optionalString,

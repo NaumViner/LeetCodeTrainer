@@ -9,6 +9,65 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_coach_interactions: {
+        Row: {
+          attempt_id: string;
+          created_at: string;
+          error_code: string | null;
+          id: string;
+          input_tokens: number;
+          interaction_type: string;
+          model: string;
+          output_tokens: number;
+          provider: string;
+          response: Json | null;
+          status: string;
+          total_tokens: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          attempt_id: string;
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          input_tokens?: number;
+          interaction_type: string;
+          model: string;
+          output_tokens?: number;
+          provider: string;
+          response?: Json | null;
+          status?: string;
+          total_tokens?: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          attempt_id?: string;
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          input_tokens?: number;
+          interaction_type?: string;
+          model?: string;
+          output_tokens?: number;
+          provider?: string;
+          response?: Json | null;
+          status?: string;
+          total_tokens?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_coach_interactions_attempt_id_fkey";
+            columns: ["attempt_id"];
+            isOneToOne: false;
+            referencedRelation: "attempts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       attempt_hints: {
         Row: {
           attempt_id: string;
@@ -1215,6 +1274,18 @@ export type Database = {
         };
         Returns: undefined;
       };
+      finish_ai_coach_interaction: {
+        Args: {
+          p_error_code?: string;
+          p_input_tokens: number;
+          p_interaction_id: string;
+          p_output_tokens: number;
+          p_response: Json;
+          p_status: string;
+          p_total_tokens: number;
+        };
+        Returns: undefined;
+      };
       mock_interview_evidence_score: {
         Args: {
           p_developing_lines: number;
@@ -1228,6 +1299,15 @@ export type Database = {
           p_available_minutes: number;
           p_items: Json;
           p_local_date: string;
+        };
+        Returns: string;
+      };
+      reserve_ai_coach_interaction: {
+        Args: {
+          p_attempt_id: string;
+          p_interaction_type: string;
+          p_model: string;
+          p_provider: string;
         };
         Returns: string;
       };

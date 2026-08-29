@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { Database } from "../../src/types/database";
+import type { Database, Json } from "../../src/types/database";
 
 type LocalStatus = {
   API_URL: string;
@@ -154,6 +154,78 @@ describe.sequential("practice attempt persistence and isolation", () => {
       .eq("id", attemptId)
       .single();
     expect(attempt?.help_level).toBe("small_hint");
+  });
+
+  it("accounts for private AI coach usage and enforces the daily limit", async () => {
+    const { data: interactionId, error: reserveError } = await learner.rpc(
+      "reserve_ai_coach_interaction",
+      {
+        p_attempt_id: attemptId,
+        p_interaction_type: "pattern_analysis",
+        p_model: "test-model",
+        p_provider: "openai",
+      },
+    );
+    expect(reserveError).toBeNull();
+    const response = {
+      feedback: "The prediction is supported by the lookup signal.",
+      nextStep: "State the invariant.",
+      question: "What work does the map avoid?",
+      verdict: "correct",
+    } as Json;
+    const { error: finishError } = await learner.rpc(
+      "finish_ai_coach_interaction",
+      {
+        p_error_code: undefined,
+        p_input_tokens: 20,
+        p_interaction_id: interactionId!,
+        p_output_tokens: 10,
+        p_response: response,
+        p_status: "completed",
+        p_total_tokens: 30,
+      },
+    );
+    expect(finishError).toBeNull();
+    const { data: ownRows } = await learner
+      .from("ai_coach_interactions")
+      .select("status, total_tokens, response");
+    expect(ownRows).toEqual([
+      expect.objectContaining({ status: "completed", total_tokens: 30 }),
+    ]);
+    expect(
+      (await otherLearner.from("ai_coach_interactions").select("id")).data,
+    ).toEqual([]);
+    expect(
+      (
+        await learner.from("ai_coach_interactions").insert({
+          attempt_id: attemptId,
+          interaction_type: "hint",
+          model: "forged",
+          provider: "openai",
+          user_id: learnerId,
+        })
+      ).error?.code,
+    ).toBe("42501");
+
+    for (let count = 1; count < 20; count += 1) {
+      const { error } = await learner.rpc("reserve_ai_coach_interaction", {
+        p_attempt_id: attemptId,
+        p_interaction_type: "hint",
+        p_model: "test-model",
+        p_provider: "openai",
+      });
+      expect(error, `reservation ${count + 1}`).toBeNull();
+    }
+    expect(
+      (
+        await learner.rpc("reserve_ai_coach_interaction", {
+          p_attempt_id: attemptId,
+          p_interaction_type: "hint",
+          p_model: "test-model",
+          p_provider: "openai",
+        })
+      ).error,
+    ).not.toBeNull();
   });
 
   it("prevents anonymous and cross-learner access", async () => {

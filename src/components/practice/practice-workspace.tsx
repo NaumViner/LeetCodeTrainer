@@ -6,6 +6,7 @@ import {
   Clock3,
   ExternalLink,
   Lightbulb,
+  MessageCircleQuestion,
   Pause,
   Play,
   RotateCcw,
@@ -24,10 +25,12 @@ import {
   advanceAttemptAction,
   completeAttemptAction,
   requestAttemptHintAction,
+  requestPatternAnalysisAction,
   savePreAttemptAction,
   updateAttemptTimerAction,
 } from "@/features/practice/actions";
 import type { PracticeAttempt } from "@/features/practice/queries";
+import type { CoachEvaluation } from "@/features/ai-coach/model";
 
 const phaseLabels: Record<AttemptPhase, string> = {
   coding: "Coding",
@@ -41,13 +44,22 @@ const phaseLabels: Record<AttemptPhase, string> = {
 const textareaClass =
   "bg-surface placeholder:text-muted/70 focus:border-primary min-h-28 w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm outline-none";
 
-export function PracticeWorkspace({ attempt }: { attempt: PracticeAttempt }) {
+export function PracticeWorkspace({
+  aiCoachEnabled,
+  attempt,
+}: {
+  aiCoachEnabled: boolean;
+  attempt: PracticeAttempt;
+}) {
   const router = useRouter();
   const [phase, setPhase] = useState(attempt.phase as AttemptPhase);
   const [seconds, setSeconds] = useState(attempt.effectiveDurationSeconds);
   const [running, setRunning] = useState(attempt.timer_running);
   const [codeSnapshot, setCodeSnapshot] = useState(attempt.code_snapshot ?? "");
   const [hints, setHints] = useState(attempt.hints);
+  const [patternAnalysis, setPatternAnalysis] = useState(
+    attempt.patternAnalysis,
+  );
   const [message, setMessage] = useState("");
   const [isPending, runAction] = useTransition();
 
@@ -118,6 +130,18 @@ export function PracticeWorkspace({ attempt }: { attempt: PracticeAttempt }) {
         return;
       }
       setHints((current) => [...current, result.data]);
+    });
+  };
+
+  const analyzePattern = () => {
+    setMessage("");
+    runAction(async () => {
+      const result = await requestPatternAnalysisAction(attempt.id);
+      if (result.status === "error") {
+        setMessage(result.message);
+        return;
+      }
+      setPatternAnalysis(result.data);
     });
   };
 
@@ -201,8 +225,11 @@ export function PracticeWorkspace({ attempt }: { attempt: PracticeAttempt }) {
           ) : null}
           {phase === "planning" ? (
             <PlanningStep
+              aiCoachEnabled={aiCoachEnabled}
+              analysis={patternAnalysis}
               attempt={attempt}
               disabled={isPending}
+              onAnalyze={analyzePattern}
               onAdvance={() => advance("coding")}
             />
           ) : null}
@@ -300,6 +327,12 @@ export function PracticeWorkspace({ attempt }: { attempt: PracticeAttempt }) {
               <h2 className="flex items-center gap-2 font-semibold">
                 <Lightbulb aria-hidden="true" className="text-primary size-4" />
                 Progressive hints
+                <Badge
+                  className="ml-auto"
+                  variant={aiCoachEnabled ? "success" : "neutral"}
+                >
+                  {aiCoachEnabled ? "AI-enhanced" : "Built-in"}
+                </Badge>
               </h2>
               <div className="mt-4 space-y-3">
                 {hints.map((hint) => (
@@ -423,12 +456,18 @@ function PreAttemptStep({
 }
 
 function PlanningStep({
+  aiCoachEnabled,
+  analysis,
   attempt,
   disabled,
+  onAnalyze,
   onAdvance,
 }: {
+  aiCoachEnabled: boolean;
+  analysis: (CoachEvaluation & { source: "ai" | "fallback" }) | null;
   attempt: PracticeAttempt;
   disabled: boolean;
+  onAnalyze(): void;
   onAdvance(): void;
 }) {
   return (
@@ -498,11 +537,59 @@ function PlanningStep({
           State the invariant, the data you maintain, and why each update moves
           toward the answer. Say it aloud before implementation.
         </p>
+        {aiCoachEnabled ? (
+          <div className="mt-6 rounded-xl border p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="flex items-center gap-2 font-semibold">
+                  <MessageCircleQuestion
+                    aria-hidden="true"
+                    className="text-primary size-4"
+                  />
+                  Pattern coach
+                </p>
+                <p className="text-muted mt-1 text-xs">
+                  Challenges your reasoning without revealing the solution.
+                </p>
+              </div>
+              <Button
+                disabled={disabled}
+                onClick={onAnalyze}
+                variant="secondary"
+              >
+                {analysis ? "Analyze again" : "Analyze my prediction"}
+              </Button>
+            </div>
+            {analysis ? <PatternAnalysis analysis={analysis} /> : null}
+          </div>
+        ) : null}
         <Button className="mt-6" disabled={disabled} onClick={onAdvance}>
           Begin coding <ArrowRight aria-hidden="true" className="size-4" />
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function PatternAnalysis({
+  analysis,
+}: {
+  analysis: CoachEvaluation & { source: "ai" | "fallback" };
+}) {
+  return (
+    <div className="bg-surface-subtle mt-4 rounded-lg border p-4 text-sm">
+      <div className="flex flex-wrap gap-2">
+        <Badge variant={analysis.verdict === "correct" ? "success" : "primary"}>
+          {analysis.verdict.replaceAll("_", " ")}
+        </Badge>
+        {analysis.source === "fallback" ? (
+          <Badge>Graceful fallback</Badge>
+        ) : null}
+      </div>
+      <p className="mt-3 leading-6">{analysis.feedback}</p>
+      <p className="text-primary mt-3 font-medium">{analysis.question}</p>
+      <p className="text-muted mt-2">Next: {analysis.nextStep}</p>
+    </div>
   );
 }
 
