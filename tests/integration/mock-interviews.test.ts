@@ -71,6 +71,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   let otherId = "";
   let problemId = "";
   let interviewId = "";
+  let realtimeSessionId = "";
 
   beforeAll(async () => {
     const status = localStatus();
@@ -162,6 +163,49 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     expect(overlappingPracticeError).not.toBeNull();
   });
 
+  it("persists a private realtime transcript and code context", async () => {
+    const { data: sessionId, error: sessionError } = await learner.rpc(
+      "begin_realtime_interview_session",
+      {
+        p_mock_interview_id: interviewId,
+        p_model: "gpt-realtime",
+        p_provider: "openai",
+        p_provider_call_id: "rtc_test",
+      },
+    );
+    expect(sessionError).toBeNull();
+    realtimeSessionId = sessionId!;
+    for (const [eventType, phase, content] of [
+      ["user_transcript", "intro", "I will clarify the constraints."],
+      ["assistant_transcript", "intro", "What assumptions would you check?"],
+      ["code_snapshot", "implementation", "function solve() { return 1; }"],
+    ] as const) {
+      const { error } = await learner.rpc("append_realtime_interview_event", {
+        p_content: content,
+        p_event_type: eventType,
+        p_mock_interview_id: interviewId,
+        p_phase: phase,
+      });
+      expect(error, eventType).toBeNull();
+    }
+    const { data: events } = await learner
+      .from("realtime_interview_events")
+      .select("event_type, content")
+      .eq("session_id", realtimeSessionId)
+      .order("id");
+    expect(events?.map((event) => event.event_type)).toEqual([
+      "user_transcript",
+      "assistant_transcript",
+      "code_snapshot",
+    ]);
+    expect(
+      (await other.from("realtime_interview_sessions").select("*")).data,
+    ).toEqual([]);
+    expect(
+      (await other.from("realtime_interview_events").select("*")).data,
+    ).toEqual([]);
+  });
+
   it("rejects phase skipping and persists every ordered stage", async () => {
     const skip = await learner.rpc("advance_mock_interview", {
       p_elapsed_seconds: 1,
@@ -203,6 +247,14 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       phase: "retrospective",
       timer_running: false,
     });
+    const { data: realtimeSession } = await learner
+      .from("realtime_interview_sessions")
+      .select("status, summary, ended_at")
+      .eq("id", realtimeSessionId)
+      .single();
+    expect(realtimeSession?.status).toBe("completed");
+    expect(realtimeSession?.ended_at).not.toBeNull();
+    expect(realtimeSession?.summary).toContain("1 learner turns");
   });
 
   it("creates a deterministic scorecard and feeds weakness into mastery", async () => {
@@ -275,6 +327,16 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         user_id: learnerId,
       });
     expect(directError?.code).toBe("42501");
+    const { error: directRealtimeError } = await learner
+      .from("realtime_interview_events")
+      .insert({
+        content: "forged",
+        event_type: "connection",
+        phase: "intro",
+        session_id: realtimeSessionId,
+        user_id: learnerId,
+      });
+    expect(directRealtimeError?.code).toBe("42501");
     const { error: anonymousError } = await anonymous.rpc(
       "start_mock_interview",
       {

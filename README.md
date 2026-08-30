@@ -4,7 +4,7 @@ An adaptive technical-interview learning platform focused on independent problem
 
 ## Current status
 
-Phases 1–12 are complete. The optional AI learning coach includes a provider abstraction, validated OpenAI adapter, progressive hints, pattern and complexity feedback, post-attempt analysis, active-recall review cards, safe fallbacks, and private usage controls. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
+Phases 1–13 are complete. The platform now includes the optional AI learning coach and a feature-flagged realtime voice interviewer with a secure WebRTC handshake, live transcript, code and phase context, and private session history. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
 
 ## Stack
 
@@ -20,6 +20,7 @@ Phases 1–12 are complete. The optional AI learning coach includes a provider a
 - Adaptive concept, pattern-recognition, and coding diagnostic with initial mastery placement
 - Timed mock interviews with hidden topics, ordered phases, private scorecards, and history
 - Feature-flagged AI learning coach with structured outputs, quotas, and no-AI fallback
+- Feature-flagged realtime voice interviews over WebRTC with transcript and code context
 - Vitest, React Testing Library, and Playwright
 - ESLint and Prettier
 
@@ -55,7 +56,7 @@ npm run db:types    # regenerate TypeScript database types
 
 Problem metadata is generated from `data/problems.json`. After reviewing catalog changes, rebuild its seed migration with `npm run data:problems:generate`. The optional `npm run data:problems:sync` command refreshes public metadata from the documented upstream sources and requires network access.
 
-See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), [adaptive-recommendations.md](docs/adaptive-recommendations.md), [daily-plan.md](docs/daily-plan.md), [diagnostic.md](docs/diagnostic.md), [mock-interviews.md](docs/mock-interviews.md), [ai-coach.md](docs/ai-coach.md), and [security.md](docs/security.md) for the model and deployment notes.
+See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), [adaptive-recommendations.md](docs/adaptive-recommendations.md), [daily-plan.md](docs/daily-plan.md), [diagnostic.md](docs/diagnostic.md), [mock-interviews.md](docs/mock-interviews.md), [ai-coach.md](docs/ai-coach.md), [realtime-interviewer.md](docs/realtime-interviewer.md), and [security.md](docs/security.md) for the model and deployment notes.
 
 ## Quality checks
 
@@ -99,5 +100,8 @@ Copy `.env.example` to `.env.local`. Never commit `.env.local` or provider secre
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only administrative key; the application does not require it
 - `AI_COACH_ENABLED`: server-only feature flag; defaults to disabled
 - `AI_PROVIDER`, `AI_MODEL`, and `AI_API_KEY`: optional server-only learning-coach configuration
+- `REALTIME_AI_ENABLED`: server-only realtime-interviewer feature flag; defaults to disabled
+- `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, and `REALTIME_AI_API_KEY`: server-only realtime provider configuration
+- `REALTIME_AI_TRANSCRIPTION_MODEL` and `REALTIME_AI_VOICE`: optional input-transcription and voice overrides
 
 Google and GitHub sign-in buttons are implemented, but each provider remains disabled until its credentials and callback URLs are configured in the target Supabase project. Email/password authentication works locally without external credentials.

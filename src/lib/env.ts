@@ -33,6 +33,9 @@ export const serverEnvSchema = z.object({
   REALTIME_AI_PROVIDER: optionalString,
   REALTIME_AI_MODEL: optionalString,
   REALTIME_AI_API_KEY: optionalString,
+  REALTIME_AI_ENABLED: optionalBoolean,
+  REALTIME_AI_TRANSCRIPTION_MODEL: optionalString,
+  REALTIME_AI_VOICE: optionalString,
   ANALYTICS_PROVIDER: optionalString,
 });
 

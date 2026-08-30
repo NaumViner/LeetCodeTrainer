@@ -68,6 +68,12 @@ Authenticated security-definer functions replace a plan and toggle one item. Rep
 
 The table uses forced RLS and own-row reads. Direct browser inserts, updates, and deletes are revoked. Pending reservations continue to count if an application process is interrupted, preventing retries or crashes from bypassing the request budget.
 
+## Realtime-interview model
+
+`realtime_interview_sessions` stores one optional provider session per mock interview, including provider/model identity, connection lifecycle, a bounded completion summary, and private provider call identifier. Reconnects update that same record instead of creating competing sessions.
+
+`realtime_interview_events` stores ordered completed learner/interviewer transcript turns, phase context, code snapshots, and connection events. General events are capped at 8,000 characters and code snapshots at 50,000. Authenticated functions verify ownership and an active parent interview before starting a session or appending an event. Direct browser writes are revoked, both tables use forced RLS, and completion of the parent mock interview closes any active realtime session and creates a deterministic summary.
+
 ## Migration workflow
 
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.

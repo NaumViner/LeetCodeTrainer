@@ -4,6 +4,7 @@ import { MockInterviewWorkspace } from "@/components/mock-interviews/mock-interv
 import type { MockInterviewPhase } from "@/domain/mock-interview";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { getMockInterview } from "@/features/mock-interviews/queries";
+import { isRealtimeInterviewEnabled } from "@/features/realtime-interviews/config";
 
 export default async function MockInterviewPage({
   params,
@@ -26,6 +27,25 @@ export default async function MockInterviewPage({
         effectiveElapsedSeconds: interview.effectiveElapsedSeconds,
         id: interview.id,
         phase: interview.phase as MockInterviewPhase,
+        realtimeEnabled: isRealtimeInterviewEnabled(),
+        realtimeTranscript: interview.realtimeEvents.flatMap((event) => {
+          if (
+            event.event_type !== "user_transcript" &&
+            event.event_type !== "assistant_transcript"
+          ) {
+            return [];
+          }
+          return [
+            {
+              id: String(event.id),
+              role:
+                event.event_type === "user_transcript"
+                  ? ("learner" as const)
+                  : ("interviewer" as const),
+              text: event.content,
+            },
+          ];
+        }),
         problem: {
           canonicalUrl:
             interview.problem.external_url ??

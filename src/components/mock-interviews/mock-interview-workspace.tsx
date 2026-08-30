@@ -26,12 +26,19 @@ import {
   advanceMockInterviewAction,
   completeMockInterviewAction,
 } from "@/features/mock-interviews/actions";
+import {
+  RealtimeInterviewPanel,
+  type RealtimeContextUpdate,
+} from "@/components/mock-interviews/realtime-interview-panel";
+import type { RealtimeTranscriptEntry } from "@/features/realtime-interviews/model";
 
 type InterviewWorkspaceInput = {
   difficultyMode: string;
   durationMinutes: number;
   effectiveElapsedSeconds: number;
   id: string;
+  realtimeEnabled: boolean;
+  realtimeTranscript: RealtimeTranscriptEntry[];
   phase: MockInterviewPhase;
   problem: {
     canonicalUrl: string;
@@ -55,6 +62,8 @@ export function MockInterviewWorkspace({
   const [seconds, setSeconds] = useState(interview.effectiveElapsedSeconds);
   const [running, setRunning] = useState(interview.timerRunning);
   const [message, setMessage] = useState("");
+  const [realtimeContext, setRealtimeContext] =
+    useState<RealtimeContextUpdate | null>(null);
   const [isPending, runAction] = useTransition();
 
   useEffect(() => {
@@ -74,6 +83,7 @@ export function MockInterviewWorkspace({
     const index = MOCK_INTERVIEW_PHASES.indexOf(phase);
     const target = MOCK_INTERVIEW_PHASES[index + 1];
     if (!target || target === "completed") return;
+    const sourcePhase = phase;
     setMessage("");
     runAction(async () => {
       const result = await advanceMockInterviewAction(interview.id, {
@@ -85,6 +95,21 @@ export function MockInterviewWorkspace({
         setMessage(result.message);
         return;
       }
+      const submittedContent =
+        input.notes ??
+        [input.timeComplexity, input.spaceComplexity]
+          .filter(Boolean)
+          .join(" time; ") + (input.spaceComplexity ? " space" : "");
+      const content =
+        submittedContent.trim() ||
+        `Learner completed ${sourcePhase} and entered ${target}.`;
+      setRealtimeContext({
+        content,
+        eventType:
+          sourcePhase === "implementation" ? "code_snapshot" : "phase_context",
+        id: crypto.randomUUID(),
+        phase: sourcePhase,
+      });
       setPhase(target);
       if (target === "retrospective") setRunning(false);
     });
@@ -166,6 +191,15 @@ export function MockInterviewWorkspace({
           );
         })}
       </ol>
+
+      {interview.realtimeEnabled ? (
+        <RealtimeInterviewPanel
+          contextUpdate={realtimeContext}
+          initialTranscript={interview.realtimeTranscript}
+          interviewId={interview.id}
+          phase={phase}
+        />
+      ) : null}
 
       {message ? (
         <p
@@ -458,7 +492,7 @@ function Retrospective({
           Complete the retrospective
         </h2>
         <p className="text-muted mt-2 text-sm leading-6">
-          Rate only dimensions the app cannot execute or hear yet. Evidence from
+          Rate the dimensions that still require your judgment. Evidence from
           earlier phases scores the rest.
         </p>
         <form className="mt-6 grid gap-5 sm:grid-cols-2" onSubmit={submit}>

@@ -1,4 +1,10 @@
-import { ArrowRight, CheckCircle2, Lightbulb, Target } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Lightbulb,
+  MessageCircle,
+  Target,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -127,6 +133,52 @@ export default async function MockInterviewScorecardPage({
           </CardContent>
         </Card>
       </div>
+      {interview.realtimeSession ? (
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <MessageCircle
+                aria-hidden="true"
+                className="text-primary size-5"
+              />
+              <h2 className="text-xl font-semibold">Voice interview record</h2>
+              <Badge variant="primary">Transcript saved</Badge>
+            </div>
+            {interview.realtimeSession.summary ? (
+              <p className="text-muted mt-3 text-sm leading-6">
+                {interview.realtimeSession.summary}
+              </p>
+            ) : null}
+            <div className="bg-surface-subtle mt-5 max-h-96 space-y-4 overflow-y-auto rounded-xl border p-4">
+              {interview.realtimeEvents
+                .filter((event) =>
+                  ["user_transcript", "assistant_transcript"].includes(
+                    event.event_type,
+                  ),
+                )
+                .map((event) => (
+                  <div key={event.id}>
+                    <p className="text-muted text-xs font-semibold uppercase">
+                      {event.event_type === "user_transcript"
+                        ? "You"
+                        : "Interviewer"}
+                    </p>
+                    <p className="mt-1 text-sm leading-6">{event.content}</p>
+                  </div>
+                ))}
+              {interview.realtimeEvents.every(
+                (event) =>
+                  event.event_type !== "user_transcript" &&
+                  event.event_type !== "assistant_transcript",
+              ) ? (
+                <p className="text-muted text-sm">
+                  No completed transcript turns were recorded.
+                </p>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
       <Card>
         <CardContent className="p-6">
           <h2 className="font-semibold">Pattern reveal</h2>

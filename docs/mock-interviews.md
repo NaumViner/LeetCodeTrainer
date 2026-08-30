@@ -23,4 +23,4 @@ Completed and abandoned sessions remain available in Interview history. Scorecar
 
 Mock-interview data uses forced Row Level Security and own-row read policies. Browser roles cannot insert, update, or delete sessions or scorecards directly. Authenticated database functions enforce ownership, one active interview, exact phase order, elapsed-time monotonicity, field limits, and transactional scorecard creation. Practice and interview starts share a learner-scoped transaction lock so the two modes cannot overlap.
 
-Only public catalog metadata is stored; the problem statement remains at its canonical LeetCode URL. Live interviewer conversation and voice are intentionally reserved for the later realtime interview phase.
+Only public catalog metadata is stored; the problem statement remains at its canonical LeetCode URL. When the realtime feature is configured, voice remains optional and attaches to this same state machine. The interviewer receives only topic-free problem metadata, the current phase, submitted phase evidence, and code snapshots. Final learner and interviewer transcript turns are stored privately and appear on the completed scorecard.

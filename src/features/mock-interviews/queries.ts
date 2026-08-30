@@ -5,10 +5,14 @@ import type { Tables } from "@/types/database";
 
 export type MockInterviewRow = Tables<"mock_interviews">;
 export type MockInterviewScorecardRow = Tables<"mock_interview_scorecards">;
+export type RealtimeInterviewEventRow = Tables<"realtime_interview_events">;
+export type RealtimeInterviewSessionRow = Tables<"realtime_interview_sessions">;
 
 export type MockInterviewDetail = MockInterviewRow & {
   effectiveElapsedSeconds: number;
   problem: Awaited<ReturnType<typeof getProblemCatalog>>[number];
+  realtimeEvents: RealtimeInterviewEventRow[];
+  realtimeSession: RealtimeInterviewSessionRow | null;
   scorecard: MockInterviewScorecardRow | null;
 };
 
@@ -39,13 +43,35 @@ export async function getMockInterview(userId: string, interviewId: string) {
   if (!interview) return null;
   const problem = catalog.find((item) => item.id === interview.problem_id);
   if (!problem) return null;
-  const { data: scorecard, error: scorecardError } = await supabase
-    .from("mock_interview_scorecards")
-    .select("*")
-    .eq("mock_interview_id", interview.id)
-    .maybeSingle();
+  const [
+    { data: scorecard, error: scorecardError },
+    { data: realtimeSession, error: realtimeSessionError },
+  ] = await Promise.all([
+    supabase
+      .from("mock_interview_scorecards")
+      .select("*")
+      .eq("mock_interview_id", interview.id)
+      .maybeSingle(),
+    supabase
+      .from("realtime_interview_sessions")
+      .select("*")
+      .eq("mock_interview_id", interview.id)
+      .maybeSingle(),
+  ]);
   if (scorecardError)
     throw new Error("The interview scorecard could not be loaded.");
+  if (realtimeSessionError)
+    throw new Error("The live interview session could not be loaded.");
+  const { data: realtimeEvents, error: realtimeEventsError } = realtimeSession
+    ? await supabase
+        .from("realtime_interview_events")
+        .select("*")
+        .eq("session_id", realtimeSession.id)
+        .order("created_at")
+        .order("id")
+    : { data: [], error: null };
+  if (realtimeEventsError)
+    throw new Error("The live interview transcript could not be loaded.");
   return {
     ...interview,
     effectiveElapsedSeconds: effectiveInterviewElapsed({
@@ -55,6 +81,8 @@ export async function getMockInterview(userId: string, interviewId: string) {
       timerRunning: interview.timer_running,
     }),
     problem,
+    realtimeEvents: realtimeEvents ?? [],
+    realtimeSession,
     scorecard,
   } satisfies MockInterviewDetail;
 }

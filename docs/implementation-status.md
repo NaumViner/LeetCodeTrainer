@@ -297,7 +297,32 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Database tests prove private usage records, revoked direct writes, token persistence, and rolling request-limit enforcement.
 - Existing practice and browser workflows continue to operate with the feature disabled.
 
-## Phases 13–15
+## Phase 13 — Realtime AI interviewer
+
+**Status:** Complete
+
+### Completed
+
+- Provider-independent realtime browser interface, separate from the learning coach
+- Feature-flagged OpenAI WebRTC adapter with configurable realtime model, transcription model, and voice
+- Authenticated server-side SDP proxy through the current Realtime calls endpoint; permanent keys never enter browser code
+- Microphone permission, mute/unmute, input level, interviewer-speaking, typed fallback, and explicit end controls
+- Live learner/interviewer transcript with refresh-safe private persistence
+- Silent interview-phase, phase-evidence, and code-snapshot context events
+- Connected, reconnecting, disconnected, and recoverable error states
+- One private reconnectable realtime record per mock interview plus ordered bounded event history
+- Completed-scorecard transcript and deterministic session summary
+- Forced-RLS own-row reads, revoked direct writes, and ownership-enforcing database functions
+- Fully operational text interview when realtime is disabled or unavailable
+
+### Verification
+
+- Unit tests cover feature-flag configuration, request/event bounds, transcript delta assembly, completed learner turns, and provider errors.
+- Integration coverage verifies private session creation, transcript and code persistence, automatic completion summary, ownership isolation, and revoked direct writes.
+- Lint, strict TypeScript, formatting, unit tests, and production build pass without realtime credentials.
+- A live provider/microphone acceptance run remains environment-dependent and requires configured OpenAI Realtime access plus a running database.
+
+## Phases 14–15
 
 **Status:** Not started
 

@@ -785,6 +785,97 @@ export type Database = {
           },
         ];
       };
+      realtime_interview_events: {
+        Row: {
+          content: string;
+          created_at: string;
+          event_type: string;
+          id: number;
+          phase: string | null;
+          session_id: string;
+          user_id: string;
+        };
+        Insert: {
+          content: string;
+          created_at?: string;
+          event_type: string;
+          id?: never;
+          phase?: string | null;
+          session_id: string;
+          user_id: string;
+        };
+        Update: {
+          content?: string;
+          created_at?: string;
+          event_type?: string;
+          id?: never;
+          phase?: string | null;
+          session_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "realtime_interview_events_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "realtime_interview_sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      realtime_interview_sessions: {
+        Row: {
+          connected_at: string;
+          created_at: string;
+          ended_at: string | null;
+          id: string;
+          mock_interview_id: string;
+          model: string;
+          provider: string;
+          provider_call_id: string | null;
+          status: string;
+          summary: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          connected_at?: string;
+          created_at?: string;
+          ended_at?: string | null;
+          id?: string;
+          mock_interview_id: string;
+          model: string;
+          provider: string;
+          provider_call_id?: string | null;
+          status?: string;
+          summary?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          connected_at?: string;
+          created_at?: string;
+          ended_at?: string | null;
+          id?: string;
+          mock_interview_id?: string;
+          model?: string;
+          provider?: string;
+          provider_call_id?: string | null;
+          status?: string;
+          summary?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "realtime_interview_sessions_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: true;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       problem_prerequisite_topics: {
         Row: {
           problem_id: string;
@@ -1247,6 +1338,24 @@ export type Database = {
         Args: { p_mock_interview_id: string };
         Returns: undefined;
       };
+      append_realtime_interview_event: {
+        Args: {
+          p_content: string;
+          p_event_type: string;
+          p_mock_interview_id: string;
+          p_phase: string;
+        };
+        Returns: number;
+      };
+      begin_realtime_interview_session: {
+        Args: {
+          p_mock_interview_id: string;
+          p_model: string;
+          p_provider: string;
+          p_provider_call_id?: string;
+        };
+        Returns: string;
+      };
       advance_mock_interview: {
         Args: {
           p_elapsed_seconds: number;
@@ -1283,6 +1392,14 @@ export type Database = {
           p_response: Json;
           p_status: string;
           p_total_tokens: number;
+        };
+        Returns: undefined;
+      };
+      end_realtime_interview_session: {
+        Args: {
+          p_mock_interview_id: string;
+          p_status: string;
+          p_summary?: string;
         };
         Returns: undefined;
       };
