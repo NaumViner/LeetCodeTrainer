@@ -10,6 +10,8 @@ import {
 import Link from "next/link";
 
 import { MetricCard } from "@/components/analytics/metric-card";
+import { ReadinessRadarChart } from "@/components/analytics/readiness-radar-chart";
+import { TopicMasteryChart } from "@/components/analytics/topic-mastery-chart";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +25,22 @@ import { requireAuthenticatedUser } from "@/features/auth/session";
 export default async function ProgressPage() {
   const user = await requireAuthenticatedUser();
   const analytics = await getAnalyticsSnapshot(user.id);
+  const readinessDimensions = [
+    { label: "Core patterns", value: analytics.readiness.corePatterns },
+    { label: "Independence", value: analytics.readiness.independentSolving },
+    { label: "Recognition", value: analytics.readiness.recognition },
+    { label: "Retention", value: analytics.readiness.retention },
+    { label: "Timed", value: analytics.readiness.timedPerformance },
+    { label: "Complexity", value: analytics.readiness.complexity },
+  ];
+  const practicedTopics = analytics.topics
+    .filter((item) => item.mastery)
+    .map(({ mastery, topic }) => ({
+      href: `/learn/${topic.slug}`,
+      name: topic.name,
+      value: mastery?.overall_score ?? 0,
+    }))
+    .sort((left, right) => right.value - left.value);
 
   return (
     <div className="space-y-8">
@@ -51,7 +69,7 @@ export default async function ProgressPage() {
       ) : (
         <>
           <Card>
-            <CardContent className="grid gap-7 p-6 sm:p-8 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-center">
+            <CardContent className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[13rem_minmax(15rem,20rem)_minmax(0,1fr)] lg:items-center">
               <div>
                 <p className="text-muted text-sm">Overall readiness</p>
                 <p className="mt-2 text-6xl font-bold tracking-tight">
@@ -65,6 +83,7 @@ export default async function ProgressPage() {
                   Coverage: {analytics.readiness.coverage}% of core topics.
                 </p>
               </div>
+              <ReadinessRadarChart dimensions={readinessDimensions} />
               <div className="grid gap-5 sm:grid-cols-2">
                 <ProgressBar
                   label="Core patterns"
@@ -178,6 +197,12 @@ export default async function ProgressPage() {
             </Card>
           ) : null}
 
+          <Card className="shadow-none">
+            <CardContent className="p-6 sm:p-8">
+              <TopicMasteryChart items={practicedTopics} />
+            </CardContent>
+          </Card>
+
           <section aria-labelledby="topic-mastery">
             <div className="mb-4">
               <h2 className="text-xl font-semibold" id="topic-mastery">
@@ -191,6 +216,9 @@ export default async function ProgressPage() {
             <Card className="overflow-hidden shadow-none">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[850px] text-left text-sm">
+                  <caption className="sr-only">
+                    Detailed topic mastery scores, attempts, and review status
+                  </caption>
                   <thead className="bg-surface-subtle text-muted text-xs tracking-wide uppercase">
                     <tr>
                       {[

@@ -12,7 +12,7 @@ export default function NotFound() {
       <p className="text-muted mt-3">
         The link may be outdated or the page may have moved.
       </p>
-      <Link className={buttonVariants({ size: "lg" })} href="/">
+      <Link className={`${buttonVariants({ size: "lg" })} mt-6`} href="/">
         Return home
       </Link>
     </main>

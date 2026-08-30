@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppNavigation } from "@/components/navigation/app-navigation";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 
 export default async function ProtectedAppLayout({
@@ -19,6 +20,7 @@ export default async function ProtectedAppLayout({
           <span className="text-muted hidden max-w-52 truncate text-sm sm:block">
             {user.email}
           </span>
+          <ThemeToggle />
           <LogoutButton />
         </div>
       }

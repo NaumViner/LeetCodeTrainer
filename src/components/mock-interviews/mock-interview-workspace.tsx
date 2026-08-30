@@ -9,6 +9,7 @@ import {
   ShieldQuestion,
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState, useTransition } from "react";
 
@@ -26,11 +27,14 @@ import {
   advanceMockInterviewAction,
   completeMockInterviewAction,
 } from "@/features/mock-interviews/actions";
-import {
-  RealtimeInterviewPanel,
-  type RealtimeContextUpdate,
-} from "@/components/mock-interviews/realtime-interview-panel";
+import type { RealtimeContextUpdate } from "@/components/mock-interviews/realtime-interview-panel";
 import type { RealtimeTranscriptEntry } from "@/features/realtime-interviews/model";
+
+const RealtimeInterviewPanel = dynamic(() =>
+  import("@/components/mock-interviews/realtime-interview-panel").then(
+    (module) => module.RealtimeInterviewPanel,
+  ),
+);
 
 type InterviewWorkspaceInput = {
   difficultyMode: string;

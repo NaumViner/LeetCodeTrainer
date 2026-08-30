@@ -13,6 +13,7 @@ import { Brand } from "@/components/navigation/brand";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const learningLoop = [
   {
@@ -72,6 +73,15 @@ export default function HomePage() {
               Start preparing
             </Link>
           </nav>
+          <div className="flex items-center gap-1 sm:hidden">
+            <ThemeToggle />
+            <Link
+              className={buttonVariants({ size: "sm", variant: "secondary" })}
+              href="/login"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
       </header>
 

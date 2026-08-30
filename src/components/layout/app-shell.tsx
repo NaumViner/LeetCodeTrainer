@@ -24,13 +24,13 @@ export function AppShell({ children, header, navigation }: AppShellProps) {
         </nav>
       </aside>
       <div className="lg:pl-64">
-        <div className="bg-surface flex min-h-16 items-center justify-between border-b px-5 py-3 sm:px-8">
+        <div className="bg-surface/95 sticky top-0 z-30 flex min-h-16 items-center justify-between border-b px-5 py-3 backdrop-blur sm:px-8">
           <Brand className="lg:hidden" />
           <div className="ml-auto">{header}</div>
         </div>
         <nav
           aria-label="Mobile application navigation"
-          className="bg-surface overflow-x-auto border-b px-3 py-2 lg:hidden"
+          className="bg-surface sticky top-16 z-20 overflow-x-auto border-b px-3 py-2 lg:hidden"
         >
           {navigation}
         </nav>

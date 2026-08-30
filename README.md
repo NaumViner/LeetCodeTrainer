@@ -4,7 +4,7 @@ An adaptive technical-interview learning platform focused on independent problem
 
 ## Current status
 
-Phases 1–13 are complete. The platform now includes the optional AI learning coach and a feature-flagged realtime voice interviewer with a secure WebRTC handshake, live transcript, code and phase context, and private session history. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
+Phases 1–14 are complete. The platform now includes the optional AI learning coach, a feature-flagged realtime voice interviewer, responsive and accessible product states, user-controlled color themes, and evidence-based progress charts. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
 
 ## Stack
 
@@ -21,6 +21,7 @@ Phases 1–13 are complete. The platform now includes the optional AI learning c
 - Timed mock interviews with hidden topics, ordered phases, private scorecards, and history
 - Feature-flagged AI learning coach with structured outputs, quotas, and no-AI fallback
 - Feature-flagged realtime voice interviews over WebRTC with transcript and code context
+- Responsive navigation, polished onboarding and recovery states, accessible charts, and System/Light/Dark themes
 - Vitest, React Testing Library, and Playwright
 - ESLint and Prettier
 
@@ -56,7 +57,7 @@ npm run db:types    # regenerate TypeScript database types
 
 Problem metadata is generated from `data/problems.json`. After reviewing catalog changes, rebuild its seed migration with `npm run data:problems:generate`. The optional `npm run data:problems:sync` command refreshes public metadata from the documented upstream sources and requires network access.
 
-See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), [adaptive-recommendations.md](docs/adaptive-recommendations.md), [daily-plan.md](docs/daily-plan.md), [diagnostic.md](docs/diagnostic.md), [mock-interviews.md](docs/mock-interviews.md), [ai-coach.md](docs/ai-coach.md), [realtime-interviewer.md](docs/realtime-interviewer.md), and [security.md](docs/security.md) for the model and deployment notes.
+See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), [adaptive-recommendations.md](docs/adaptive-recommendations.md), [daily-plan.md](docs/daily-plan.md), [diagnostic.md](docs/diagnostic.md), [mock-interviews.md](docs/mock-interviews.md), [ai-coach.md](docs/ai-coach.md), [realtime-interviewer.md](docs/realtime-interviewer.md), [product-polish.md](docs/product-polish.md), and [security.md](docs/security.md) for the model and deployment notes.
 
 ## Quality checks
 

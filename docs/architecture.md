@@ -44,6 +44,8 @@ The optional learning coach sits behind a provider interface that is separate fr
 
 The realtime interviewer has its own provider boundary and is disabled unless its server-only flag and credentials are present. The browser creates a WebRTC offer and sends it to an authenticated Next.js Route Handler. That server verifies ownership, applies topic-safe interviewer instructions, and proxies the offer to the provider; the permanent provider key never reaches JavaScript. The browser uses the WebRTC audio track and data channel for speech, transcript events, typed turns, phase context, and code snapshots. Narrow database functions persist completed transcript/context events and lifecycle state under forced RLS. The text-only mock interview remains fully operational when realtime is disabled or disconnected.
 
+The interface uses semantic color tokens with an early theme bootstrap for System, Light, and Dark preferences. Navigation, forms, recovery states, and analytics preserve keyboard and screen-reader semantics. Progress visuals are server-rendered SVG and CSS with adjacent exact values. The optional realtime client is dynamically loaded only for voice-enabled sessions, keeping the default text interview bundle smaller. See [product-polish.md](product-polish.md) for the Phase 14 review.
+
 ## Authentication approach
 
 Browser and server clients use `@supabase/ssr`. The Next.js proxy refreshes session cookies and performs optimistic navigation redirects. Protected layouts and Server Actions verify signed claims again before reading or mutating data.

@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 
 import { Brand } from "@/components/navigation/brand";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <main className="grid min-h-screen lg:grid-cols-[0.85fr_1.15fr]">
       <section className="bg-surface flex flex-col border-r px-5 py-6 sm:px-10 lg:px-14">
-        <Brand />
+        <div className="flex items-center justify-between">
+          <Brand />
+          <ThemeToggle />
+        </div>
         <div className="my-auto py-16">
           <p className="text-primary text-sm font-semibold">
             A plan that learns with you

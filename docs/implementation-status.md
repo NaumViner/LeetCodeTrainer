@@ -322,8 +322,29 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Lint, strict TypeScript, formatting, unit tests, and production build pass without realtime credentials.
 - A live provider/microphone acceptance run remains environment-dependent and requires configured OpenAI Realtime access plus a running database.
 
-## Phases 14–15
+## Phase 14 — Polish
+
+**Status:** Complete
+
+### Completed
+
+- Responsive sticky application header and mobile navigation with clear active-page state
+- Browser-persisted System, Light, and Dark themes applied before first paint
+- Accessible readiness radar and ranked topic-mastery charts with exact text values
+- Improved onboarding expectations, step progress, and device-timezone detection
+- Strengthened form validation relationships, error recovery, table labeling, focus behavior, and reduced-motion support
+- Audited task-specific empty states and retained direct next actions throughout learning workflows
+- Lazy-loaded realtime WebRTC interview interface for voice-enabled sessions only
+- Product accessibility and performance review documentation
+
+### Verification
+
+- Component tests cover theme preference changes and accessible analytics values.
+- Lint, strict TypeScript, unit/component tests, formatting, and the production build pass.
+- Database-backed integration and full authenticated browser tests remain dependent on a running local Supabase stack.
+
+## Phase 15 — Deployment
 
 **Status:** Not started
 
-They will be implemented in the order defined by the master build prompt.
+This is the final phase in the master build prompt.

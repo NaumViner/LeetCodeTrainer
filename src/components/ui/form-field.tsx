@@ -27,11 +27,17 @@ export function FieldShell({
         {label}
       </label>
       {description ? (
-        <p className="text-muted mt-1 text-xs leading-5">{description}</p>
+        <p
+          className="text-muted mt-1 text-xs leading-5"
+          id={`${htmlFor}-description`}
+        >
+          {description}
+        </p>
       ) : null}
       <div className="mt-2">{children}</div>
       {error ? (
         <p
+          aria-live="polite"
           className="mt-1.5 text-sm text-red-600 dark:text-red-400"
           id={`${htmlFor}-error`}
         >

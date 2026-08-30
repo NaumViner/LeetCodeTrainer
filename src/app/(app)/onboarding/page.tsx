@@ -19,17 +19,19 @@ export default async function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <p className="text-primary text-sm font-semibold">One short setup</p>
+      <p className="text-primary text-sm font-semibold">
+        Welcome to your academy
+      </p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
         Tell us what you are preparing for.
       </h1>
       <p className="text-muted mt-3 max-w-2xl leading-7">
-        These details determine curriculum pacing and daily study time. The
-        diagnostic comes next and adapts the starting level.
+        In about two minutes, we will shape your curriculum and daily study
+        time. A short diagnostic comes next to adapt your starting level.
       </p>
       <Card className="mt-8 shadow-none">
         <CardContent className="p-6 sm:p-8">
-          <ProfileForm profile={profile} />
+          <ProfileForm onboarding profile={profile} />
         </CardContent>
       </Card>
     </div>

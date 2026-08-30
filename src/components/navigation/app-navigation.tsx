@@ -1,3 +1,5 @@
+"use client";
+
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -11,6 +13,7 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const items = [
   { href: "/dashboard", icon: Gauge, label: "Dashboard" },
@@ -26,19 +29,25 @@ const items = [
 ] as const;
 
 export function AppNavigation() {
+  const pathname = usePathname();
+
   return (
     <ul className="flex gap-1 lg:block lg:space-y-1">
-      {items.map(({ href, icon: Icon, label }) => (
-        <li key={label}>
-          <Link
-            className="text-muted hover:bg-surface-subtle hover:text-foreground flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap lg:gap-3"
-            href={href}
-          >
-            <Icon aria-hidden="true" className="size-4" />
-            {label}
-          </Link>
-        </li>
-      ))}
+      {items.map(({ href, icon: Icon, label }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <li key={label}>
+            <Link
+              aria-current={active ? "page" : undefined}
+              className={`flex min-h-11 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap lg:gap-3 ${active ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-subtle hover:text-foreground"}`}
+              href={href}
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              {label}
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }
