@@ -50,6 +50,7 @@ type InterviewWorkspaceInput = {
     externalId: string;
     title: string;
   };
+  startedAt: string;
   timerRunning: boolean;
 };
 
@@ -69,6 +70,17 @@ export function MockInterviewWorkspace({
   const [realtimeContext, setRealtimeContext] =
     useState<RealtimeContextUpdate | null>(null);
   const [isPending, runAction] = useTransition();
+
+  const authoritativeElapsedSeconds = () =>
+    Math.min(
+      14_400,
+      Math.max(
+        seconds,
+        Math.floor(
+          (Date.now() - new Date(interview.startedAt).getTime()) / 1_000,
+        ),
+      ),
+    );
 
   useEffect(() => {
     if (!running) return;
@@ -91,7 +103,7 @@ export function MockInterviewWorkspace({
     setMessage("");
     runAction(async () => {
       const result = await advanceMockInterviewAction(interview.id, {
-        elapsedSeconds: seconds,
+        elapsedSeconds: authoritativeElapsedSeconds(),
         targetPhase: target,
         ...input,
       });
@@ -124,7 +136,7 @@ export function MockInterviewWorkspace({
     runAction(async () => {
       const result = await completeMockInterviewAction(interview.id, {
         ...input,
-        elapsedSeconds: seconds,
+        elapsedSeconds: authoritativeElapsedSeconds(),
       });
       if (result.status === "error") {
         setMessage(result.message);

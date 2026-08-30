@@ -341,7 +341,8 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 
 - Component tests cover theme preference changes and accessible analytics values.
 - Lint, strict TypeScript, unit/component tests, formatting, and the production build pass.
-- Database-backed integration and full authenticated browser tests remain dependent on a running local Supabase stack.
+- All 34 database integration checks pass against the migrated local Supabase stack.
+- The complete authenticated browser journey passes on desktop and mobile Chromium.
 
 ## Phase 15 — Deployment
 

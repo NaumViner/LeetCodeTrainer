@@ -54,6 +54,7 @@ export default async function MockInterviewPage({
           externalId: interview.problem.external_id ?? "custom",
           title: interview.problem.title,
         },
+        startedAt: interview.started_at,
         timerRunning: interview.timer_running,
       }}
     />

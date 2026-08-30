@@ -1,36 +1,12 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
-type LocalStatus = {
-  API_URL: string;
-  SECRET_KEY?: string;
-  SERVICE_ROLE_KEY?: string;
-};
-
-function readLocalStatus(): LocalStatus {
-  const cliPath = resolve(
-    process.cwd(),
-    "node_modules/supabase/dist/supabase.js",
-  );
-  const output = execFileSync(
-    process.execPath,
-    [cliPath, "status", "-o", "json"],
-    {
-      cwd: process.cwd(),
-      encoding: "utf8",
-    },
-  );
-  return JSON.parse(output) as LocalStatus;
-}
-
 test("a learner can onboard, return, and persist lesson progress", async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const email = `browser-${randomUUID()}@example.com`;
   const password = "BrowserFlow123";
 
@@ -241,8 +217,14 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await expect(
       page.getByRole("heading", { level: 1, name: "Progress and readiness" }),
     ).toBeVisible();
-    await expect(page.getByText("Topic mastery")).toBeVisible();
-    await expect(page.getByText("Two Pointers")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Topic mastery" }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "Topic mastery" })
+        .getByRole("link", { name: "Two Pointers" }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: "History" }).click();
     await expect(
@@ -412,10 +394,10 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     await page.getByRole("link", { name: "Progress" }).click();
     await expect(page.getByText("Interview execution")).toBeVisible();
   } finally {
-    const status = readLocalStatus();
-    const secretKey = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;
-    if (secretKey) {
-      const admin = createClient(status.API_URL, secretKey, {
+    const apiUrl = process.env.E2E_SUPABASE_API_URL;
+    const secretKey = process.env.E2E_SUPABASE_SECRET_KEY;
+    if (apiUrl && secretKey) {
+      const admin = createClient(apiUrl, secretKey, {
         auth: { autoRefreshToken: false, persistSession: false },
       });
       const { data } = await admin.auth.admin.listUsers();

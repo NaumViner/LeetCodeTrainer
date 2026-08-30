@@ -247,14 +247,6 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       phase: "retrospective",
       timer_running: false,
     });
-    const { data: realtimeSession } = await learner
-      .from("realtime_interview_sessions")
-      .select("status, summary, ended_at")
-      .eq("id", realtimeSessionId)
-      .single();
-    expect(realtimeSession?.status).toBe("completed");
-    expect(realtimeSession?.ended_at).not.toBeNull();
-    expect(realtimeSession?.summary).toContain("1 learner turns");
   });
 
   it("creates a deterministic scorecard and feeds weakness into mastery", async () => {
@@ -297,6 +289,14 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       status: "completed",
       timer_running: false,
     });
+    const { data: realtimeSession } = await learner
+      .from("realtime_interview_sessions")
+      .select("status, summary, ended_at")
+      .eq("id", realtimeSessionId)
+      .single();
+    expect(realtimeSession?.status).toBe("completed");
+    expect(realtimeSession?.ended_at).not.toBeNull();
+    expect(realtimeSession?.summary).toContain("1 learner turns");
     expect(scorecard?.overall_score).toBeLessThan(60);
     expect(scorecard?.improvements.length).toBeGreaterThan(0);
     const { data: mastery } = await learner
