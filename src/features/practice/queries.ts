@@ -1,7 +1,13 @@
 import { effectiveDurationSeconds } from "@/domain/practice";
+import type { ZodType } from "zod";
 import {
+  attemptAnalysisSchema,
   coachEvaluationSchema,
+  reviewCardDraftSchema,
+  type AttemptAnalysis,
   type CoachEvaluation,
+  type PersistedCoachResult,
+  type ReviewCardDraft,
 } from "@/features/ai-coach/model";
 import type { Problem } from "@/features/problems/model";
 import { getProblemCatalog } from "@/features/problems/queries";
@@ -13,6 +19,7 @@ export type AttemptHintRow = Tables<"attempt_hints">;
 
 export type PreviousAttemptSummary = Pick<
   AttemptRow,
+  | "id"
   | "completed_at"
   | "correct_pattern"
   | "duration_seconds"
@@ -25,15 +32,18 @@ export type PreviousAttemptSummary = Pick<
 >;
 
 export type PracticeAttempt = AttemptRow & {
+  attemptAnalysis: PersistedCoachResult<AttemptAnalysis> | null;
+  complexityFeedback: PersistedCoachResult<CoachEvaluation> | null;
   effectiveDurationSeconds: number;
   hints: AttemptHintRow[];
-  patternAnalysis: (CoachEvaluation & { source: "ai" | "fallback" }) | null;
+  patternAnalysis: PersistedCoachResult<CoachEvaluation> | null;
   previousAttempt: PreviousAttemptSummary | null;
   problem: Problem;
   reviewSchedule: Pick<
     Tables<"problem_reviews">,
     "interval_days" | "next_review_at" | "repetition"
   > | null;
+  reviewCardDraft: PersistedCoachResult<ReviewCardDraft> | null;
 };
 
 export async function getActiveAttempt(userId: string) {
@@ -149,7 +159,6 @@ export async function getPracticeAttempt(
     { data: hints, error: hintError },
     { data: previousAttempt, error: previousError },
     { data: reviewSchedule, error: reviewError },
-    { data: patternInteraction, error: patternError },
   ] = await Promise.all([
     supabase
       .from("attempt_hints")
@@ -160,7 +169,7 @@ export async function getPracticeAttempt(
       ? supabase
           .from("attempts")
           .select(
-            "completed_at, correct_pattern, duration_seconds, help_level, mistakes, result, submitted_space_complexity, submitted_time_complexity, takeaway",
+            "id, completed_at, correct_pattern, duration_seconds, help_level, mistakes, result, submitted_space_complexity, submitted_time_complexity, takeaway",
           )
           .eq("user_id", userId)
           .eq("problem_id", attempt.problem_id)
@@ -176,29 +185,48 @@ export async function getPracticeAttempt(
       .eq("user_id", userId)
       .eq("problem_id", attempt.problem_id)
       .maybeSingle(),
-    supabase
-      .from("ai_coach_interactions")
-      .select("response, status")
-      .eq("attempt_id", attempt.id)
-      .eq("interaction_type", "pattern_analysis")
-      .in("status", ["completed", "fallback"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
   ]);
 
   if (hintError) throw new Error("Practice hints could not be loaded.");
   if (previousError)
     throw new Error("Previous review evidence could not be loaded.");
   if (reviewError) throw new Error("The review schedule could not be loaded.");
-  if (patternError) throw new Error("Pattern analysis could not be loaded.");
 
-  const patternAnalysis = coachEvaluationSchema.safeParse(
-    patternInteraction?.response,
+  const coachAttemptIds = [attempt.id];
+  if (previousAttempt?.id) coachAttemptIds.push(previousAttempt.id);
+  const { data: interactions, error: coachError } = await supabase
+    .from("ai_coach_interactions")
+    .select("attempt_id, interaction_type, response, status")
+    .in("attempt_id", coachAttemptIds)
+    .in("status", ["completed", "fallback"])
+    .order("created_at", { ascending: false });
+  if (coachError) throw new Error("AI coach results could not be loaded.");
+  const currentInteraction = (interactionType: string) =>
+    (interactions ?? []).find(
+      (item) =>
+        item.attempt_id === attempt.id &&
+        item.interaction_type === interactionType,
+    );
+  const reviewAttemptId =
+    attempt.mode === "review" && attempt.status === "started" && previousAttempt
+      ? previousAttempt.id
+      : attempt.id;
+  const reviewInteraction = (interactions ?? []).find(
+    (item) =>
+      item.attempt_id === reviewAttemptId &&
+      item.interaction_type === "review_card",
   );
 
   return {
     ...attempt,
+    attemptAnalysis: parseCoachResult(
+      currentInteraction("attempt_analysis"),
+      attemptAnalysisSchema,
+    ),
+    complexityFeedback: parseCoachResult(
+      currentInteraction("complexity_feedback"),
+      coachEvaluationSchema,
+    ),
     effectiveDurationSeconds: effectiveDurationSeconds({
       durationSeconds: attempt.duration_seconds,
       now: new Date(),
@@ -206,15 +234,26 @@ export async function getPracticeAttempt(
       timerStartedAt: attempt.timer_started_at,
     }),
     hints: hints ?? [],
-    patternAnalysis: patternAnalysis.success
-      ? {
-          ...patternAnalysis.data,
-          source:
-            patternInteraction?.status === "completed" ? "ai" : "fallback",
-        }
-      : null,
+    patternAnalysis: parseCoachResult(
+      currentInteraction("pattern_analysis"),
+      coachEvaluationSchema,
+    ),
     previousAttempt,
     problem,
     reviewSchedule,
+    reviewCardDraft: parseCoachResult(reviewInteraction, reviewCardDraftSchema),
+  };
+}
+
+function parseCoachResult<T extends object>(
+  interaction:
+    Pick<Tables<"ai_coach_interactions">, "response" | "status"> | undefined,
+  schema: ZodType<T>,
+): PersistedCoachResult<T> | null {
+  const parsed = schema.safeParse(interaction?.response);
+  if (!parsed.success || !parsed.data) return null;
+  return {
+    ...parsed.data,
+    source: interaction?.status === "completed" ? "ai" : "fallback",
   };
 }

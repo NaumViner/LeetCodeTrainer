@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
 
 ## Phase 1 — Repository foundation
 
@@ -274,9 +274,9 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 
 ## Phase 12 — AI learning coach
 
-**Status:** In progress — Phase 12A complete
+**Status:** Complete
 
-### Completed in Phase 12A
+### Completed
 
 - Provider-independent five-operation learning-coach interface, separate from realtime interviewing
 - Feature-flagged OpenAI Responses adapter with configurable model and server-only key
@@ -284,18 +284,16 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 - Minimum-context assembly with hashed learner safety identifiers
 - AI-enhanced progressive hints that preserve all existing help-level accounting
 - Persisted pattern analysis with feedback, one Socratic question, and a concrete next step
+- Reflection-time complexity feedback grounded in the learner's submitted time and space bounds
+- Post-attempt analysis with evidence-based strengths, improvements, and summary
+- Persisted active-recall review-card drafts integrated into the next review's comparison step
 - Private request reservations, rolling 20-request daily limit, provider/model identity, status, and token counters
 - Fully operational deterministic practice experience when AI is disabled or unavailable
 
-### Remaining for Phase 12B
-
-- Complexity feedback
-- Post-attempt analysis
-- Review-card drafting and review-flow integration
-
 ### Verification
 
-- Provider tests prove structured Responses requests, output validation, retry limits, and failure behavior.
+- Provider tests prove structured Responses requests and validation for all response shapes, retry limits, and failure behavior.
+- Deterministic fallback tests prove every Phase 12B response remains schema-valid.
 - Database tests prove private usage records, revoked direct writes, token persistence, and rolling request-limit enforcement.
 - Existing practice and browser workflows continue to operate with the feature disabled.
 

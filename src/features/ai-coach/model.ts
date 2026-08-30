@@ -87,3 +87,5 @@ export type ProviderUsage = {
 };
 
 export type ProviderResult<T> = { data: T; usage: ProviderUsage };
+
+export type PersistedCoachResult<T> = T & { source: "ai" | "fallback" };

@@ -40,7 +40,7 @@ The TypeScript mastery and review modules mirror the database formulas for indep
 
 Mock interviews use a separate persisted state machine so practice assistance cannot leak into an interview. The browser receives only topic-free problem metadata during an active session. Narrow database functions serialize starts, enforce ordered phase transitions, stop the timer at retrospective, create the ten-criterion scorecard, and smooth interview evidence into topic mastery. Readiness blends completed interview execution only after scorecard evidence exists.
 
-The optional learning coach sits behind a provider interface that is separate from the later realtime interviewer. The first adapter uses the OpenAI Responses API with strict JSON schemas, Zod validation, an eight-second timeout, and one safe retry. Practice actions assemble the minimum learner context server-side. Built-in deterministic hints remain the default and the fallback, so neither configuration nor provider failure blocks practice.
+The optional learning coach sits behind a provider interface that is separate from the later realtime interviewer. The first adapter uses the OpenAI Responses API with strict JSON schemas, Zod validation, an eight-second timeout, and one safe retry. Practice actions assemble the minimum learner context server-side. Progressive hints, pattern and complexity feedback, attempt analysis, and review-card drafts persist through one private interaction ledger; review cards reappear as active-recall prompts on the next attempt. Built-in deterministic behavior remains the default and fallback, so neither configuration nor provider failure blocks practice.
 
 ## Authentication approach
 

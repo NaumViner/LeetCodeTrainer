@@ -25,12 +25,20 @@ import {
   advanceAttemptAction,
   completeAttemptAction,
   requestAttemptHintAction,
+  requestAttemptAnalysisAction,
+  requestComplexityFeedbackAction,
   requestPatternAnalysisAction,
+  requestReviewCardDraftAction,
   savePreAttemptAction,
   updateAttemptTimerAction,
 } from "@/features/practice/actions";
 import type { PracticeAttempt } from "@/features/practice/queries";
-import type { CoachEvaluation } from "@/features/ai-coach/model";
+import type {
+  AttemptAnalysis,
+  CoachEvaluation,
+  PersistedCoachResult,
+  ReviewCardDraft,
+} from "@/features/ai-coach/model";
 
 const phaseLabels: Record<AttemptPhase, string> = {
   coding: "Coding",
@@ -60,6 +68,9 @@ export function PracticeWorkspace({
   const [patternAnalysis, setPatternAnalysis] = useState(
     attempt.patternAnalysis,
   );
+  const [complexityFeedback, setComplexityFeedback] = useState(
+    attempt.complexityFeedback,
+  );
   const [message, setMessage] = useState("");
   const [isPending, runAction] = useTransition();
 
@@ -73,7 +84,9 @@ export function PracticeWorkspace({
   }, [phase, running]);
 
   if (attempt.status === "completed" || phase === "completed") {
-    return <CompletedAttempt attempt={attempt} />;
+    return (
+      <CompletedAttempt aiCoachEnabled={aiCoachEnabled} attempt={attempt} />
+    );
   }
 
   const perform = (
@@ -142,6 +155,21 @@ export function PracticeWorkspace({
         return;
       }
       setPatternAnalysis(result.data);
+    });
+  };
+
+  const analyzeComplexity = (input: {
+    spaceComplexity: string;
+    timeComplexity: string;
+  }) => {
+    setMessage("");
+    runAction(async () => {
+      const result = await requestComplexityFeedbackAction(attempt.id, input);
+      if (result.status === "error") {
+        setMessage(result.message);
+        return;
+      }
+      setComplexityFeedback(result.data);
     });
   };
 
@@ -250,8 +278,11 @@ export function PracticeWorkspace({
           ) : null}
           {phase === "reflection" ? (
             <ReflectionStep
+              aiCoachEnabled={aiCoachEnabled}
               attempt={attempt}
               disabled={isPending}
+              feedback={complexityFeedback}
+              onAnalyze={analyzeComplexity}
               onSubmit={(input) =>
                 perform(
                   () =>
@@ -516,6 +547,21 @@ function PlanningStep({
               />
             </dl>
             <div className="mt-4 border-t pt-4 text-sm">
+              {attempt.reviewCardDraft ? (
+                <div className="bg-primary-soft mb-5 rounded-lg border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">Recall prompts</p>
+                    {attempt.reviewCardDraft.source === "fallback" ? (
+                      <Badge>Graceful fallback</Badge>
+                    ) : null}
+                  </div>
+                  <ul className="mt-3 list-disc space-y-2 pl-5 leading-6">
+                    <li>{attempt.reviewCardDraft.patternPrompt}</li>
+                    <li>{attempt.reviewCardDraft.complexityPrompt}</li>
+                    <li>{attempt.reviewCardDraft.mistakePrompt}</li>
+                  </ul>
+                </div>
+              ) : null}
               <p className="text-muted">Earlier takeaway</p>
               <p className="mt-1 leading-6">
                 {attempt.previousAttempt.takeaway ?? "Not recorded"}
@@ -560,7 +606,7 @@ function PlanningStep({
                 {analysis ? "Analyze again" : "Analyze my prediction"}
               </Button>
             </div>
-            {analysis ? <PatternAnalysis analysis={analysis} /> : null}
+            {analysis ? <CoachEvaluationPanel analysis={analysis} /> : null}
           </div>
         ) : null}
         <Button className="mt-6" disabled={disabled} onClick={onAdvance}>
@@ -571,7 +617,7 @@ function PlanningStep({
   );
 }
 
-function PatternAnalysis({
+function CoachEvaluationPanel({
   analysis,
 }: {
   analysis: CoachEvaluation & { source: "ai" | "fallback" };
@@ -681,12 +727,18 @@ function TestingStep({
 }
 
 function ReflectionStep({
+  aiCoachEnabled,
   attempt,
   disabled,
+  feedback,
+  onAnalyze,
   onSubmit,
 }: {
+  aiCoachEnabled: boolean;
   attempt: PracticeAttempt;
   disabled: boolean;
+  feedback: PersistedCoachResult<CoachEvaluation> | null;
+  onAnalyze(input: { spaceComplexity: string; timeComplexity: string }): void;
   onSubmit(input: Record<string, unknown>): void;
 }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -760,6 +812,53 @@ function ReflectionStep({
               required
             />
           </Field>
+          {aiCoachEnabled ? (
+            <div className="rounded-xl border p-5 sm:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 font-semibold">
+                    <MessageCircleQuestion
+                      aria-hidden="true"
+                      className="text-primary size-4"
+                    />
+                    Complexity coach
+                  </p>
+                  <p className="text-muted mt-1 text-xs">
+                    Checks how your claimed bounds follow from the operations
+                    and stored state.
+                  </p>
+                </div>
+                <Button
+                  disabled={disabled}
+                  onClick={(event) => {
+                    const form = event.currentTarget.form;
+                    if (!form) return;
+                    const timeInput = form.elements.namedItem("timeComplexity");
+                    const spaceInput =
+                      form.elements.namedItem("spaceComplexity");
+                    if (
+                      (timeInput instanceof HTMLInputElement &&
+                        !timeInput.reportValidity()) ||
+                      (spaceInput instanceof HTMLInputElement &&
+                        !spaceInput.reportValidity())
+                    ) {
+                      return;
+                    }
+                    const data = new FormData(form);
+                    onAnalyze({
+                      spaceComplexity: String(data.get("spaceComplexity")),
+                      timeComplexity: String(data.get("timeComplexity")),
+                    });
+                  }}
+                  type="button"
+                  variant="secondary"
+                >
+                  {feedback ? "Check again" : "Check complexity"}
+                </Button>
+              </div>
+              {feedback ? <CoachEvaluationPanel analysis={feedback} /> : null}
+            </div>
+          ) : null}
           <Field label="Is the complexity analysis correct?">
             <Select name="complexityCorrect">
               <option value="unknown">Not checked yet</option>
@@ -795,7 +894,42 @@ function ReflectionStep({
   );
 }
 
-function CompletedAttempt({ attempt }: { attempt: PracticeAttempt }) {
+function CompletedAttempt({
+  aiCoachEnabled,
+  attempt,
+}: {
+  aiCoachEnabled: boolean;
+  attempt: PracticeAttempt;
+}) {
+  const [analysis, setAnalysis] = useState(attempt.attemptAnalysis);
+  const [reviewCard, setReviewCard] = useState(attempt.reviewCardDraft);
+  const [message, setMessage] = useState("");
+  const [isPending, runAction] = useTransition();
+
+  const requestAnalysis = () => {
+    setMessage("");
+    runAction(async () => {
+      const result = await requestAttemptAnalysisAction(attempt.id);
+      if (result.status === "error") {
+        setMessage(result.message);
+        return;
+      }
+      setAnalysis(result.data);
+    });
+  };
+
+  const requestReviewCard = () => {
+    setMessage("");
+    runAction(async () => {
+      const result = await requestReviewCardDraftAction(attempt.id);
+      if (result.status === "error") {
+        setMessage(result.message);
+        return;
+      }
+      setReviewCard(result.data);
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-success-soft rounded-xl border p-6 sm:p-8">
@@ -877,6 +1011,103 @@ function CompletedAttempt({ attempt }: { attempt: PracticeAttempt }) {
           </div>
         </CardContent>
       </Card>
+      {aiCoachEnabled ? (
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Learning coach</h2>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  Turn this attempt into focused feedback and active-recall
+                  prompts for the next review.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={isPending}
+                  onClick={requestAnalysis}
+                  variant="secondary"
+                >
+                  {analysis ? "Analyze again" : "Analyze attempt"}
+                </Button>
+                <Button disabled={isPending} onClick={requestReviewCard}>
+                  {reviewCard ? "Redraft review card" : "Draft review card"}
+                </Button>
+              </div>
+            </div>
+
+            {message ? (
+              <p
+                aria-live="polite"
+                className="bg-danger-soft text-danger mt-5 rounded-lg px-4 py-3 text-sm"
+              >
+                {message}
+              </p>
+            ) : null}
+            {analysis ? <AttemptAnalysisPanel analysis={analysis} /> : null}
+            {reviewCard ? <ReviewCardPanel draft={reviewCard} /> : null}
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
+
+function AttemptAnalysisPanel({
+  analysis,
+}: {
+  analysis: PersistedCoachResult<AttemptAnalysis>;
+}) {
+  return (
+    <div className="bg-surface-subtle mt-6 rounded-xl border p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-semibold">Attempt analysis</h3>
+        {analysis.source === "fallback" ? (
+          <Badge>Graceful fallback</Badge>
+        ) : null}
+      </div>
+      <p className="mt-3 text-sm leading-6">{analysis.summary}</p>
+      <div className="mt-4 grid gap-5 text-sm sm:grid-cols-2">
+        <CoachList items={analysis.strengths} label="Strengths" />
+        <CoachList items={analysis.improvements} label="Try next" />
+      </div>
+    </div>
+  );
+}
+
+function ReviewCardPanel({
+  draft,
+}: {
+  draft: PersistedCoachResult<ReviewCardDraft>;
+}) {
+  return (
+    <div className="bg-primary-soft mt-5 rounded-xl border p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-semibold">Next-review recall card</h3>
+        {draft.source === "fallback" ? <Badge>Graceful fallback</Badge> : null}
+      </div>
+      <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6">
+        <li>{draft.patternPrompt}</li>
+        <li>{draft.complexityPrompt}</li>
+        <li>{draft.mistakePrompt}</li>
+      </ul>
+    </div>
+  );
+}
+
+function CoachList({ items, label }: { items: string[]; label: string }) {
+  return (
+    <div>
+      <p className="font-semibold">{label}</p>
+      {items.length ? (
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 leading-6">
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-muted mt-2">None recorded.</p>
+      )}
     </div>
   );
 }

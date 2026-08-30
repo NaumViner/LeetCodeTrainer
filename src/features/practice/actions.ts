@@ -4,8 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { fallbackPatternEvaluation } from "@/features/ai-coach/fallback";
-import type { CoachEvaluation } from "@/features/ai-coach/model";
+import {
+  fallbackAttemptAnalysis,
+  fallbackComplexityEvaluation,
+  fallbackPatternEvaluation,
+  fallbackReviewCard,
+} from "@/features/ai-coach/fallback";
+import type {
+  AttemptAnalysis,
+  CoachEvaluation,
+  PersistedCoachResult,
+  ReviewCardDraft,
+} from "@/features/ai-coach/model";
 import {
   buildCoachContext,
   createLearningCoachProvider,
@@ -33,6 +43,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { TablesUpdate } from "@/types/database";
 
 const problemIdSchema = z.uuid();
+const complexityCoachInputSchema = z.object({
+  spaceComplexity: z.string().trim().min(1).max(120),
+  timeComplexity: z.string().trim().min(1).max(120),
+});
 
 export async function startPracticeAttemptAction(formData: FormData) {
   const problemId = problemIdSchema.safeParse(formData.get("problemId"));
@@ -258,6 +272,123 @@ export async function requestPatternAnalysisAction(
   }
 }
 
+export async function requestComplexityFeedbackAction(
+  attemptId: string,
+  input: unknown,
+): Promise<PracticeActionResult<PersistedCoachResult<CoachEvaluation>>> {
+  const parsedId = attemptIdSchema.safeParse(attemptId);
+  const parsed = complexityCoachInputSchema.safeParse(input);
+  if (!parsedId.success || !parsed.success) return invalidInput();
+  const user = await requireAuthenticatedUser();
+  const attempt = await getPracticeAttempt(user.id, parsedId.data);
+  if (
+    !attempt ||
+    attempt.status !== "started" ||
+    attempt.phase !== "reflection"
+  ) {
+    return unavailableAttempt();
+  }
+  if (!createLearningCoachProvider()) return coachUnavailable();
+  const context = await buildCoachContext(user.id, attempt);
+  const coachInput = { ...context, ...parsed.data };
+  try {
+    const result = await runCoachInteraction({
+      attemptId: attempt.id,
+      fallback: fallbackComplexityEvaluation(coachInput),
+      interactionType: "complexity_feedback",
+      operation: (provider) => provider.evaluateComplexity(coachInput),
+    });
+    revalidateAttempt(attempt.id);
+    return {
+      data: { ...result.data, source: result.source },
+      status: "success",
+    };
+  } catch (error) {
+    return coachFailure(error, "Complexity feedback could not be started.");
+  }
+}
+
+export async function requestAttemptAnalysisAction(
+  attemptId: string,
+): Promise<PracticeActionResult<PersistedCoachResult<AttemptAnalysis>>> {
+  const parsedId = attemptIdSchema.safeParse(attemptId);
+  if (!parsedId.success) return invalidInput();
+  const user = await requireAuthenticatedUser();
+  const attempt = await getPracticeAttempt(user.id, parsedId.data);
+  if (!attempt || attempt.status !== "completed" || !attempt.result) {
+    return unavailableAttempt();
+  }
+  const attemptResult = attempt.result;
+  if (!createLearningCoachProvider()) return coachUnavailable();
+  const context = await buildCoachContext(user.id, attempt);
+  const fallback = fallbackAttemptAnalysis({
+    helpLevel: attempt.help_level,
+    mistakes: attempt.mistakes,
+    result: attemptResult,
+    takeaway: attempt.takeaway ?? "",
+  });
+  try {
+    const result = await runCoachInteraction({
+      attemptId: attempt.id,
+      fallback,
+      interactionType: "attempt_analysis",
+      operation: (provider) =>
+        provider.analyzeAttempt({
+          ...context,
+          codeSnapshot: attempt.code_snapshot ?? "",
+          reflection: [
+            attempt.takeaway,
+            ...attempt.mistakes,
+            ...attempt.edge_cases_missed,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          result: attemptResult,
+        }),
+    });
+    revalidateAttempt(attempt.id);
+    return {
+      data: { ...result.data, source: result.source },
+      status: "success",
+    };
+  } catch (error) {
+    return coachFailure(error, "Attempt analysis could not be started.");
+  }
+}
+
+export async function requestReviewCardDraftAction(
+  attemptId: string,
+): Promise<PracticeActionResult<PersistedCoachResult<ReviewCardDraft>>> {
+  const parsedId = attemptIdSchema.safeParse(attemptId);
+  if (!parsedId.success) return invalidInput();
+  const user = await requireAuthenticatedUser();
+  const attempt = await getPracticeAttempt(user.id, parsedId.data);
+  if (!attempt || attempt.status !== "completed") return unavailableAttempt();
+  if (!createLearningCoachProvider()) return coachUnavailable();
+  const context = await buildCoachContext(user.id, attempt);
+  const coachInput = {
+    ...context,
+    mistakes: attempt.mistakes,
+    takeaway: attempt.takeaway ?? "Review the recognition signal.",
+  };
+  try {
+    const result = await runCoachInteraction({
+      attemptId: attempt.id,
+      fallback: fallbackReviewCard(coachInput),
+      interactionType: "review_card",
+      operation: (provider) => provider.generateReviewCard(coachInput),
+    });
+    revalidateAttempt(attempt.id);
+    revalidatePath("/review");
+    return {
+      data: { ...result.data, source: result.source },
+      status: "success",
+    };
+  } catch (error) {
+    return coachFailure(error, "Review-card drafting could not be started.");
+  }
+}
+
 export async function completeAttemptAction(
   attemptId: string,
   input: unknown,
@@ -358,6 +489,26 @@ function unavailableAttempt(): PracticeActionResult<never> {
 function saveError(): PracticeActionResult<never> {
   return {
     message: "Your practice progress could not be saved.",
+    status: "error",
+  };
+}
+
+function coachUnavailable(): PracticeActionResult<never> {
+  return {
+    message: "The AI coach is not configured for this environment.",
+    status: "error",
+  };
+}
+
+function coachFailure(
+  error: unknown,
+  fallbackMessage: string,
+): PracticeActionResult<never> {
+  return {
+    message:
+      error instanceof Error && error.message === "AI_COACH_LIMIT"
+        ? "Your 20 AI coach requests for the last 24 hours are used."
+        : fallbackMessage,
     status: "error",
   };
 }

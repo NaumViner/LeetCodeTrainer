@@ -4,7 +4,7 @@ An adaptive technical-interview learning platform focused on independent problem
 
 ## Current status
 
-Phases 1–11 are complete, and Phase 12A adds the first half of the optional AI learning coach: a provider abstraction, validated OpenAI adapter, AI-enhanced progressive hints, pattern analysis, safe fallbacks, and private usage controls. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
+Phases 1–12 are complete. The optional AI learning coach includes a provider abstraction, validated OpenAI adapter, progressive hints, pattern and complexity feedback, post-attempt analysis, active-recall review cards, safe fallbacks, and private usage controls. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
 
 ## Stack
 
@@ -19,7 +19,7 @@ Phases 1–11 are complete, and Phase 12A adds the first half of the optional AI
 - Personalized daily-plan generation, completion, regeneration, and dashboard progress
 - Adaptive concept, pattern-recognition, and coding diagnostic with initial mastery placement
 - Timed mock interviews with hidden topics, ordered phases, private scorecards, and history
-- Feature-flagged AI coaching foundation with structured outputs, quotas, and no-AI fallback
+- Feature-flagged AI learning coach with structured outputs, quotas, and no-AI fallback
 - Vitest, React Testing Library, and Playwright
 - ESLint and Prettier
 
