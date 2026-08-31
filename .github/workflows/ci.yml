@@ -18,7 +18,14 @@ jobs:
         with:
           cache: npm
           node-version: 24.x
-      - run: npm ci
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! npm ci 2> >(tee npm-ci-errors.log >&2); then
+            error="$(grep -E '^npm (error|ERR!)' npm-ci-errors.log | head -20 | tr '\n' ' ')"
+            echo "::error title=npm ci failed::${error:-See the npm install log.}"
+            exit 1
+          fi
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -33,8 +40,16 @@ jobs:
         with:
           cache: npm
           node-version: 24.x
-      - run: npm ci
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! npm ci 2> >(tee npm-ci-errors.log >&2); then
+            error="$(grep -E '^npm (error|ERR!)' npm-ci-errors.log | head -20 | tr '\n' ' ')"
+            echo "::error title=npm ci failed::${error:-See the npm install log.}"
+            exit 1
+          fi
       - name: Start and migrate local Supabase
+        id: supabase
         run: npm run db:start
       - name: Export local application settings
         shell: bash
@@ -47,5 +62,5 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: Stop local Supabase
-        if: always()
+        if: always() && steps.supabase.outcome == 'success'
         run: npm run db:stop -- --no-backup
