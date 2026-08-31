@@ -10,13 +10,10 @@ import {
 } from "@/features/auth/schema";
 import { getSupabasePublicConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 
 const configurationMessage =
   "Authentication is not configured. Start the local Supabase stack or add hosted project credentials.";
-
-function siteUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-}
 
 export async function loginAction(
   _previousState: AuthActionState,
@@ -87,7 +84,7 @@ export async function signupAction(
     email: result.data.email,
     options: {
       data: { display_name: result.data.displayName },
-      emailRedirectTo: `${siteUrl()}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/onboarding`,
     },
     password: result.data.password,
   });
@@ -117,7 +114,7 @@ export async function signInWithOAuthAction(
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
-    options: { redirectTo: `${siteUrl()}/auth/callback?next=/onboarding` },
+    options: { redirectTo: `${getSiteUrl()}/auth/callback?next=/onboarding` },
     provider,
   });
 

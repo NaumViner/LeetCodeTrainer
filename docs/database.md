@@ -79,3 +79,5 @@ The table uses forced RLS and own-row reads. Direct browser inserts, updates, an
 Create a new migration for every schema change, test it with `npm run db:reset`, regenerate `src/types/database.ts` with `npm run db:types`, and commit the migration and generated types together.
 
 Production changes should be applied through the Supabase CLI migration workflow after linking the intended project. Do not place production keys in repository files or command history.
+
+The exact dry-run, production push, catalog verification, and rollback boundaries are documented in [deployment.md](deployment.md). The committed `seed.sql` does not create identities or test data; required curriculum and problem metadata are versioned migrations.

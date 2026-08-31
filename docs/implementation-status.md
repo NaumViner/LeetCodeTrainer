@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 ## Phase 1 — Repository foundation
 
@@ -346,6 +346,27 @@ Hosted Supabase deployment is environment-specific and is not linked from the re
 
 ## Phase 15 — Deployment
 
-**Status:** Not started
+**Status:** Complete
 
-This is the final phase in the master build prompt.
+### Completed
+
+- Vercel project configuration with a production-only environment validation gate
+- Canonical and preview-aware application URL resolution for email and OAuth callbacks
+- Database-backed `/api/health` readiness endpoint with safe HTTP 503 failure behavior
+- Independent post-deployment smoke verification command
+- GitHub Actions quality, database integration, and desktop/mobile browser jobs
+- Production Supabase migration procedure with non-destructive dry-run and catalog checks
+- Exact Supabase, Google, and GitHub OAuth URL configuration
+- Complete environment-variable matrix for the optional AI coach and realtime voice interviewer
+- Production acceptance, logging, rollback, and migration compatibility runbook
+
+### Verification
+
+- Production environment validation accepts a complete secret-safe configuration and rejects missing required settings.
+- Unit/component tests cover canonical and Vercel preview URL resolution.
+- The local browser suite verifies the health endpoint against the fully migrated Supabase stack.
+- Lint, strict TypeScript, formatting, unit tests, database integration tests, browser journeys, and the production build pass.
+
+### Launch boundary
+
+Repository deployment readiness is complete. Creating the Vercel and hosted Supabase projects, entering account-owned secrets, choosing the public domain, and enabling billable AI access remain explicit owner actions; no production account was mutated from this checkout.

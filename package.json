@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:production": "npm run env:check:production && next build",
     "start": "next start",
     "lint": "eslint src tests scripts playwright.config.ts vitest.config.mts vitest.integration.config.mts next.config.ts",
     "lint:fix": "eslint src tests scripts playwright.config.ts vitest.config.mts vitest.integration.config.mts next.config.ts --fix",
@@ -13,6 +14,8 @@
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "env:check:production": "node scripts/check-production-env.mjs",
+    "verify:deployment": "node scripts/verify-deployment.mjs",
     "db:start": "supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
     "db:stop": "supabase stop",
     "db:status": "supabase status",
@@ -25,7 +28,7 @@
     "format:check": "prettier --check ."
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "24.x"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

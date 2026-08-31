@@ -6,7 +6,7 @@ Email/password sign-up, login, and logout are fully implemented. New users recei
 
 After profile setup, new learners continue to the initial diagnostic. Returning learners with an unfinished diagnostic resume it, while completed learners go directly to the dashboard. Diagnostic completion and placement columns are excluded from browser profile-update privileges and can only be set by trusted grading.
 
-Google and GitHub OAuth entry points are present but disabled in local Supabase configuration. To enable one, configure its client ID and secret in the Supabase environment, enable the provider, and register `/auth/callback` for the deployment URL.
+Google and GitHub OAuth entry points are present but disabled in local Supabase configuration. To enable one, configure its client ID and secret in the Supabase environment, enable the provider, register the hosted Supabase `/auth/v1/callback` URL with the provider, and allow the application's `/auth/callback` URL in Supabase. See [deployment.md](deployment.md) for the exact production and preview URLs.
 
 ## Session handling
 

@@ -4,7 +4,7 @@ An adaptive technical-interview learning platform focused on independent problem
 
 ## Current status
 
-Phases 1–14 are complete. The platform now includes the optional AI learning coach, a feature-flagged realtime voice interviewer, responsive and accessible product states, user-controlled color themes, and evidence-based progress charts. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
+All 15 implementation phases are complete. The platform includes the optional AI learning coach, a feature-flagged realtime voice interviewer, responsive and accessible product states, automated CI, production environment validation, and database-backed deployment health verification. See [the implementation log](docs/implementation-status.md) for the verified status of each phase.
 
 ## Stack
 
@@ -27,7 +27,7 @@ Phases 1–14 are complete. The platform now includes the optional AI learning c
 
 ## Local setup
 
-Requirements: Node.js 20.9 or newer, npm, and Docker Desktop.
+Requirements: Node.js 24, npm, and Docker Desktop.
 
 ```bash
 npm install
@@ -57,7 +57,7 @@ npm run db:types    # regenerate TypeScript database types
 
 Problem metadata is generated from `data/problems.json`. After reviewing catalog changes, rebuild its seed migration with `npm run data:problems:generate`. The optional `npm run data:problems:sync` command refreshes public metadata from the documented upstream sources and requires network access.
 
-See [database.md](docs/database.md), [authentication.md](docs/authentication.md), [curriculum.md](docs/curriculum.md), [problem-library.md](docs/problem-library.md), [practice-engine.md](docs/practice-engine.md), [analytics-mastery.md](docs/analytics-mastery.md), [spaced-repetition.md](docs/spaced-repetition.md), [adaptive-recommendations.md](docs/adaptive-recommendations.md), [daily-plan.md](docs/daily-plan.md), [diagnostic.md](docs/diagnostic.md), [mock-interviews.md](docs/mock-interviews.md), [ai-coach.md](docs/ai-coach.md), [realtime-interviewer.md](docs/realtime-interviewer.md), [product-polish.md](docs/product-polish.md), and [security.md](docs/security.md) for the model and deployment notes.
+See [deployment.md](docs/deployment.md) for the production runbook. The remaining documents cover the database, authentication, curriculum, problem library, practice engine, analytics, review scheduling, recommendations, daily plans, diagnostic, mock interviews, AI coach, realtime interviewer, product polish, and security model.
 
 ## Quality checks
 
@@ -72,6 +72,16 @@ npm run format:check
 ```
 
 The integration and browser authentication tests require the local Supabase services. Install Playwright's browser once with `npx playwright install chromium`.
+
+## Production deployment
+
+The supported production target is Vercel plus a dedicated hosted Supabase project. CI validates every push and pull request; Vercel runs the stricter production environment check before building. After deployment, verify the landing page and database-backed health endpoint with:
+
+```bash
+npm run verify:deployment -- https://your-production-domain.example
+```
+
+The full migration, OAuth, environment-variable, AI/voice, acceptance, and rollback procedure is in [the deployment runbook](docs/deployment.md). Cloud projects and secrets are intentionally not created or stored by the repository.
 
 ## Structure
 
