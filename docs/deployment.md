@@ -53,10 +53,14 @@ Add the following variables in Vercel. Apply required database variables to Prod
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                             | Production, Preview | Yes                | Browser-safe publishable key                     |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                    | Production, Preview | Legacy only        | Alternative to the publishable key               |
 | `SUPABASE_SERVICE_ROLE_KEY`                                        | Server only         | No                 | Not required by this application                 |
+| `GEMINI_API_KEY`                                                   | Server only         | With Gemini AI     | Shared Gemini coach, evaluator, and Live key     |
 | `AI_COACH_ENABLED`                                                 | Server only         | No                 | Set `true` to enable the learning coach          |
-| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`                            | Server only         | When coach enabled | OpenAI coach configuration                       |
+| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`                            | Server only         | When coach enabled | Gemini or OpenAI coach configuration             |
+| `INTERVIEW_EVALUATOR_ENABLED`                                      | Server only         | No                 | Enables post-interview structured evaluation     |
+| `INTERVIEW_EVALUATOR_PROVIDER`, `INTERVIEW_EVALUATOR_MODEL`        | Server only         | When enabled       | Gemini evaluator configuration                   |
+| `INTERVIEW_EVALUATOR_API_KEY`                                      | Server only         | Optional           | Gemini override when shared key is not used      |
 | `REALTIME_AI_ENABLED`                                              | Server only         | No                 | Set `true` for live voice interviews             |
-| `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, `REALTIME_AI_API_KEY` | Server only         | When voice enabled | OpenAI Realtime configuration                    |
+| `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, `REALTIME_AI_API_KEY` | Server only         | When voice enabled | Gemini Live or OpenAI Realtime configuration     |
 | `REALTIME_AI_TRANSCRIPTION_MODEL`, `REALTIME_AI_VOICE`             | Server only         | No                 | Optional realtime overrides                      |
 | `ANALYTICS_PROVIDER`                                               | Server only         | No                 | Reserved analytics setting                       |
 

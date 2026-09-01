@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { MOCK_INTERVIEW_PHASES } from "@/domain/mock-interview";
+import {
+  INTERVIEWER_LEVELS,
+  INTERVIEW_LANGUAGES,
+  MOCK_INTERVIEW_PHASES,
+} from "@/domain/mock-interview";
 
 export const mockInterviewIdSchema = z.uuid();
 export const mockInterviewSetupSchema = z.object({
@@ -9,7 +13,19 @@ export const mockInterviewSetupSchema = z.object({
     .number()
     .int()
     .pipe(z.union([z.literal(30), z.literal(45), z.literal(60)])),
+  interviewerLevel: z.enum(INTERVIEWER_LEVELS),
+  interviewLanguage: z.enum(INTERVIEW_LANGUAGES),
 });
+
+export type MockInterviewStartActionState = {
+  message: string;
+  status: "error" | "idle";
+};
+
+export const initialMockInterviewStartActionState = {
+  message: "",
+  status: "idle",
+} satisfies MockInterviewStartActionState;
 
 export const mockInterviewAdvanceSchema = z.object({
   elapsedSeconds: z.number().int().min(0).max(14_400),

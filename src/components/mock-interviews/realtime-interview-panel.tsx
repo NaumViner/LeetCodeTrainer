@@ -29,7 +29,12 @@ import type {
   RealtimeConnectionState,
   RealtimeTranscriptEntry,
 } from "@/features/realtime-interviews/model";
+import { GeminiLiveInterviewProvider } from "@/features/realtime-interviews/gemini-live-provider";
 import { OpenAiWebRtcInterviewProvider } from "@/features/realtime-interviews/openai-webrtc-provider";
+import type {
+  RealtimeInterviewProvider,
+  RealtimeInterviewProviderName,
+} from "@/features/realtime-interviews/provider";
 
 export type RealtimeContextUpdate = {
   content: string;
@@ -43,13 +48,17 @@ export function RealtimeInterviewPanel({
   initialTranscript,
   interviewId,
   phase,
+  providerName,
+  textDirection,
 }: {
   contextUpdate: RealtimeContextUpdate | null;
   initialTranscript: RealtimeTranscriptEntry[];
   interviewId: string;
   phase: MockInterviewPhase;
+  providerName: RealtimeInterviewProviderName;
+  textDirection: "auto" | "ltr" | "rtl";
 }) {
-  const providerRef = useRef<OpenAiWebRtcInterviewProvider | null>(null);
+  const providerRef = useRef<RealtimeInterviewProvider | null>(null);
   const persistedContextRef = useRef<string | null>(null);
   const phaseRef = useRef(phase);
   const animationRef = useRef<number | null>(null);
@@ -123,7 +132,7 @@ export function RealtimeInterviewPanel({
     setMessage("");
     await providerRef.current?.closeSession();
     stopInputMeter();
-    const provider = new OpenAiWebRtcInterviewProvider();
+    const provider = createRealtimeProvider(providerName);
     providerRef.current = provider;
     try {
       const session = await provider.createSession({
@@ -254,6 +263,9 @@ export function RealtimeInterviewPanel({
                 <Radio aria-hidden="true" className="text-primary size-4" />
                 Live interviewer
               </h2>
+              <Badge variant="neutral">
+                {providerName === "gemini" ? "Gemini Live" : "OpenAI Live"}
+              </Badge>
               <ConnectionBadge state={connectionState} />
               {isSpeaking ? (
                 <Badge variant="primary">
@@ -332,6 +344,7 @@ export function RealtimeInterviewPanel({
           className="bg-surface-subtle mt-5 max-h-72 space-y-3 overflow-y-auto rounded-xl border p-4"
           aria-label="Live interview transcript"
           aria-live="polite"
+          dir={textDirection}
         >
           {transcript.length ? (
             transcript.map((entry) => (
@@ -360,6 +373,7 @@ export function RealtimeInterviewPanel({
             <input
               className="bg-surface focus:border-primary min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
               id="realtime-message"
+              dir={textDirection}
               maxLength={2_000}
               name="message"
               placeholder="Type instead of speaking…"
@@ -376,6 +390,12 @@ export function RealtimeInterviewPanel({
       </CardContent>
     </Card>
   );
+}
+
+function createRealtimeProvider(provider: RealtimeInterviewProviderName) {
+  return provider === "gemini"
+    ? new GeminiLiveInterviewProvider()
+    : new OpenAiWebRtcInterviewProvider();
 }
 
 function ConnectionBadge({ state }: { state: RealtimeConnectionState }) {

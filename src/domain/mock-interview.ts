@@ -16,6 +16,33 @@ export const MOCK_INTERVIEW_PHASES = [
 export type MockInterviewPhase = (typeof MOCK_INTERVIEW_PHASES)[number];
 export type MockInterviewResult = "failed" | "partial" | "solved";
 
+export const INTERVIEW_LANGUAGES = ["auto", "english", "hebrew"] as const;
+export type InterviewLanguage = (typeof INTERVIEW_LANGUAGES)[number];
+
+export function interviewTextDirection(language: InterviewLanguage) {
+  return language === "hebrew"
+    ? "rtl"
+    : language === "english"
+      ? "ltr"
+      : "auto";
+}
+
+export function normalizeInterviewLanguage(value: string): InterviewLanguage {
+  return value === "hebrew" || value === "english" ? value : "auto";
+}
+
+export const INTERVIEWER_LEVELS = ["beginner", "faang_tough"] as const;
+export type InterviewerLevel = (typeof INTERVIEWER_LEVELS)[number];
+
+export const interviewerLevelLabels: Record<InterviewerLevel, string> = {
+  beginner: "Beginner interviewer",
+  faang_tough: "Tough FAANG interviewer",
+};
+
+export function normalizeInterviewerLevel(value: string): InterviewerLevel {
+  return value === "faang_tough" ? "faang_tough" : "beginner";
+}
+
 export const mockInterviewPhaseLabels: Record<MockInterviewPhase, string> = {
   brute_force: "Brute force",
   clarify: "Clarify",

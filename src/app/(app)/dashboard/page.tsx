@@ -11,6 +11,7 @@ import {
   Dumbbell,
   RefreshCw,
   Target,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -22,6 +23,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { defaultDailyMinutes, localDateKey } from "@/domain/daily-plan";
 import { readinessLevel } from "@/domain/mastery";
+import { recommendedInterviewDifficulty } from "@/domain/interview-recommendation";
+import { interviewEvaluationDimensionLabels } from "@/features/interview-evaluation/model";
 import { formatDuration } from "@/features/analytics/format";
 import { getAnalyticsSnapshot } from "@/features/analytics/queries";
 import { requireAuthenticatedUser } from "@/features/auth/session";
@@ -63,6 +66,10 @@ export default async function DashboardPage() {
         left.mastery!.overall_score - right.mastery!.overall_score,
     )[0];
   const recentAttempt = analytics.attempts[0];
+  const interviewOverall = analytics.interviewPerformance.allTime.overall;
+  const nextInterviewDifficulty = recommendedInterviewDifficulty(
+    analytics.interviewPerformance,
+  );
 
   const details = [
     {
@@ -102,6 +109,75 @@ export default async function DashboardPage() {
         eyebrow="Dashboard"
         title={`Welcome${profile.display_name ? `, ${profile.display_name}` : ""}`}
       />
+
+      <Card>
+        <CardContent className="p-6 sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)_auto] lg:items-center">
+            <div>
+              <p className="text-primary text-sm font-semibold">
+                Interview performance
+              </p>
+              {interviewOverall.adjustedScore === null ? (
+                <p className="mt-2 text-2xl font-bold">No baseline yet</p>
+              ) : (
+                <>
+                  <p className="mt-2 text-5xl font-bold">
+                    {Math.round(interviewOverall.adjustedScore)}
+                  </p>
+                  <Badge className="mt-2" variant="primary">
+                    {interviewOverall.level}
+                  </Badge>
+                </>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <TrendingUp
+                  aria-hidden="true"
+                  className="text-primary size-4"
+                />
+                <p className="font-semibold">
+                  {Math.round(interviewOverall.confidence)}% confidence ·{" "}
+                  {interviewOverall.trend.direction}
+                </p>
+              </div>
+              <p className="text-muted mt-2 text-sm leading-6">
+                {analytics.interviewPerformance.weakestDimensions.length > 0
+                  ? `Priority dimensions: ${analytics.interviewPerformance.weakestDimensions
+                      .map(
+                        (dimension) =>
+                          interviewEvaluationDimensionLabels[dimension],
+                      )
+                      .join(", ")}.`
+                  : "Complete a mock interview to identify the first execution priorities."}
+              </p>
+              <p className="text-muted mt-2 text-xs capitalize">
+                Suggested next interview: {nextInterviewDifficulty} ·{" "}
+                {analytics.interviewPerformance.evaluatedInterviews < 2
+                  ? 30
+                  : interviewOverall.confidence >= 70
+                    ? 60
+                    : 45}{" "}
+                minutes
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 lg:flex-col">
+              <Link
+                className={buttonVariants()}
+                href={`/interviews?difficulty=${nextInterviewDifficulty}&duration=${analytics.interviewPerformance.evaluatedInterviews < 2 ? 30 : interviewOverall.confidence >= 70 ? 60 : 45}`}
+              >
+                Start suggested interview
+              </Link>
+              <Link
+                className={buttonVariants({ variant: "secondary" })}
+                href="/interview-profile"
+              >
+                View interview profile
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <section id="today-plan">
         <Card>
@@ -180,13 +256,13 @@ export default async function DashboardPage() {
             <div className="flex items-start justify-between gap-5">
               <div>
                 <p className="text-primary text-sm font-semibold">
-                  Readiness estimate
+                  Learning readiness
                 </p>
                 <p className="mt-2 text-4xl font-bold">
-                  {Math.round(analytics.readiness.overall)}
+                  {Math.round(analytics.learningReadiness.overall)}
                 </p>
                 <p className="text-muted mt-1 text-sm">
-                  {readinessLevel(analytics.readiness.overall)}
+                  {readinessLevel(analytics.learningReadiness.overall)}
                   {analytics.metrics.totalAttempts === 0
                     ? " · diagnostic baseline"
                     : null}
@@ -199,10 +275,11 @@ export default async function DashboardPage() {
             <ProgressBar
               className="mt-6"
               label="Core-topic evidence"
-              value={analytics.readiness.coverage}
+              value={analytics.learningReadiness.coverage}
             />
             <p className="text-muted mt-4 text-xs">
-              Training estimate, not a prediction of interview outcome.
+              Learning mastery only; interview performance is tracked
+              separately.
             </p>
             <div className="mt-5">
               <Link

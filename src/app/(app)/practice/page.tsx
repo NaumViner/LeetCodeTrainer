@@ -1,4 +1,5 @@
 import { ArrowRight, BrainCircuit, Clock3, Lightbulb } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DifficultyBadge } from "@/components/problems/difficulty-badge";
@@ -28,7 +29,8 @@ export default async function PracticePage({
     getAdaptiveRecommendationSnapshot(user.id, now),
     searchParams,
   ]);
-  const { catalog, evidence, recommendation } = snapshot;
+  const { catalog, evidence, interviewRecommendations, recommendation } =
+    snapshot;
   const requestedExternalId = scalar(params.problem);
   const selected = requestedExternalId
     ? catalog.find((problem) => problem.external_id === requestedExternalId)
@@ -130,6 +132,49 @@ export default async function PracticePage({
           </CardContent>
         </Card>
       </div>
+
+      <section aria-labelledby="interview-first-actions">
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold" id="interview-first-actions">
+            Interview-first next actions
+          </h2>
+          <p className="text-muted mt-1 text-sm">
+            Non-blocking suggestions from interview evidence, learning mastery,
+            retention, and recent repetition. Manual practice remains available.
+          </p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          {interviewRecommendations.slice(0, 3).map((item) => (
+            <Card
+              className="shadow-none"
+              key={`${item.actionType}-${item.target}`}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="primary">Priority {item.priority}</Badge>
+                  <span className="text-muted text-xs">
+                    {item.estimatedMinutes} min
+                  </span>
+                </div>
+                <h3 className="mt-4 font-semibold">{item.title}</h3>
+                <p className="text-muted mt-2 text-sm leading-6">
+                  {item.reasons[0]}
+                </p>
+                <p className="bg-surface-subtle text-muted mt-3 rounded-lg border p-3 text-xs leading-5">
+                  Evidence: {item.evidence[0]}
+                </p>
+                <Link
+                  className="text-primary mt-4 inline-flex items-center gap-2 text-sm font-semibold"
+                  href={item.directRoute}
+                >
+                  Open action
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

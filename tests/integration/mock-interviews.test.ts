@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { buildInterviewEvidencePackage } from "../../src/features/interview-evaluation/evidence-model";
+import type { Problem } from "../../src/features/problems/model";
 import type { Database, Json } from "../../src/types/database";
 
 type LocalStatus = {
@@ -70,7 +72,9 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   let learnerId = "";
   let otherId = "";
   let problemId = "";
+  const problemIdsByDifficulty = new Map<string, string>();
   let interviewId = "";
+  let lastAbandonedInterviewId = "";
   let realtimeSessionId = "";
 
   beforeAll(async () => {
@@ -97,6 +101,8 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       throw new Error("Test users failed.");
     learnerId = first.data.user.id;
     otherId = second.data.user.id;
+    // PostgREST can observe a just-issued local JWT one clock tick before Auth.
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
     const setupResults = await Promise.all([
       learner
         .from("profiles")
@@ -110,14 +116,24 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     const setupError = setupResults.find((result) => result.error)?.error;
     if (setupError) throw setupError;
     await Promise.all([completeDiagnostic(learner), completeDiagnostic(other)]);
-    const { data: problem } = await learner
+    const { data: problems } = await learner
       .from("problems")
-      .select("id")
-      .eq("difficulty", "easy")
-      .limit(1)
-      .single();
-    if (!problem) throw new Error("Interview problem is missing.");
-    problemId = problem.id;
+      .select("id, difficulty")
+      .eq("active", true)
+      .in("difficulty", ["easy", "medium", "hard"]);
+    for (const problem of problems ?? []) {
+      if (!problemIdsByDifficulty.has(problem.difficulty)) {
+        problemIdsByDifficulty.set(problem.difficulty, problem.id);
+      }
+    }
+    problemId = problemIdsByDifficulty.get("easy") ?? "";
+    if (
+      !problemId ||
+      !problemIdsByDifficulty.has("medium") ||
+      !problemIdsByDifficulty.has("hard")
+    ) {
+      throw new Error("Interview inventory is missing a difficulty.");
+    }
   });
 
   afterAll(async () => {
@@ -128,10 +144,58 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     );
   });
 
+  it("accepts every difficulty, duration, and interviewer-level combination", async () => {
+    for (const difficulty of ["adaptive", "easy", "medium", "hard"] as const) {
+      for (const durationMinutes of [30, 45, 60] as const) {
+        for (const interviewerLevel of ["beginner", "faang_tough"] as const) {
+          for (const interviewLanguage of [
+            "auto",
+            "english",
+            "hebrew",
+          ] as const) {
+            const selectedProblemId =
+              difficulty === "adaptive"
+                ? problemId
+                : problemIdsByDifficulty.get(difficulty)!;
+            const { data, error } = await learner.rpc("start_mock_interview", {
+              p_difficulty_mode: difficulty,
+              p_duration_minutes: durationMinutes,
+              p_interview_language: interviewLanguage,
+              p_interviewer_level: interviewerLevel,
+              p_problem_id: selectedProblemId,
+            });
+            expect(
+              error,
+              `${difficulty}/${durationMinutes}/${interviewerLevel}/${interviewLanguage}`,
+            ).toBeNull();
+            lastAbandonedInterviewId = data!;
+            const { error: abandonError } = await learner.rpc(
+              "abandon_mock_interview",
+              { p_mock_interview_id: data! },
+            );
+            expect(abandonError).toBeNull();
+          }
+        }
+      }
+    }
+  });
+
   it("starts one private mandatory-timer session", async () => {
+    expect(
+      (
+        await learner.rpc("start_mock_interview", {
+          p_difficulty_mode: "easy",
+          p_duration_minutes: 45,
+          p_interviewer_level: "unknown",
+          p_problem_id: problemId,
+        })
+      ).error,
+    ).not.toBeNull();
     const { data, error } = await learner.rpc("start_mock_interview", {
       p_difficulty_mode: "easy",
       p_duration_minutes: 45,
+      p_interview_language: "hebrew",
+      p_interviewer_level: "faang_tough",
       p_problem_id: problemId,
     });
     expect(error).toBeNull();
@@ -143,6 +207,8 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .single();
     expect(interview).toMatchObject({
       duration_minutes: 45,
+      interview_language: "hebrew",
+      interviewer_level: "faang_tough",
       phase: "intro",
       status: "active",
       timer_running: true,
@@ -309,6 +375,211 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     expect(mastery?.overall_score).toBeLessThan(beforeMastery!.overall_score);
   });
 
+  it("persists one immutable, ownership-scoped evaluation version", async () => {
+    const { error: abandonedError } = await learner.rpc(
+      "reserve_mock_interview_evaluation",
+      {
+        p_evaluation_version: 1,
+        p_evidence_version: 1,
+        p_mock_interview_id: lastAbandonedInterviewId,
+        p_model: "deterministic-v1",
+        p_provider: "deterministic",
+      },
+    );
+    expect(abandonedError).not.toBeNull();
+
+    const { data: reservationValue, error: reservationError } =
+      await learner.rpc("reserve_mock_interview_evaluation", {
+        p_evaluation_version: 1,
+        p_evidence_version: 1,
+        p_mock_interview_id: interviewId,
+        p_model: "deterministic-v1",
+        p_provider: "deterministic",
+      });
+    expect(reservationError).toBeNull();
+    const reservation = reservationValue as {
+      evaluationId: string;
+      shouldEvaluate: boolean;
+      status: string;
+      version: number;
+    };
+    expect(reservation).toMatchObject({
+      shouldEvaluate: true,
+      status: "pending",
+      version: 1,
+    });
+
+    const invalidFinalize = await learner.rpc(
+      "finalize_mock_interview_evaluation",
+      {
+        p_confidence: 0.3,
+        p_dimensions: {} as Json,
+        p_error_code: "",
+        p_evaluation_id: reservation.evaluationId,
+        p_evidence_coverage: { semanticCorrectness: "unsupported" } as Json,
+        p_improvements: ["Practice testing with boundary cases."],
+        p_input_tokens: 0,
+        p_output_tokens: 0,
+        p_raw_score: 60,
+        p_recommended_actions: [
+          { actionType: "testing_drill", title: "Test boundaries" },
+        ] as Json,
+        p_recurring_signals: [],
+        p_status: "provisional",
+        p_strengths: [],
+        p_summary:
+          "A provisional evaluation with intentionally invalid dimensions.",
+        p_total_tokens: 0,
+      },
+    );
+    expect(invalidFinalize.error).not.toBeNull();
+
+    const dimensions = interviewEvaluationDimensions();
+    const { error: finalizeError } = await learner.rpc(
+      "finalize_mock_interview_evaluation",
+      {
+        p_confidence: 0.3,
+        p_dimensions: dimensions,
+        p_error_code: "provider_unconfigured",
+        p_evaluation_id: reservation.evaluationId,
+        p_evidence_coverage: {
+          hasTrustedTests: false,
+          semanticCorrectness: "unsupported",
+        } as Json,
+        p_improvements: ["Practice testing with boundary cases."],
+        p_input_tokens: 0,
+        p_output_tokens: 0,
+        p_raw_score: 60,
+        p_recommended_actions: [
+          {
+            actionType: "testing_drill",
+            estimatedMinutes: 15,
+            priority: 1,
+            rationale: "Testing evidence was limited in this interview.",
+            target: "testing",
+            title: "Test boundary cases",
+          },
+        ] as Json,
+        p_recurring_signals: [],
+        p_status: "provisional",
+        p_strengths: ["Recorded an optimization path."],
+        p_summary:
+          "This provisional evaluation uses bounded deterministic interview evidence.",
+        p_total_tokens: 0,
+      },
+    );
+    expect(finalizeError).toBeNull();
+
+    const { data: evaluation } = await learner
+      .from("mock_interview_evaluations")
+      .select("*")
+      .eq("id", reservation.evaluationId)
+      .single();
+    expect(evaluation).toMatchObject({
+      confidence: 0.3,
+      error_code: "provider_unconfigured",
+      is_current: true,
+      raw_score: 60,
+      source_difficulty: "easy",
+      source_duration_minutes: 45,
+      source_interviewer_level: "faang_tough",
+      status: "provisional",
+      version: 1,
+    });
+    expect(evaluation?.dimensions).toEqual(dimensions);
+
+    const secondFinalize = await learner.rpc(
+      "finalize_mock_interview_evaluation",
+      {
+        p_confidence: 0.3,
+        p_dimensions: dimensions,
+        p_error_code: "provider_unconfigured",
+        p_evaluation_id: reservation.evaluationId,
+        p_evidence_coverage: {} as Json,
+        p_improvements: ["Practice testing with boundary cases."],
+        p_input_tokens: 0,
+        p_output_tokens: 0,
+        p_raw_score: 60,
+        p_recommended_actions: [{ title: "Repeat" }] as Json,
+        p_recurring_signals: [],
+        p_status: "provisional",
+        p_strengths: [],
+        p_summary: "Attempt to replace an immutable completed evaluation.",
+        p_total_tokens: 0,
+      },
+    );
+    expect(secondFinalize.error).not.toBeNull();
+
+    const { data: secondReservation } = await learner.rpc(
+      "reserve_mock_interview_evaluation",
+      {
+        p_evaluation_version: 1,
+        p_evidence_version: 1,
+        p_mock_interview_id: interviewId,
+        p_model: "deterministic-v1",
+        p_provider: "deterministic",
+      },
+    );
+    expect(secondReservation).toMatchObject({
+      evaluationId: reservation.evaluationId,
+      shouldEvaluate: false,
+      status: "provisional",
+      version: 1,
+    });
+    expect(
+      (await other.from("mock_interview_evaluations").select("*")).data,
+    ).toEqual([]);
+  });
+
+  it("assembles canonical evidence from completed learner-owned rows", async () => {
+    const [interviewResult, problemResult, sessionResult, eventsResult] =
+      await Promise.all([
+        learner
+          .from("mock_interviews")
+          .select("*")
+          .eq("id", interviewId)
+          .single(),
+        learner.from("problems").select("*").eq("id", problemId).single(),
+        learner
+          .from("realtime_interview_sessions")
+          .select("*")
+          .eq("mock_interview_id", interviewId)
+          .maybeSingle(),
+        learner
+          .from("realtime_interview_events")
+          .select("*")
+          .eq("session_id", realtimeSessionId)
+          .order("id"),
+      ]);
+    expect(interviewResult.error).toBeNull();
+    expect(problemResult.error).toBeNull();
+    const { data: primaryTopic, error: topicError } = await learner
+      .from("topics")
+      .select("*")
+      .eq("id", problemResult.data!.primary_topic_id)
+      .single();
+    expect(topicError).toBeNull();
+
+    const evidence = buildInterviewEvidencePackage({
+      assembledAt: new Date(),
+      interview: interviewResult.data!,
+      problem: {
+        ...problemResult.data!,
+        prerequisiteTopics: [],
+        primaryTopic: primaryTopic!,
+        secondaryTopics: [],
+      } satisfies Problem,
+      questionContent: null,
+      realtimeEvents: eventsResult.data ?? [],
+      realtimeSession: sessionResult.data,
+    });
+    expect(evidence).toMatchObject({
+      interview: { id: interviewId },
+      learnerOutcome: { result: "partial" },
+      version: 2,
+    });
+  });
+
   it("denies anonymous, cross-user, and direct browser access", async () => {
     expect((await other.from("mock_interviews").select("*")).data).toEqual([]);
     expect(
@@ -323,6 +594,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .insert({
         difficulty_mode: "easy",
         duration_minutes: 45,
+        interview_language: "hebrew",
         problem_id: problemId,
         user_id: learnerId,
       });
@@ -337,6 +609,21 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         user_id: learnerId,
       });
     expect(directRealtimeError?.code).toBe("42501");
+    const { error: directEvaluationError } = await learner
+      .from("mock_interview_evaluations")
+      .insert({
+        evaluation_version: 1,
+        evidence_version: 1,
+        mock_interview_id: interviewId,
+        model: "forged",
+        provider: "forged",
+        source_difficulty: "easy",
+        source_duration_minutes: 45,
+        source_interviewer_level: "faang_tough",
+        user_id: learnerId,
+        version: 2,
+      });
+    expect(directEvaluationError?.code).toBe("42501");
     const { error: anonymousError } = await anonymous.rpc(
       "start_mock_interview",
       {
@@ -348,3 +635,33 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     expect(anonymousError?.code).toBe("42501");
   });
 });
+
+function interviewEvaluationDimensions(): Json {
+  return Object.fromEntries(
+    [
+      "problemUnderstanding",
+      "clarification",
+      "approachQuality",
+      "optimization",
+      "correctness",
+      "codeQuality",
+      "testing",
+      "complexityReasoning",
+      "communication",
+      "independence",
+    ].map((dimension) => [
+      dimension,
+      {
+        confidence: dimension === "correctness" ? 0.25 : 0.4,
+        evidence: [
+          {
+            reference: `Saved ${dimension} phase evidence.`,
+            source: "phase_note",
+          },
+        ],
+        rationale: `Bounded saved evidence supports the ${dimension} score provisionally.`,
+        score: 3,
+      },
+    ]),
+  ) as Json;
+}

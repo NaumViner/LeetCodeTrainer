@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateAttemptAnalytics,
   overallReadiness,
+  preparationReadiness,
 } from "@/domain/analytics";
 import { scoreAttempt, updateMastery } from "@/domain/mastery";
 
@@ -87,7 +88,17 @@ describe("mastery and analytics domain", () => {
     expect(readiness.corePatterns).toBe(80);
     expect(readiness.coverage).toBe(5.6);
     expect(readiness.overall).toBeLessThan(60);
-    expect(readiness.interviewExecution).toBeNull();
+  });
+
+  it("keeps learning and interview readiness explicit", () => {
+    const readiness = preparationReadiness({
+      interview: { adjustedScore: 72, confidence: 60 },
+      learning: { coverage: 50, overall: 64 },
+    });
+    expect(readiness.learning).toEqual({ confidence: 50, score: 64 });
+    expect(readiness.interview).toEqual({ confidence: 60, score: 72 });
+    expect(readiness.combined.score).toBeCloseTo(68.4, 1);
+    expect(readiness.combined.summary).toContain("separate");
   });
 
   it("aggregates real attempts without fabricated values", () => {

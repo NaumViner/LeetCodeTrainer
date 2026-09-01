@@ -12,7 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { buildInterviewPerformanceProfile } from "@/domain/interview-profile";
+import {
+  interviewTextDirection,
+  interviewerLevelLabels,
+  normalizeInterviewLanguage,
+  normalizeInterviewerLevel,
+} from "@/domain/mock-interview";
 import { requireAuthenticatedUser } from "@/features/auth/session";
+import {
+  INTERVIEW_EVALUATION_DIMENSIONS,
+  interviewEvaluationDimensionLabels,
+  interviewEvaluationSchema,
+} from "@/features/interview-evaluation/model";
+import { getInterviewPerformanceProfile } from "@/features/interview-profile/queries";
 import { getMockInterview } from "@/features/mock-interviews/queries";
 
 export default async function MockInterviewScorecardPage({
@@ -28,6 +41,34 @@ export default async function MockInterviewScorecardPage({
   if (interview.status === "active") redirect(`/interviews/${interview.id}`);
   if (!interview.scorecard) redirect("/interviews/history");
   const scorecard = interview.scorecard;
+  const evaluation = interview.evaluation
+    ? interviewEvaluationSchema.safeParse({
+        confidence: interview.evaluation.confidence,
+        dimensions: interview.evaluation.dimensions,
+        improvements: interview.evaluation.improvements,
+        rawScore: interview.evaluation.raw_score,
+        recommendedActions: interview.evaluation.recommended_actions,
+        recurringSignals: interview.evaluation.recurring_signals,
+        strengths: interview.evaluation.strengths,
+        summary: interview.evaluation.summary,
+      })
+    : null;
+  const profileSnapshot = evaluation?.success
+    ? await getInterviewPerformanceProfile(user.id)
+    : null;
+  const currentProfile = profileSnapshot?.profile.allTime.overall;
+  const previousProfile = profileSnapshot
+    ? buildInterviewPerformanceProfile(
+        profileSnapshot.evidence.filter(
+          (item) => item.id !== interview.evaluation?.id,
+        ),
+        {
+          now: new Date(),
+          topicIds: profileSnapshot.topics.map((topic) => topic.id),
+          totalTopicCount: profileSnapshot.topics.length,
+        },
+      ).allTime.overall
+    : null;
   const criteria = [
     ["Problem understanding", scorecard.problem_understanding],
     ["Clarification", scorecard.clarification],
@@ -46,6 +87,13 @@ export default async function MockInterviewScorecardPage({
         <Badge variant="success">
           <CheckCircle2 aria-hidden="true" className="size-3.5" /> Interview
           complete
+        </Badge>
+        <Badge className="ml-2">
+          {
+            interviewerLevelLabels[
+              normalizeInterviewerLevel(interview.interviewer_level)
+            ]
+          }
         </Badge>
         <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -68,6 +116,99 @@ export default async function MockInterviewScorecardPage({
           Training estimate, not a prediction of interview outcome.
         </p>
       </div>
+      {evaluation?.success && interview.evaluation ? (
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="mr-2 text-xl font-semibold">
+                Evidence-based evaluation
+              </h2>
+              <Badge
+                variant={
+                  interview.evaluation.status === "completed"
+                    ? "success"
+                    : "neutral"
+                }
+              >
+                {interview.evaluation.status === "provisional"
+                  ? "Provisional fallback"
+                  : "Provider evaluated"}
+              </Badge>
+              <Badge>
+                {Math.round(evaluation.data.confidence * 100)}% confidence
+              </Badge>
+            </div>
+            <p className="text-muted mt-4 text-sm leading-6">
+              {evaluation.data.summary}
+            </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {INTERVIEW_EVALUATION_DIMENSIONS.map((dimension) => {
+                const result = evaluation.data.dimensions[dimension];
+                return (
+                  <div
+                    className="bg-surface-subtle rounded-lg border p-4"
+                    key={dimension}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-semibold">
+                        {interviewEvaluationDimensionLabels[dimension]}
+                      </h3>
+                      <Badge>
+                        {result.score}/5 · {Math.round(result.confidence * 100)}
+                        %
+                      </Badge>
+                    </div>
+                    <p className="text-muted mt-3 text-sm leading-6">
+                      {result.rationale}
+                    </p>
+                    <p className="text-muted mt-2 text-xs">
+                      Evidence:{" "}
+                      {result.evidence
+                        .map((item) => item.reference)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="bg-primary-soft mt-6 rounded-lg border p-4 text-sm">
+              <p className="font-semibold">Profile impact</p>
+              <p className="text-muted mt-1">
+                {currentProfile?.adjustedScore === null || !currentProfile
+                  ? "This interview did not produce usable profile evidence."
+                  : previousProfile?.adjustedScore === null || !previousProfile
+                    ? `Created your first interview profile at ${Math.round(currentProfile.adjustedScore)} with ${Math.round(currentProfile.confidence)}% confidence.`
+                    : `Adjusted profile ${signedDelta(currentProfile.adjustedScore - previousProfile.adjustedScore)} points to ${Math.round(currentProfile.adjustedScore)}; confidence changed ${signedDelta(currentProfile.confidence - previousProfile.confidence)} points.`}
+              </p>
+            </div>
+            <div className="mt-6">
+              <h3 className="font-semibold">Direct next actions</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {evaluation.data.recommendedActions.map((action) => (
+                  <Link
+                    className="bg-surface-subtle hover:border-primary rounded-lg border p-4"
+                    href={evaluationActionRoute(action.actionType)}
+                    key={`${action.actionType}-${action.title}`}
+                  >
+                    <p className="font-semibold">{action.title}</p>
+                    <p className="text-muted mt-1 text-xs leading-5">
+                      {action.rationale} · {action.estimatedMinutes} min
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            {correctnessCoverage(interview.evaluation.evidence_coverage) !==
+            "trusted_tests" ? (
+              <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                Code correctness was not verified by trusted private tests. The
+                correctness score uses bounded session evidence and reduced
+                confidence.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
       <Card>
         <CardContent className="p-6 sm:p-8">
           <h2 className="text-xl font-semibold">Interview rubric</h2>
@@ -149,7 +290,12 @@ export default async function MockInterviewScorecardPage({
                 {interview.realtimeSession.summary}
               </p>
             ) : null}
-            <div className="bg-surface-subtle mt-5 max-h-96 space-y-4 overflow-y-auto rounded-xl border p-4">
+            <div
+              className="bg-surface-subtle mt-5 max-h-96 space-y-4 overflow-y-auto rounded-xl border p-4"
+              dir={interviewTextDirection(
+                normalizeInterviewLanguage(interview.interview_language),
+              )}
+            >
               {interview.realtimeEvents
                 .filter((event) =>
                   ["user_transcript", "assistant_transcript"].includes(
@@ -202,9 +348,39 @@ export default async function MockInterviewScorecardPage({
             >
               View interview history
             </Link>
+            <Link
+              className={buttonVariants({ variant: "secondary" })}
+              href="/interview-profile"
+            >
+              Open interview profile
+            </Link>
           </div>
         </CardContent>
       </Card>
     </div>
   );
+}
+
+function signedDelta(value: number) {
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded > 0 ? "+" : ""}${rounded}`;
+}
+
+function correctnessCoverage(value: unknown) {
+  if (
+    value &&
+    typeof value === "object" &&
+    "semanticCorrectness" in value &&
+    value.semanticCorrectness === "trusted_tests"
+  ) {
+    return "trusted_tests";
+  }
+  return "unsupported";
+}
+
+function evaluationActionRoute(actionType: string) {
+  if (actionType === "next_interview") return "/interviews";
+  if (actionType === "lesson") return "/learn";
+  if (actionType === "review") return "/review";
+  return "/practice";
 }

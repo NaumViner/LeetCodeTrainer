@@ -88,17 +88,23 @@ export function rankRecommendations(
   candidates: RecommendationCandidate[],
   context: RecommendationContext,
 ) {
-  const scored = candidates.map((candidate) =>
-    scoreRecommendation(candidate, context),
-  );
+  const scored = scoreRecommendations(candidates, context);
   const eligible = scored.filter((item) => item.eligible);
-  const pool = eligible.length > 0 ? eligible : scored;
-  return pool.sort(
-    (left, right) =>
-      right.breakdown.total - left.breakdown.total ||
-      left.candidate.datasetOrder - right.candidate.datasetOrder ||
-      left.candidate.id.localeCompare(right.candidate.id),
-  );
+  return eligible.length > 0 ? eligible : scored;
+}
+
+export function scoreRecommendations(
+  candidates: RecommendationCandidate[],
+  context: RecommendationContext,
+) {
+  return candidates
+    .map((candidate) => scoreRecommendation(candidate, context))
+    .sort(
+      (left, right) =>
+        right.breakdown.total - left.breakdown.total ||
+        left.candidate.datasetOrder - right.candidate.datasetOrder ||
+        left.candidate.id.localeCompare(right.candidate.id),
+    );
 }
 
 export function scoreRecommendation(

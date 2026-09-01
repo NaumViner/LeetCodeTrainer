@@ -15,6 +15,8 @@ export type RealtimeInterviewSession = {
   localStream: MediaStream;
 };
 
+export type RealtimeInterviewProviderName = "gemini" | "openai";
+
 export interface RealtimeInterviewProvider {
   closeSession(): Promise<void>;
   createSession(

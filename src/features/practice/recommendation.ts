@@ -1,9 +1,12 @@
 import {
   rankRecommendations,
   recommendProblem,
+  scoreRecommendations,
   type RecommendationAttempt,
   type RecommendationCandidate,
 } from "@/domain/recommendation";
+import { buildInterviewFirstRecommendations } from "@/domain/interview-recommendation";
+import { getInterviewPerformanceProfile } from "@/features/interview-profile/queries";
 import {
   getCompletedLessonTopicIds,
   getRecommendationEvidence,
@@ -15,11 +18,13 @@ export async function getAdaptiveRecommendationSnapshot(
   userId: string,
   now: Date,
 ) {
-  const [catalog, evidence, completedTopicIds] = await Promise.all([
-    getProblemCatalog(),
-    getRecommendationEvidence(userId, now),
-    getCompletedLessonTopicIds(userId),
-  ]);
+  const [catalog, evidence, completedTopicIds, interviewPerformance] =
+    await Promise.all([
+      getProblemCatalog(),
+      getRecommendationEvidence(userId, now),
+      getCompletedLessonTopicIds(userId),
+      getInterviewPerformanceProfile(userId, now),
+    ]);
   const catalogById = new Map(catalog.map((problem) => [problem.id, problem]));
   const candidates = catalog.map(toCandidate);
   const context = {
@@ -51,8 +56,31 @@ export async function getAdaptiveRecommendationSnapshot(
     catalog,
     context,
     evidence,
+    interviewRecommendations: buildInterviewFirstRecommendations({
+      candidates: catalog.map((problem) => ({
+        difficulty: problem.difficulty as "easy" | "hard" | "medium",
+        externalId: problem.external_id,
+        id: problem.id,
+        primaryTopicId: problem.primaryTopic.id,
+        primaryTopicName: problem.primaryTopic.name,
+        primaryTopicSlug: problem.primaryTopic.slug,
+        title: problem.title,
+      })),
+      dueProblemIds: evidence.dueProblemIds,
+      interviewDate: evidence.interviewDate,
+      learningMastery: new Map(
+        [...evidence.topicEvidence].map(([topicId, topic]) => [
+          topicId,
+          topic.overallScore,
+        ]),
+      ),
+      now,
+      profile: interviewPerformance.profile,
+      recentProblemIds: context.attempts.map((attempt) => attempt.problemId),
+    }),
     ranked: rankRecommendations(candidates, context),
     recommendation: recommendProblem(candidates, context),
+    scored: scoreRecommendations(candidates, context),
   };
 }
 

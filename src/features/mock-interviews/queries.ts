@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database";
 
 export type MockInterviewRow = Tables<"mock_interviews">;
+export type MockInterviewEvaluationRow = Tables<"mock_interview_evaluations">;
 export type MockInterviewScorecardRow = Tables<"mock_interview_scorecards">;
 export type RealtimeInterviewEventRow = Tables<"realtime_interview_events">;
 export type RealtimeInterviewSessionRow = Tables<"realtime_interview_sessions">;
 
 export type MockInterviewDetail = MockInterviewRow & {
   effectiveElapsedSeconds: number;
+  evaluation: MockInterviewEvaluationRow | null;
   problem: Awaited<ReturnType<typeof getProblemCatalog>>[number];
   realtimeEvents: RealtimeInterviewEventRow[];
   realtimeSession: RealtimeInterviewSessionRow | null;
@@ -44,9 +46,16 @@ export async function getMockInterview(userId: string, interviewId: string) {
   const problem = catalog.find((item) => item.id === interview.problem_id);
   if (!problem) return null;
   const [
+    { data: evaluation, error: evaluationError },
     { data: scorecard, error: scorecardError },
     { data: realtimeSession, error: realtimeSessionError },
   ] = await Promise.all([
+    supabase
+      .from("mock_interview_evaluations")
+      .select("*")
+      .eq("mock_interview_id", interview.id)
+      .eq("is_current", true)
+      .maybeSingle(),
     supabase
       .from("mock_interview_scorecards")
       .select("*")
@@ -58,6 +67,8 @@ export async function getMockInterview(userId: string, interviewId: string) {
       .eq("mock_interview_id", interview.id)
       .maybeSingle(),
   ]);
+  if (evaluationError)
+    throw new Error("The interview evaluation could not be loaded.");
   if (scorecardError)
     throw new Error("The interview scorecard could not be loaded.");
   if (realtimeSessionError)
@@ -80,6 +91,7 @@ export async function getMockInterview(userId: string, interviewId: string) {
       startedAt: interview.started_at,
       timerRunning: interview.timer_running,
     }),
+    evaluation,
     problem,
     realtimeEvents: realtimeEvents ?? [],
     realtimeSession,
@@ -100,19 +112,39 @@ export async function getMockInterviewHistory(userId: string) {
   ]);
   if (error) throw new Error("Mock interview history could not be loaded.");
   const ids = (interviews ?? []).map((item) => item.id);
-  const { data: scorecards, error: scorecardError } = ids.length
-    ? await supabase
-        .from("mock_interview_scorecards")
-        .select("*")
-        .in("mock_interview_id", ids)
-    : { data: [], error: null };
+  const [scorecardsResult, evaluationsResult] = ids.length
+    ? await Promise.all([
+        supabase
+          .from("mock_interview_scorecards")
+          .select("*")
+          .in("mock_interview_id", ids),
+        supabase
+          .from("mock_interview_evaluations")
+          .select("*")
+          .in("mock_interview_id", ids)
+          .eq("is_current", true),
+      ])
+    : [
+        { data: [], error: null },
+        { data: [], error: null },
+      ];
+  const { data: scorecards, error: scorecardError } = scorecardsResult;
+  const { data: evaluations, error: evaluationError } = evaluationsResult;
   if (scorecardError)
     throw new Error("Interview scorecards could not be loaded.");
+  if (evaluationError)
+    throw new Error("Interview evaluations could not be loaded.");
   const problemById = new Map(catalog.map((problem) => [problem.id, problem]));
   const scorecardById = new Map(
     (scorecards ?? []).map((scorecard) => [
       scorecard.mock_interview_id,
       scorecard,
+    ]),
+  );
+  const evaluationById = new Map(
+    (evaluations ?? []).map((evaluation) => [
+      evaluation.mock_interview_id,
+      evaluation,
     ]),
   );
   return (interviews ?? []).flatMap((interview) => {
@@ -121,6 +153,7 @@ export async function getMockInterviewHistory(userId: string) {
       ? [
           {
             ...interview,
+            evaluation: evaluationById.get(interview.id) ?? null,
             problem,
             scorecard: scorecardById.get(interview.id) ?? null,
           },

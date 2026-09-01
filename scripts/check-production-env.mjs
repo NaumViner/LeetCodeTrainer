@@ -51,16 +51,60 @@ if (
 }
 
 if (enabled("AI_COACH_ENABLED")) {
-  requireValue("AI_API_KEY");
-  const provider = (environment.AI_PROVIDER ?? "openai").toLowerCase();
-  if (provider !== "openai") errors.push("AI_PROVIDER must be openai.");
+  const provider = (
+    environment.AI_PROVIDER ??
+    (environment.GEMINI_API_KEY ? "gemini" : "openai")
+  ).toLowerCase();
+  if (!["gemini", "openai"].includes(provider)) {
+    errors.push("AI_PROVIDER must be gemini or openai.");
+  } else if (provider === "gemini") {
+    if (
+      !environment.GEMINI_API_KEY?.trim() &&
+      !environment.AI_API_KEY?.trim()
+    ) {
+      errors.push(
+        "GEMINI_API_KEY is required when the Gemini AI coach is enabled.",
+      );
+    }
+  } else {
+    requireValue("AI_API_KEY");
+  }
+}
+
+if (enabled("INTERVIEW_EVALUATOR_ENABLED")) {
+  const provider = (
+    environment.INTERVIEW_EVALUATOR_PROVIDER ?? "gemini"
+  ).toLowerCase();
+  if (provider !== "gemini") {
+    errors.push("INTERVIEW_EVALUATOR_PROVIDER must currently be gemini.");
+  } else if (
+    !environment.GEMINI_API_KEY?.trim() &&
+    !environment.INTERVIEW_EVALUATOR_API_KEY?.trim()
+  ) {
+    errors.push(
+      "GEMINI_API_KEY is required when the post-interview evaluator is enabled.",
+    );
+  }
 }
 
 if (enabled("REALTIME_AI_ENABLED")) {
-  requireValue("REALTIME_AI_API_KEY");
-  const provider = (environment.REALTIME_AI_PROVIDER ?? "openai").toLowerCase();
-  if (provider !== "openai") {
-    errors.push("REALTIME_AI_PROVIDER must be openai.");
+  const provider = (
+    environment.REALTIME_AI_PROVIDER ??
+    (environment.GEMINI_API_KEY ? "gemini" : "openai")
+  ).toLowerCase();
+  if (!["gemini", "openai"].includes(provider)) {
+    errors.push("REALTIME_AI_PROVIDER must be gemini or openai.");
+  } else if (provider === "gemini") {
+    if (
+      !environment.GEMINI_API_KEY?.trim() &&
+      !environment.REALTIME_AI_API_KEY?.trim()
+    ) {
+      errors.push(
+        "GEMINI_API_KEY is required when Gemini realtime voice is enabled.",
+      );
+    }
+  } else {
+    requireValue("REALTIME_AI_API_KEY");
   }
 }
 
@@ -71,5 +115,5 @@ if (errors.length) {
 }
 
 console.log(
-  `Production environment is valid. AI coach: ${environment.AI_COACH_ENABLED === "true" ? "enabled" : "disabled"}; realtime voice: ${environment.REALTIME_AI_ENABLED === "true" ? "enabled" : "disabled"}.`,
+  `Production environment is valid. AI coach: ${environment.AI_COACH_ENABLED === "true" ? "enabled" : "disabled"}; interview evaluator: ${environment.INTERVIEW_EVALUATOR_ENABLED === "true" ? "enabled" : "disabled"}; realtime voice: ${environment.REALTIME_AI_ENABLED === "true" ? "enabled" : "disabled"}.`,
 );

@@ -18,7 +18,7 @@ All 15 implementation phases are complete. The platform includes the optional AI
 - Deterministic review scheduling, due queue, review mode, and schedule history
 - Personalized daily-plan generation, completion, regeneration, and dashboard progress
 - Adaptive concept, pattern-recognition, and coding diagnostic with initial mastery placement
-- Timed mock interviews with hidden topics, ordered phases, private scorecards, and history
+- Timed mock interviews with hidden topics, selectable beginner or tough-FAANG interviewer behavior, ordered phases, private scorecards, and history
 - Feature-flagged AI learning coach with structured outputs, quotas, and no-AI fallback
 - Feature-flagged realtime voice interviews over WebRTC with transcript and code context
 - Responsive navigation, polished onboarding and recovery states, accessible charts, and System/Light/Dark themes
@@ -111,8 +111,13 @@ Copy `.env.example` to `.env.local`. Never commit `.env.local` or provider secre
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only administrative key; the application does not require it
 - `AI_COACH_ENABLED`: server-only feature flag; defaults to disabled
 - `AI_PROVIDER`, `AI_MODEL`, and `AI_API_KEY`: optional server-only learning-coach configuration
+- `GEMINI_API_KEY`: preferred single server-only key for the Gemini coach, post-interview evaluator, and live interviewer
+- `INTERVIEW_EVALUATOR_ENABLED`: server-only feature flag; defaults to disabled
+- `INTERVIEW_EVALUATOR_PROVIDER`, `INTERVIEW_EVALUATOR_MODEL`, and `INTERVIEW_EVALUATOR_API_KEY`: optional server-only post-interview evaluation configuration; Gemini is currently supported
 - `REALTIME_AI_ENABLED`: server-only realtime-interviewer feature flag; defaults to disabled
 - `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, and `REALTIME_AI_API_KEY`: server-only realtime provider configuration
 - `REALTIME_AI_TRANSCRIPTION_MODEL` and `REALTIME_AI_VOICE`: optional input-transcription and voice overrides
+
+Gemini is the zero-cost local-development default when its API free tier is available. Set only `GEMINI_API_KEY` after copying `.env.example`; the example already enables the Gemini coach, post-interview evaluator, and live interviewer. OpenAI remains supported for the learning coach and live interviewer by setting their provider variables to `openai` and supplying the corresponding integration keys; the post-interview evaluator currently uses Gemini or its deterministic provisional fallback.
 
 Google and GitHub sign-in buttons are implemented, but each provider remains disabled until its credentials and callback URLs are configured in the target Supabase project. Email/password authentication works locally without external credentials.

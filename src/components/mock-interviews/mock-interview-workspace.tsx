@@ -19,6 +19,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form-field";
 import {
   MOCK_INTERVIEW_PHASES,
+  interviewTextDirection,
+  type InterviewLanguage,
+  interviewerLevelLabels,
+  type InterviewerLevel,
   mockInterviewPhaseLabels,
   type MockInterviewPhase,
 } from "@/domain/mock-interview";
@@ -29,6 +33,7 @@ import {
 } from "@/features/mock-interviews/actions";
 import type { RealtimeContextUpdate } from "@/components/mock-interviews/realtime-interview-panel";
 import type { RealtimeTranscriptEntry } from "@/features/realtime-interviews/model";
+import type { RealtimeInterviewProviderName } from "@/features/realtime-interviews/provider";
 
 const RealtimeInterviewPanel = dynamic(() =>
   import("@/components/mock-interviews/realtime-interview-panel").then(
@@ -41,7 +46,10 @@ type InterviewWorkspaceInput = {
   durationMinutes: number;
   effectiveElapsedSeconds: number;
   id: string;
+  interviewerLevel: InterviewerLevel;
+  interviewLanguage: InterviewLanguage;
   realtimeEnabled: boolean;
+  realtimeProvider: RealtimeInterviewProviderName | null;
   realtimeTranscript: RealtimeTranscriptEntry[];
   phase: MockInterviewPhase;
   problem: {
@@ -70,6 +78,7 @@ export function MockInterviewWorkspace({
   const [realtimeContext, setRealtimeContext] =
     useState<RealtimeContextUpdate | null>(null);
   const [isPending, runAction] = useTransition();
+  const textDirection = interviewTextDirection(interview.interviewLanguage);
 
   const authoritativeElapsedSeconds = () =>
     Math.min(
@@ -165,6 +174,15 @@ export function MockInterviewWorkspace({
               Topic hidden
             </Badge>
             <Badge>Hints disabled</Badge>
+            <Badge
+              variant={
+                interview.interviewerLevel === "faang_tough"
+                  ? "warning"
+                  : "neutral"
+              }
+            >
+              {interviewerLevelLabels[interview.interviewerLevel]}
+            </Badge>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -214,6 +232,8 @@ export function MockInterviewWorkspace({
           initialTranscript={interview.realtimeTranscript}
           interviewId={interview.id}
           phase={phase}
+          providerName={interview.realtimeProvider ?? "openai"}
+          textDirection={textDirection}
         />
       ) : null}
 
@@ -231,6 +251,7 @@ export function MockInterviewWorkspace({
         onAdvance={advance}
         onComplete={complete}
         phase={phase}
+        textDirection={textDirection}
       />
 
       <Card className="shadow-none">
@@ -265,6 +286,7 @@ function InterviewPhase({
   onAdvance,
   onComplete,
   phase,
+  textDirection,
 }: {
   disabled: boolean;
   onAdvance(input: {
@@ -274,6 +296,7 @@ function InterviewPhase({
   }): void;
   onComplete(input: Record<string, unknown>): void;
   phase: MockInterviewPhase;
+  textDirection: "auto" | "ltr" | "rtl";
 }) {
   if (phase === "intro") {
     return (
@@ -299,7 +322,13 @@ function InterviewPhase({
     );
   }
   if (phase === "retrospective") {
-    return <Retrospective disabled={disabled} onComplete={onComplete} />;
+    return (
+      <Retrospective
+        disabled={disabled}
+        onComplete={onComplete}
+        textDirection={textDirection}
+      />
+    );
   }
   if (phase === "complexity") {
     return <ComplexityStep disabled={disabled} onAdvance={onAdvance} />;
@@ -379,6 +408,7 @@ function InterviewPhase({
       label={copy.label}
       onAdvance={onAdvance}
       placeholder={copy.placeholder}
+      textDirection={copy.label === "Code snapshot" ? "ltr" : textDirection}
       title={copy.title}
     />
   );
@@ -391,6 +421,7 @@ function NotesStep({
   label,
   onAdvance,
   placeholder,
+  textDirection,
   title,
 }: {
   button: string;
@@ -399,6 +430,7 @@ function NotesStep({
   label: string;
   onAdvance(input: { notes: string }): void;
   placeholder: string;
+  textDirection: "auto" | "ltr" | "rtl";
   title: string;
 }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -416,6 +448,7 @@ function NotesStep({
             {label}
             <textarea
               className={`${textareaClass} mt-2 ${label === "Code snapshot" ? "min-h-96 font-mono" : ""}`}
+              dir={textDirection}
               name="notes"
               placeholder={placeholder}
               required
@@ -482,9 +515,11 @@ function ComplexityStep({
 function Retrospective({
   disabled,
   onComplete,
+  textDirection,
 }: {
   disabled: boolean;
   onComplete(input: Record<string, unknown>): void;
+  textDirection: "auto" | "ltr" | "rtl";
 }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -528,6 +563,7 @@ function Retrospective({
               What went well, what broke down, and what will you change?
               <textarea
                 className={`${textareaClass} mt-2`}
+                dir={textDirection}
                 name="retrospective"
                 required
               />

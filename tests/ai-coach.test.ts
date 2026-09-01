@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import type {
+  GenerateContentParameters,
+  GenerateContentResponse,
+} from "@google/genai";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { getAiCoachConfig } from "@/features/ai-coach/config";
 import {
   fallbackAttemptAnalysis,
   fallbackComplexityEvaluation,
@@ -11,7 +16,10 @@ import {
   reviewCardDraftSchema,
   type HintInput,
 } from "@/features/ai-coach/model";
+import { GeminiLearningCoachProvider } from "@/features/ai-coach/gemini-provider";
 import { OpenAiLearningCoachProvider } from "@/features/ai-coach/openai-provider";
+
+afterEach(() => vi.unstubAllEnvs());
 
 const input: HintInput = {
   attempt: {
@@ -36,6 +44,72 @@ const input: HintInput = {
   },
   safetyIdentifier: "safe-user-hash",
 };
+
+describe("GeminiLearningCoachProvider", () => {
+  it("keeps Gemini disabled while the setup placeholder is present", () => {
+    vi.stubEnv("GEMINI_API_KEY", "replace-with-your-gemini-api-key");
+    vi.stubEnv("AI_COACH_ENABLED", "true");
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    expect(getAiCoachConfig()).toBeNull();
+  });
+
+  it("uses the shared Gemini key configuration and structured JSON output", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "gemini-test-key");
+    vi.stubEnv("AI_COACH_ENABLED", "true");
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("AI_MODEL", "");
+    expect(getAiCoachConfig()).toMatchObject({
+      model: "gemini-3.5-flash",
+      provider: "gemini",
+    });
+
+    const generateContent = vi.fn<
+      (
+        parameters: GenerateContentParameters,
+      ) => Promise<GenerateContentResponse>
+    >(async () =>
+      geminiResponse(
+        '{"content":"What work repeats for each candidate?","title":"Find repeated work"}',
+      ),
+    );
+    const provider = new GeminiLearningCoachProvider(
+      "gemini-test-key",
+      "gemini-3.5-flash",
+      generateContent,
+    );
+    await expect(provider.generateHint(input)).resolves.toMatchObject({
+      data: { title: "Find repeated work" },
+      usage: { totalTokens: 30 },
+    });
+    expect(generateContent.mock.calls[0]?.[0]).toMatchObject({
+      config: {
+        maxOutputTokens: 600,
+        responseMimeType: "application/json",
+      },
+      model: "gemini-3.5-flash",
+    });
+  });
+
+  it("retries one invalid Gemini structured response", async () => {
+    const generateContent = vi
+      .fn()
+      .mockResolvedValueOnce(geminiResponse("not-json"))
+      .mockResolvedValueOnce(
+        geminiResponse(
+          '{"content":"Which state could avoid repeated work?","title":"Retain state"}',
+        ),
+      );
+    const provider = new GeminiLearningCoachProvider(
+      "gemini-test-key",
+      "gemini-3.5-flash",
+      generateContent,
+    );
+    await expect(provider.generateHint(input)).resolves.toMatchObject({
+      data: { title: "Retain state" },
+    });
+    expect(generateContent).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("OpenAiLearningCoachProvider", () => {
   it("uses a non-stored structured Responses request and validates output", async () => {
@@ -212,6 +286,17 @@ function responseWith(outputText: string) {
     }),
     { headers: { "Content-Type": "application/json" } },
   );
+}
+
+function geminiResponse(text: string) {
+  return {
+    text,
+    usageMetadata: {
+      candidatesTokenCount: 10,
+      promptTokenCount: 20,
+      totalTokenCount: 30,
+    },
+  } as unknown as GenerateContentResponse;
 }
 
 function requestSchemaName(fetcher: ReturnType<typeof vi.fn<typeof fetch>>) {

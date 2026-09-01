@@ -26,12 +26,15 @@ export default async function ProgressPage() {
   const user = await requireAuthenticatedUser();
   const analytics = await getAnalyticsSnapshot(user.id);
   const readinessDimensions = [
-    { label: "Core patterns", value: analytics.readiness.corePatterns },
-    { label: "Independence", value: analytics.readiness.independentSolving },
-    { label: "Recognition", value: analytics.readiness.recognition },
-    { label: "Retention", value: analytics.readiness.retention },
-    { label: "Timed", value: analytics.readiness.timedPerformance },
-    { label: "Complexity", value: analytics.readiness.complexity },
+    { label: "Core patterns", value: analytics.learningReadiness.corePatterns },
+    {
+      label: "Independence",
+      value: analytics.learningReadiness.independentSolving,
+    },
+    { label: "Recognition", value: analytics.learningReadiness.recognition },
+    { label: "Retention", value: analytics.learningReadiness.retention },
+    { label: "Timed", value: analytics.learningReadiness.timedPerformance },
+    { label: "Complexity", value: analytics.learningReadiness.complexity },
   ];
   const practicedTopics = analytics.topics
     .filter((item) => item.mastery)
@@ -71,46 +74,48 @@ export default async function ProgressPage() {
           <Card>
             <CardContent className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[13rem_minmax(15rem,20rem)_minmax(0,1fr)] lg:items-center">
               <div>
-                <p className="text-muted text-sm">Overall readiness</p>
+                <p className="text-muted text-sm">Learning readiness</p>
                 <p className="mt-2 text-6xl font-bold tracking-tight">
-                  {Math.round(analytics.readiness.overall)}
+                  {Math.round(analytics.learningReadiness.overall)}
                 </p>
                 <Badge className="mt-3" variant="primary">
-                  {readinessLevel(analytics.readiness.overall)}
+                  {readinessLevel(analytics.learningReadiness.overall)}
                 </Badge>
                 <p className="text-muted mt-4 text-xs leading-5">
                   Training estimate, not a prediction of interview outcome.
-                  Coverage: {analytics.readiness.coverage}% of core topics.
+                  Coverage: {analytics.learningReadiness.coverage}% of core
+                  topics. Interview performance is reported separately.
                 </p>
               </div>
               <ReadinessRadarChart dimensions={readinessDimensions} />
               <div className="grid gap-5 sm:grid-cols-2">
                 <ProgressBar
                   label="Core patterns"
-                  value={analytics.readiness.corePatterns}
+                  value={analytics.learningReadiness.corePatterns}
                 />
                 <ProgressBar
                   label="Independent solving"
-                  value={analytics.readiness.independentSolving}
+                  value={analytics.learningReadiness.independentSolving}
                 />
                 <ProgressBar
                   label="Recognition"
-                  value={analytics.readiness.recognition}
+                  value={analytics.learningReadiness.recognition}
                 />
                 <ProgressBar
                   label="Retention evidence"
-                  value={analytics.readiness.retention}
+                  value={analytics.learningReadiness.retention}
                 />
                 <ProgressBar
                   label="Timed performance"
-                  value={analytics.readiness.timedPerformance}
+                  value={analytics.learningReadiness.timedPerformance}
                 />
                 <ProgressBar
                   label="Complexity"
-                  value={analytics.readiness.complexity}
+                  value={analytics.learningReadiness.complexity}
                 />
                 <div className="sm:col-span-2">
-                  {analytics.readiness.interviewExecution === null ? (
+                  {analytics.interviewPerformance.allTime.overall
+                    .adjustedScore === null ? (
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="font-medium">Interview execution</span>
                       <Link
@@ -122,8 +127,14 @@ export default async function ProgressPage() {
                     </div>
                   ) : (
                     <ProgressBar
-                      label="Interview execution"
-                      value={analytics.readiness.interviewExecution}
+                      label={`Interview performance · ${Math.round(
+                        analytics.interviewPerformance.allTime.overall
+                          .confidence,
+                      )}% confidence`}
+                      value={
+                        analytics.interviewPerformance.allTime.overall
+                          .adjustedScore
+                      }
                     />
                   )}
                 </div>

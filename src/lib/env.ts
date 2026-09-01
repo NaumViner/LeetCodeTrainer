@@ -30,6 +30,11 @@ export const serverEnvSchema = z.object({
   AI_MODEL: optionalString,
   AI_API_KEY: optionalString,
   AI_COACH_ENABLED: optionalBoolean,
+  GEMINI_API_KEY: optionalString,
+  INTERVIEW_EVALUATOR_API_KEY: optionalString,
+  INTERVIEW_EVALUATOR_ENABLED: optionalBoolean,
+  INTERVIEW_EVALUATOR_MODEL: optionalString,
+  INTERVIEW_EVALUATOR_PROVIDER: optionalString,
   REALTIME_AI_PROVIDER: optionalString,
   REALTIME_AI_MODEL: optionalString,
   REALTIME_AI_API_KEY: optionalString,
@@ -45,4 +50,16 @@ export function parseServerEnv(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): ServerEnv {
   return serverEnvSchema.parse(environment);
+}
+
+export function isConfiguredServerSecret(
+  value: string | undefined,
+): value is string {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized.length > 0 &&
+    !normalized.startsWith("replace-with-") &&
+    !normalized.startsWith("your-")
+  );
 }

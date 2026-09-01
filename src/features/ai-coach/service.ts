@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { getAiCoachConfig } from "@/features/ai-coach/config";
+import { GeminiLearningCoachProvider } from "@/features/ai-coach/gemini-provider";
 import type { CoachContext, ProviderResult } from "@/features/ai-coach/model";
 import { OpenAiLearningCoachProvider } from "@/features/ai-coach/openai-provider";
 import type { LearningCoachProvider } from "@/features/ai-coach/provider";
@@ -18,7 +19,9 @@ export type CoachInteractionType =
 export function createLearningCoachProvider(): LearningCoachProvider | null {
   const config = getAiCoachConfig();
   if (!config) return null;
-  return new OpenAiLearningCoachProvider(config.apiKey, config.model);
+  return config.provider === "gemini"
+    ? new GeminiLearningCoachProvider(config.apiKey, config.model)
+    : new OpenAiLearningCoachProvider(config.apiKey, config.model);
 }
 
 export async function buildCoachContext(

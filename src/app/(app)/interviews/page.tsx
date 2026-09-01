@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   BriefcaseBusiness,
   Clock3,
   History,
@@ -9,28 +8,45 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select } from "@/components/ui/form-field";
+import { MockInterviewSetupForm } from "@/components/mock-interviews/mock-interview-setup-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireAuthenticatedUser } from "@/features/auth/session";
-import { startMockInterviewAction } from "@/features/mock-interviews/actions";
+import { recommendedInterviewDifficulty } from "@/domain/interview-recommendation";
+import { getInterviewPerformanceProfile } from "@/features/interview-profile/queries";
 import {
   getActiveMockInterview,
   getMockInterviewHistory,
 } from "@/features/mock-interviews/queries";
 import { getProfile } from "@/features/profile/queries";
 
-export default async function MockInterviewsPage() {
+export default async function MockInterviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireAuthenticatedUser();
-  const [profile, active, history] = await Promise.all([
-    getProfile(user.id),
-    getActiveMockInterview(user.id),
-    getMockInterviewHistory(user.id),
-  ]);
+  const [profile, active, history, params, interviewPerformance] =
+    await Promise.all([
+      getProfile(user.id),
+      getActiveMockInterview(user.id),
+      getMockInterviewHistory(user.id),
+      searchParams,
+      getInterviewPerformanceProfile(user.id),
+    ]);
   if (!profile?.onboarding_completed) redirect("/onboarding");
   if (!profile.diagnostic_completed) redirect("/diagnostic");
   if (active) redirect(`/interviews/${active.id}`);
+  const recommendedDifficulty = recommendedInterviewDifficulty(
+    interviewPerformance.profile,
+  );
+  const recommendedDuration =
+    interviewPerformance.profile.evaluatedInterviews < 2
+      ? "30"
+      : interviewPerformance.profile.allTime.overall.confidence >= 70
+        ? "60"
+        : "45";
 
   return (
     <div className="space-y-8">
@@ -58,47 +74,18 @@ export default async function MockInterviewsPage() {
                 <h2 className="text-xl font-semibold">Session setup</h2>
                 <p className="text-muted mt-2 text-sm leading-6">
                   Adaptive selection uses mastery, prerequisites, recent work,
-                  and failure signals. The chosen topic remains hidden until
-                  completion.
+                  and failure signals. Fixed difficulty always uses the full
+                  active catalog and never requires an unlock. The chosen topic
+                  remains hidden until completion.
                 </p>
               </div>
             </div>
-            <form
-              action={startMockInterviewAction}
-              className="mt-7 grid gap-5 sm:grid-cols-2"
-            >
-              <label className="text-sm font-semibold">
-                Duration
-                <Select
-                  className="mt-2"
-                  defaultValue="45"
-                  name="durationMinutes"
-                >
-                  <option value="30">30 minutes</option>
-                  <option value="45">45 minutes</option>
-                  <option value="60">60 minutes</option>
-                </Select>
-              </label>
-              <label className="text-sm font-semibold">
-                Difficulty
-                <Select
-                  className="mt-2"
-                  defaultValue="adaptive"
-                  name="difficulty"
-                >
-                  <option value="adaptive">Adaptive</option>
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </Select>
-              </label>
-              <div className="sm:col-span-2">
-                <Button size="lg" type="submit">
-                  Start mock interview{" "}
-                  <ArrowRight aria-hidden="true" className="size-4" />
-                </Button>
-              </div>
-            </form>
+            <MockInterviewSetupForm
+              defaultDifficulty={difficultyDefault(params.difficulty)}
+              defaultDurationMinutes={durationDefault(params.duration)}
+              recommendedDifficulty={recommendedDifficulty}
+              recommendedDurationMinutes={recommendedDuration}
+            />
           </CardContent>
         </Card>
         <Card className="shadow-none">
@@ -128,8 +115,8 @@ export default async function MockInterviewsPage() {
               </li>
             </ul>
             <p className="bg-surface-subtle text-muted mt-5 rounded-lg border p-3 text-xs leading-5">
-              This phase is text and code. Voice interaction arrives after the
-              realtime provider foundation.
+              The selected interviewer level also governs the live voice
+              conversation and remains fixed after the session starts.
             </p>
           </CardContent>
         </Card>
@@ -158,4 +145,22 @@ export default async function MockInterviewsPage() {
       ) : null}
     </div>
   );
+}
+
+function scalar(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function difficultyDefault(value: string | string[] | undefined) {
+  const candidate = scalar(value);
+  return candidate === "easy" || candidate === "medium" || candidate === "hard"
+    ? candidate
+    : "adaptive";
+}
+
+function durationDefault(value: string | string[] | undefined) {
+  const candidate = scalar(value);
+  return candidate === "30" || candidate === "45" || candidate === "60"
+    ? candidate
+    : "45";
 }

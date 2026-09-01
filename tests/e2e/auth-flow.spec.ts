@@ -166,13 +166,17 @@ test("a learner can onboard, return, and persist lesson progress", async ({
       .fill("function trap(height) { return 0; }");
     await page.getByRole("button", { name: "Save draft" }).click();
     await page.getByRole("button", { name: "Reveal next hint" }).click();
-    await expect(page.getByText("Socratic question")).toBeVisible();
+    const firstHintTitle = page.getByText(/^1\.\s/);
+    await expect(firstHintTitle).toBeVisible({ timeout: 20_000 });
+    const persistedHintTitle = await firstHintTitle.textContent();
 
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "Implement independently" }),
     ).toBeVisible();
-    await expect(page.getByText("Socratic question")).toBeVisible();
+    await expect(
+      page.getByText(persistedHintTitle ?? "", { exact: true }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Move to testing" }).click();
     await expect(
       page.getByRole("heading", { name: "Test before judging the result" }),
@@ -336,10 +340,14 @@ test("a learner can onboard, return, and persist lesson progress", async ({
     ).toBeVisible();
     await page.getByLabel("Duration").selectOption("30");
     await page.getByLabel("Difficulty").selectOption("easy");
+    await page.getByRole("radio", { name: /Tough FAANG interviewer/ }).check();
     await page.getByRole("button", { name: "Start mock interview" }).click();
 
     await expect(page).toHaveURL(/\/interviews\/[0-9a-f-]{36}$/);
     await expect(page.getByText("Topic hidden", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Tough FAANG interviewer", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText("Time remaining")).toBeVisible();
     await page.getByRole("button", { name: "Begin clarification" }).click();
     await page
@@ -386,13 +394,16 @@ test("a learner can onboard, return, and persist lesson progress", async ({
       page.getByRole("heading", { name: "Interview rubric" }),
     ).toBeVisible();
     await expect(page.getByText("Topic revealed")).toBeVisible();
+    await expect(
+      page.getByText("Tough FAANG interviewer", { exact: true }),
+    ).toBeVisible();
     await page.getByRole("link", { name: "View interview history" }).click();
     await expect(
       page.getByRole("heading", { name: "Mock interview history" }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: /Scorecard/ })).toBeVisible();
     await page.getByRole("link", { name: "Progress" }).click();
-    await expect(page.getByText("Interview execution")).toBeVisible();
+    await expect(page.getByText(/^Interview performance ·/)).toBeVisible();
   } finally {
     const apiUrl = process.env.E2E_SUPABASE_API_URL;
     const secretKey = process.env.E2E_SUPABASE_SECRET_KEY;

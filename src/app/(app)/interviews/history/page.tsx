@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  interviewerLevelLabels,
+  normalizeInterviewerLevel,
+} from "@/domain/mock-interview";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { getMockInterviewHistory } from "@/features/mock-interviews/queries";
 
@@ -52,6 +56,29 @@ export default async function MockInterviewHistoryPage() {
                     <Badge className="capitalize">
                       {interview.problem.difficulty}
                     </Badge>
+                    <Badge>
+                      {
+                        interviewerLevelLabels[
+                          normalizeInterviewerLevel(interview.interviewer_level)
+                        ]
+                      }
+                    </Badge>
+                    {interview.evaluation ? (
+                      <Badge
+                        variant={
+                          interview.evaluation.status === "completed"
+                            ? "success"
+                            : "neutral"
+                        }
+                      >
+                        {interview.evaluation.status === "provisional"
+                          ? "Provisional evaluation"
+                          : "Evaluated"}
+                        {interview.evaluation.raw_score === null
+                          ? ""
+                          : ` · ${Math.round(interview.evaluation.raw_score)}`}
+                      </Badge>
+                    ) : null}
                   </div>
                   <h2 className="mt-3 text-lg font-semibold">
                     {interview.problem.title}

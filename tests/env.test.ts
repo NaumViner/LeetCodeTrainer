@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseServerEnv } from "@/lib/env";
+import { isConfiguredServerSecret, parseServerEnv } from "@/lib/env";
 
 describe("parseServerEnv", () => {
   it("allows optional integrations to remain unconfigured", () => {
@@ -24,5 +24,22 @@ describe("parseServerEnv", () => {
       AI_COACH_ENABLED: true,
     });
     expect(() => parseServerEnv({ AI_COACH_ENABLED: "yes" })).toThrow();
+  });
+
+  it("parses the post-interview evaluator feature flag", () => {
+    expect(
+      parseServerEnv({ INTERVIEW_EVALUATOR_ENABLED: "true" }),
+    ).toMatchObject({ INTERVIEW_EVALUATOR_ENABLED: true });
+    expect(() =>
+      parseServerEnv({ INTERVIEW_EVALUATOR_ENABLED: "yes" }),
+    ).toThrow();
+  });
+
+  it("does not treat setup placeholders as configured secrets", () => {
+    expect(isConfiguredServerSecret("replace-with-your-gemini-api-key")).toBe(
+      false,
+    );
+    expect(isConfiguredServerSecret("your-api-key")).toBe(false);
+    expect(isConfiguredServerSecret("AIza-real-test-key")).toBe(true);
   });
 });

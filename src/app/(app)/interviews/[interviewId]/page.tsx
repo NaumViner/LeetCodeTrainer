@@ -1,10 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 
 import { MockInterviewWorkspace } from "@/components/mock-interviews/mock-interview-workspace";
-import type { MockInterviewPhase } from "@/domain/mock-interview";
+import {
+  normalizeInterviewLanguage,
+  normalizeInterviewerLevel,
+  type MockInterviewPhase,
+} from "@/domain/mock-interview";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { getMockInterview } from "@/features/mock-interviews/queries";
-import { isRealtimeInterviewEnabled } from "@/features/realtime-interviews/config";
+import { getRealtimeInterviewProviderName } from "@/features/realtime-interviews/config";
 
 export default async function MockInterviewPage({
   params,
@@ -19,6 +23,7 @@ export default async function MockInterviewPage({
   if (interview.status === "completed")
     redirect(`/interviews/${interview.id}/scorecard`);
   if (interview.status === "abandoned") redirect("/interviews/history");
+  const realtimeProvider = getRealtimeInterviewProviderName();
   return (
     <MockInterviewWorkspace
       interview={{
@@ -26,8 +31,15 @@ export default async function MockInterviewPage({
         durationMinutes: interview.duration_minutes,
         effectiveElapsedSeconds: interview.effectiveElapsedSeconds,
         id: interview.id,
+        interviewerLevel: normalizeInterviewerLevel(
+          interview.interviewer_level,
+        ),
+        interviewLanguage: normalizeInterviewLanguage(
+          interview.interview_language,
+        ),
         phase: interview.phase as MockInterviewPhase,
-        realtimeEnabled: isRealtimeInterviewEnabled(),
+        realtimeEnabled: realtimeProvider !== null,
+        realtimeProvider,
         realtimeTranscript: interview.realtimeEvents.flatMap((event) => {
           if (
             event.event_type !== "user_transcript" &&

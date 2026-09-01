@@ -58,9 +58,11 @@ Authenticated security-definer functions replace a plan and toggle one item. Rep
 
 ## Mock-interview model
 
-`mock_interviews` stores one structured interview session with a required 30-, 45-, or 60-minute timer, adaptive or explicit difficulty, ordered phase, notes, code, complexity analysis, retrospective, and result. A partial unique index permits one active interview per learner. A shared advisory lock and attempt-insert trigger prevent an active practice attempt and active interview from overlapping, including concurrent starts.
+`mock_interviews` stores one structured interview session with a required 30-, 45-, or 60-minute timer, adaptive or explicit difficulty, Beginner or Tough FAANG behavior, automatic/English/Hebrew interview language, ordered phase, notes, code, complexity analysis, retrospective, and result. Interview language is independent of profile coding language. A partial unique index permits one active interview per learner. A shared advisory lock and attempt-insert trigger prevent an active practice attempt and active interview from overlapping, including concurrent starts.
 
 `mock_interview_scorecards` stores the immutable ten-criterion rubric and overall score. Authenticated database functions start, advance, complete, or abandon only the caller's interview. Completion validates every phase, calculates the scorecard from persisted evidence plus explicit retrospective ratings, and smooths the result into the problem topic's mastery. Both tables use forced RLS, allow only own-row reads, and revoke direct browser writes.
+
+`mock_interview_evaluations` stores versioned post-interview evaluations alongside the legacy scorecard. It records pending/completed/provisional/failed lifecycle, evaluator identity and usage, raw score and confidence, ten bounded dimension payloads, evidence coverage, recommendations, and immutable difficulty/duration/interviewer/language snapshots. Narrow ownership-checking functions reserve and finalize a row; authenticated browser roles have own-row reads and no direct writes. Finalized rows cannot be updated. The service role has explicit read-only access for support and verification. Existing scorecards are backfilled as provisional version-zero records with no invented evidence and are excluded from the evidence-based profile.
 
 ## AI-coach usage model
 

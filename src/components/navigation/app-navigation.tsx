@@ -11,6 +11,7 @@ import {
   LibraryBig,
   RefreshCw,
   Settings,
+  UserRoundSearch,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,6 +23,11 @@ const items = [
   { href: "/practice", icon: Dumbbell, label: "Practice" },
   { href: "/review", icon: RefreshCw, label: "Review" },
   { href: "/interviews", icon: BriefcaseBusiness, label: "Interview" },
+  {
+    href: "/interview-profile",
+    icon: UserRoundSearch,
+    label: "Interview profile",
+  },
   { href: "/problems", icon: LibraryBig, label: "Problems" },
   { href: "/progress", icon: ChartNoAxesCombined, label: "Progress" },
   { href: "/history", icon: History, label: "History" },

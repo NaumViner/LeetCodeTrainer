@@ -7,6 +7,10 @@ export const realtimeSessionRequestSchema = z.object({
   sdp: z.string().min(20).max(200_000),
 });
 
+export const geminiRealtimeSessionRequestSchema = z.object({
+  interviewId: z.uuid(),
+});
+
 export const realtimeEventInputSchema = z
   .object({
     content: z.string().trim().min(1).max(50_000),

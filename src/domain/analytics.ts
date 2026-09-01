@@ -12,7 +12,6 @@ export type MasterySnapshot = {
 export function overallReadiness(
   masteries: MasterySnapshot[],
   totalCoreTopics: number,
-  interviewScores: number[] = [],
 ) {
   if (masteries.length === 0 || totalCoreTopics <= 0) {
     return {
@@ -20,7 +19,6 @@ export function overallReadiness(
       corePatterns: 0,
       coverage: 0,
       independentSolving: 0,
-      interviewExecution: null,
       overall: 0,
       recognition: 0,
       retention: 0,
@@ -39,21 +37,69 @@ export function overallReadiness(
   const coverage = Math.min(1, masteries.length / totalCoreTopics);
   const coverageFactor = 0.55 + 0.45 * Math.sqrt(coverage);
   const baseOverall = dimensions.corePatterns * coverageFactor;
-  const interviewExecution = interviewScores.length
-    ? average(interviewScores)
-    : null;
 
   return {
     ...dimensions,
     coverage: round(coverage * 100, 1),
-    interviewExecution:
-      interviewExecution === null ? null : round(interviewExecution, 1),
-    overall: round(
-      interviewExecution === null
-        ? baseOverall
-        : baseOverall * 0.8 + interviewExecution * 0.2,
-      1,
-    ),
+    overall: round(baseOverall, 1),
+  };
+}
+
+export function preparationReadiness(input: {
+  interview: { adjustedScore: number | null; confidence: number };
+  learning: { coverage: number; overall: number };
+}) {
+  const learningConfidence = round(input.learning.coverage, 1);
+  const interviewConfidence = round(input.interview.confidence, 1);
+  const hasLearning = learningConfidence > 0;
+  const hasInterview =
+    input.interview.adjustedScore !== null && interviewConfidence > 0;
+  const totalConfidence =
+    (hasLearning ? learningConfidence : 0) +
+    (hasInterview ? interviewConfidence : 0);
+  const combinedScore =
+    totalConfidence === 0
+      ? null
+      : round(
+          ((hasLearning ? input.learning.overall * learningConfidence : 0) +
+            (hasInterview
+              ? input.interview.adjustedScore! * interviewConfidence
+              : 0)) /
+            totalConfidence,
+          1,
+        );
+  const combinedConfidence =
+    totalConfidence === 0
+      ? 0
+      : hasLearning && hasInterview
+        ? round(
+            0.6 * Math.max(learningConfidence, interviewConfidence) +
+              0.4 * Math.min(learningConfidence, interviewConfidence),
+            1,
+          )
+        : round(totalConfidence * 0.7, 1);
+
+  return {
+    combined: {
+      confidence: combinedConfidence,
+      score: combinedScore,
+      summary:
+        hasLearning && hasInterview
+          ? "Combined preparation reflects separate learning-mastery and interview-performance evidence."
+          : hasInterview
+            ? "Interview evidence is available; learning coverage is still limited."
+            : hasLearning
+              ? "Learning evidence is available; complete evaluated interviews to add execution evidence."
+              : "Complete learning practice and an evaluated interview to establish preparation evidence.",
+    },
+    interview: {
+      confidence: interviewConfidence,
+      score: input.interview.adjustedScore,
+    },
+    learning: {
+      confidence: learningConfidence,
+      score: hasLearning ? input.learning.overall : null,
+    },
   };
 }
 

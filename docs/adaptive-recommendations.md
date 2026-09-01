@@ -32,6 +32,12 @@ The engine ranks deterministically, then considers at most five candidates withi
 
 The practice page shows the selected problem's adaptive score, up to three plain-language reasons, and the active safeguards. The score is a prioritization value, not a mastery percentage. Manual problem selection remains available and bypasses recommendation ranking without bypassing attempt security.
 
+## Interview-first actions
+
+The interview-first layer adds a separate deterministic action list. It prioritizes the weakest evaluated interview dimension, weak or under-covered interview topics, recurring signals, challenge-adjusted performance by difficulty, learning mastery, due review, and recent problem repetition. Actions can be a next interview, specific problem, topic drill, testing drill, complexity drill, communication drill, review, or lesson. A lesson appears only when both interview evidence and learning mastery indicate a knowledge gap.
+
+Every action includes a target, one to three reasons, bounded triggering evidence, a direct route, priority, and estimated time. Interview actions also include suggested difficulty and duration. Hard is recommended only after direct Hard evidence or repeated, confident Medium evidence; one strong Easy interview is insufficient. Remediation is placed before the follow-up interview, and all setup choices remain manually available.
+
 ## Privacy
 
 Recommendation evidence is read server-side from attempts, topic mastery, due reviews, completed lessons, and the learner profile. Every private table remains protected by its existing forced Row Level Security policy. The browser receives only the chosen problem, its reasons, and its score; it does not calculate or supply learner evidence.

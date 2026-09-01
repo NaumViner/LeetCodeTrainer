@@ -1,12 +1,15 @@
 import { getAuthenticatedUser } from "@/features/auth/session";
 import { getMockInterview } from "@/features/mock-interviews/queries";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
+import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
 import { realtimeSessionRequestSchema } from "@/features/realtime-interviews/model";
 import { createClient } from "@/lib/supabase/server";
+import { recordOperationalEvent } from "@/lib/operational-events";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const [user, config] = await Promise.all([
     getAuthenticatedUser(),
     Promise.resolve(getRealtimeInterviewConfig()),
@@ -20,6 +23,12 @@ export async function POST(request: Request) {
   if (!config) {
     return Response.json(
       { message: "The realtime interviewer is not configured." },
+      { status: 503 },
+    );
+  }
+  if (config.provider !== "openai") {
+    return Response.json(
+      { message: "The OpenAI realtime provider is not configured." },
       { status: 503 },
     );
   }
@@ -41,37 +50,27 @@ export async function POST(request: Request) {
   }
 
   const form = new FormData();
-  form.append(
-    "sdp",
-    new Blob([parsed.data.sdp], { type: "application/sdp" }),
-    "offer.sdp",
-  );
+  form.append("sdp", parsed.data.sdp);
   form.append(
     "session",
-    new Blob(
-      [
-        JSON.stringify({
-          audio: {
-            input: {
-              transcription: { model: config.transcriptionModel },
-              turn_detection: {
-                create_response: true,
-                interrupt_response: true,
-                type: "server_vad",
-              },
-            },
-            output: { voice: config.voice },
+    JSON.stringify({
+      audio: {
+        input: {
+          transcription: { model: config.transcriptionModel },
+          turn_detection: {
+            create_response: true,
+            interrupt_response: true,
+            type: "server_vad",
           },
-          instructions: buildInterviewInstructions(interview),
-          max_output_tokens: 500,
-          model: config.model,
-          output_modalities: ["audio"],
-          type: "realtime",
-        }),
-      ],
-      { type: "application/json" },
-    ),
-    "session.json",
+        },
+        output: { voice: config.voice },
+      },
+      instructions: buildInterviewInstructions(interview),
+      max_output_tokens: 500,
+      model: config.model,
+      output_modalities: ["audio"],
+      type: "realtime",
+    }),
   );
 
   const providerResponse = await fetch(
@@ -84,6 +83,10 @@ export async function POST(request: Request) {
     },
   ).catch(() => null);
   if (!providerResponse?.ok) {
+    recordOperationalEvent("realtime_connection_failed", {
+      latencyMs: Date.now() - startedAt,
+      provider: "openai",
+    });
     return Response.json(
       { message: "The voice provider could not create a session." },
       { status: 502 },
@@ -102,25 +105,22 @@ export async function POST(request: Request) {
   });
   if (error) {
     if (providerCallId) await hangUpProviderCall(providerCallId, config.apiKey);
+    recordOperationalEvent("realtime_connection_failed", {
+      interviewId: interview.id,
+      latencyMs: Date.now() - startedAt,
+      provider: config.provider,
+    });
     return Response.json(
       { message: "The voice session could not be recorded securely." },
       { status: 502 },
     );
   }
+  recordOperationalEvent("realtime_connection_succeeded", {
+    interviewId: interview.id,
+    latencyMs: Date.now() - startedAt,
+    provider: config.provider,
+  });
   return Response.json({ sdp: answerSdp });
-}
-
-function buildInterviewInstructions(
-  interview: NonNullable<Awaited<ReturnType<typeof getMockInterview>>>,
-) {
-  return [
-    "You are conducting a realistic technical coding interview.",
-    "Greet the learner briefly, ask one concise question at a time, listen to their reasoning, and use follow-up questions instead of giving the solution.",
-    "Do not reveal the hidden topic, pattern, or an optimal solution. Never invent problem constraints; ask the learner to consult or clarify the original prompt when needed.",
-    "Bracketed CODE SNAPSHOT and INTERVIEW PHASE messages are silent context updates, not spoken learner turns. Use them to ask relevant questions without reading them aloud.",
-    `Problem title: ${interview.problem.title}. Difficulty: ${interview.problem.difficulty}.`,
-    `Current phase: ${interview.phase}. Keep responses under about 45 seconds.`,
-  ].join("\n");
 }
 
 async function hangUpProviderCall(callId: string, apiKey: string) {

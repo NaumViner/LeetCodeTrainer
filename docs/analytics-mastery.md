@@ -31,7 +31,9 @@ Performance and mastery tables use forced Row Level Security. Authenticated lear
 
 ## Readiness and analytics
 
-Overall readiness begins with mean topic mastery and applies a coverage factor across the 18 core problem topics. This prevents one strong topic from representing broad interview readiness. Once completed mock-interview scorecards exist, their average contributes 20% of readiness and appears as a separate interview-execution dimension; before that, the original mastery estimate is unchanged. It is always labeled “Training estimate, not a prediction of interview outcome.”
+Learning readiness begins with mean topic mastery and applies a coverage factor across the 18 core problem topics. This prevents one strong topic from representing broad knowledge. It is always labeled as learning evidence rather than a prediction of interview outcome.
+
+Interview readiness is now derived separately from versioned post-interview evaluations. It reports raw session performance, challenge-adjusted skill evidence, confidence, level, trends, dimensions, topic scopes, difficulty scopes, and interviewer-level scopes. A combined preparation summary is available only alongside the two named layers and their separate confidence values; the former `80% mastery + 20% scorecard average` field is no longer exposed to UI consumers.
 
 Mock-interview completion also smooths correctness, independence, recognition, complexity, speed, and overall performance into the problem's primary topic. Weak interview evidence can therefore lower topic mastery and naturally raise that topic in later adaptive recommendations.
 

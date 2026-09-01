@@ -1,10 +1,12 @@
 import {
   aggregateAttemptAnalytics,
   overallReadiness,
+  preparationReadiness,
   type MasterySnapshot,
 } from "@/domain/analytics";
 import { getProblemCatalog } from "@/features/problems/queries";
 import { createClient } from "@/lib/supabase/server";
+import { getInterviewPerformanceProfile } from "@/features/interview-profile/queries";
 import type { Tables } from "@/types/database";
 
 export type TopicMasteryRow = Tables<"topic_mastery">;
@@ -28,6 +30,7 @@ export async function getAnalyticsSnapshot(userId: string) {
     performanceResult,
     masteryResult,
     interviewResult,
+    interviewPerformance,
     catalog,
   ] = await Promise.all([
     supabase
@@ -43,6 +46,7 @@ export async function getAnalyticsSnapshot(userId: string) {
       .select("overall_score")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
+    getInterviewPerformanceProfile(userId),
     getProblemCatalog(),
   ]);
   const error =
@@ -108,15 +112,17 @@ export async function getAnalyticsSnapshot(userId: string) {
     })),
   );
 
+  const learningReadiness = overallReadiness(masteries, coreTopics.length);
   return {
     attempts,
+    interviewPerformance: interviewPerformance.profile,
+    learningReadiness,
     metrics,
     mockInterviewCount: interviewResult.data?.length ?? 0,
-    readiness: overallReadiness(
-      masteries,
-      coreTopics.length,
-      (interviewResult.data ?? []).map((item) => item.overall_score),
-    ),
+    preparation: preparationReadiness({
+      interview: interviewPerformance.profile.allTime.overall,
+      learning: learningReadiness,
+    }),
     topics,
   };
 }
