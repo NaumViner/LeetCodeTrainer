@@ -9,7 +9,7 @@ The package contains:
 - interview ID, requested and actual difficulty, duration, elapsed time, interviewer level, and safe realtime provider/model metadata;
 - primary and secondary topic metadata;
 - bounded clarification, examples, brute-force, optimization, testing, and complexity evidence;
-- the most recent code snapshot, preferring a later persisted realtime snapshot;
+- the most recent bounded code snapshot by timestamp across the saved interview workspace and persisted realtime events;
 - final learner and interviewer transcript turns;
 - available connection events and phase timings derived from persisted phase-context boundaries;
 - learner-selected result and retrospective;
@@ -29,15 +29,15 @@ When more than 80 transcript turns exist, the package keeps the first 40 and las
 
 ## First-party question-content boundary
 
-The server-only question registry requires a legally usable prompt, constraints, examples, expected invariants, a content version, and one or more private evaluator tests. Public evaluator context is separated from private test cases before evidence assembly.
+The server-only question registry requires a legally usable prompt, constraints, examples, expected invariants, content version, provenance, and approved review state. Private evaluator tests are a separate optional trusted-runner concern rather than a prerequisite for prompt approval. Learner-visible content is derived through a strict schema that omits expected invariants.
 
-The current registry is intentionally empty. Existing catalog titles and external links are metadata, not first-party answer keys. Consequently, current evidence packages label semantic correctness as `unsupported`. A package may use `prompt_only` only after original or licensed question content is registered, and `trusted_tests` only after an isolated runner supplies bounded results. The application must not claim production-grade code correctness before that point.
+The initial registry contains 18 repository-authored version-one prompts, one for every canonical NeetCode topic. Matching catalog rows are explicitly marked `interview_ready`; all other catalog titles and external links remain metadata and cannot enter the versioned selection flow. A matching approved snapshot produces `prompt_only` semantic-correctness coverage. `trusted_tests` remains unavailable until an isolated runner supplies bounded results, so the application still does not claim production-grade code correctness.
 
 ## Ownership and lifecycle
 
 The exported assembler is server-only and uses the existing learner-scoped mock-interview query, which applies both the authenticated database session and an explicit `user_id` predicate. Active and abandoned interviews return no evaluation evidence. Realtime events with a different user or session ID are discarded defensively even if supplied to the pure bounded builder in a test.
 
-The live interviewer and learning coach do not own or mutate this contract.
+The final submitted workspace snapshot remains evaluator evidence even when realtime is disabled or disconnected. The live interviewer and learning coach do not own or mutate this contract.
 
 ## Evaluator architecture
 

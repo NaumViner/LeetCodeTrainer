@@ -44,6 +44,9 @@ export const firstPartyQuestionContentSchema = z
   })
   .strict();
 
+export const learnerVisibleQuestionContentSchema =
+  firstPartyQuestionContentSchema.omit({ expectedInvariants: true });
+
 const trustedTestResultsSchema = z
   .object({
     compileStatus: z.enum(["not_required", "passed", "failed"]),
@@ -185,6 +188,9 @@ export const interviewEvidencePackageSchema = z
 export type FirstPartyQuestionContent = z.infer<
   typeof firstPartyQuestionContentSchema
 >;
+export type LearnerVisibleQuestionContent = z.infer<
+  typeof learnerVisibleQuestionContentSchema
+>;
 export type InterviewEvidencePackage = z.infer<
   typeof interviewEvidencePackageSchema
 >;
@@ -221,7 +227,11 @@ export function buildInterviewEvidencePackage(input: {
   const truncatedFields: string[] = [];
   const transcript = buildTranscript(events);
   if (transcript.truncated) truncatedFields.push("transcript");
-  const code = latestCode(input.interview.code_snapshot ?? "", events);
+  const code = latestCode(
+    input.interview.code_snapshot ?? "",
+    input.interview.code_updated_at,
+    events,
+  );
   if (code.truncated) truncatedFields.push("code");
   const phaseEvidence = {
     bruteForce: truncate(
@@ -386,13 +396,22 @@ function buildTranscript(events: RealtimeEventRow[]) {
   };
 }
 
-function latestCode(interviewCode: string, events: RealtimeEventRow[]) {
-  const realtimeCode = [...events]
+function latestCode(
+  interviewCode: string,
+  interviewCodeUpdatedAt: string | null,
+  events: RealtimeEventRow[],
+) {
+  const realtimeEvent = [...events]
     .reverse()
-    .find((event) => event.event_type === "code_snapshot")?.content;
-  const sourceText = realtimeCode ?? interviewCode;
+    .find((event) => event.event_type === "code_snapshot");
+  const realtimeIsLatest =
+    realtimeEvent &&
+    (!interviewCodeUpdatedAt ||
+      new Date(realtimeEvent.created_at).getTime() >
+        new Date(interviewCodeUpdatedAt).getTime());
+  const sourceText = realtimeIsLatest ? realtimeEvent.content : interviewCode;
   return {
-    source: realtimeCode
+    source: realtimeIsLatest
       ? ("realtime_event" as const)
       : interviewCode
         ? ("interview_state" as const)

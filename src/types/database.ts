@@ -624,6 +624,53 @@ export type Database = {
           },
         ];
       };
+      mock_interview_code_submissions: {
+        Row: {
+          code_snapshot: string;
+          coding_language: string;
+          elapsed_seconds: number;
+          id: string;
+          mock_interview_id: string;
+          phase: string;
+          snapshot_version: number;
+          submission_kind: string;
+          submitted_at: string;
+          user_id: string;
+        };
+        Insert: {
+          code_snapshot: string;
+          coding_language: string;
+          elapsed_seconds: number;
+          id?: string;
+          mock_interview_id: string;
+          phase: string;
+          snapshot_version: number;
+          submission_kind: string;
+          submitted_at?: string;
+          user_id: string;
+        };
+        Update: {
+          code_snapshot?: string;
+          coding_language?: string;
+          elapsed_seconds?: number;
+          id?: string;
+          mock_interview_id?: string;
+          phase?: string;
+          snapshot_version?: number;
+          submission_kind?: string;
+          submitted_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_code_submissions_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: false;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       mock_interview_evaluations: {
         Row: {
           completed_at: string | null;
@@ -728,6 +775,68 @@ export type Database = {
           },
         ];
       };
+      mock_interview_phase_events: {
+        Row: {
+          code_submission_ids: string[];
+          created_at: string;
+          display_summary: string | null;
+          evidence_event_ids: number[];
+          evidence_fields: string[];
+          id: string;
+          mock_interview_id: string;
+          model: string | null;
+          phase: string;
+          provider: string | null;
+          reason_code: string | null;
+          source: string;
+          suggested_phase: string | null;
+          transition_type: string;
+          user_id: string;
+        };
+        Insert: {
+          code_submission_ids?: string[];
+          created_at?: string;
+          display_summary?: string | null;
+          evidence_event_ids?: number[];
+          evidence_fields?: string[];
+          id?: string;
+          mock_interview_id: string;
+          model?: string | null;
+          phase: string;
+          provider?: string | null;
+          reason_code?: string | null;
+          source: string;
+          suggested_phase?: string | null;
+          transition_type: string;
+          user_id: string;
+        };
+        Update: {
+          code_submission_ids?: string[];
+          created_at?: string;
+          display_summary?: string | null;
+          evidence_event_ids?: number[];
+          evidence_fields?: string[];
+          id?: string;
+          mock_interview_id?: string;
+          model?: string | null;
+          phase?: string;
+          provider?: string | null;
+          reason_code?: string | null;
+          source?: string;
+          suggested_phase?: string | null;
+          transition_type?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_phase_events_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: false;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       mock_interview_scorecards: {
         Row: {
           approach_quality: number;
@@ -808,6 +917,9 @@ export type Database = {
           brute_force_notes: string | null;
           clarification_notes: string | null;
           code_snapshot: string | null;
+          code_submitted_at: string | null;
+          code_updated_at: string | null;
+          coding_language: string;
           completed_at: string | null;
           created_at: string;
           difficulty_mode: string;
@@ -820,8 +932,16 @@ export type Database = {
           optimization_notes: string | null;
           phase: string;
           problem_id: string;
+          question_content_version: number | null;
+          requested_difficulties: string[];
+          requested_topic_id: string | null;
           result: string | null;
           retrospective: string | null;
+          scratchpad: string | null;
+          selected_topic_id: string;
+          selection_algorithm_version: number;
+          selection_metadata: Json;
+          selection_mode: string;
           started_at: string;
           status: string;
           submitted_space_complexity: string | null;
@@ -830,11 +950,16 @@ export type Database = {
           timer_running: boolean;
           updated_at: string;
           user_id: string;
+          workspace_updated_at: string | null;
+          workspace_version: number;
         };
         Insert: {
           brute_force_notes?: string | null;
           clarification_notes?: string | null;
           code_snapshot?: string | null;
+          code_submitted_at?: string | null;
+          code_updated_at?: string | null;
+          coding_language?: string;
           completed_at?: string | null;
           created_at?: string;
           difficulty_mode: string;
@@ -847,8 +972,16 @@ export type Database = {
           optimization_notes?: string | null;
           phase?: string;
           problem_id: string;
+          question_content_version?: number | null;
+          requested_difficulties?: string[];
+          requested_topic_id?: string | null;
           result?: string | null;
           retrospective?: string | null;
+          scratchpad?: string | null;
+          selected_topic_id: string;
+          selection_algorithm_version?: number;
+          selection_metadata?: Json;
+          selection_mode?: string;
           started_at?: string;
           status?: string;
           submitted_space_complexity?: string | null;
@@ -857,11 +990,16 @@ export type Database = {
           timer_running?: boolean;
           updated_at?: string;
           user_id: string;
+          workspace_updated_at?: string | null;
+          workspace_version?: number;
         };
         Update: {
           brute_force_notes?: string | null;
           clarification_notes?: string | null;
           code_snapshot?: string | null;
+          code_submitted_at?: string | null;
+          code_updated_at?: string | null;
+          coding_language?: string;
           completed_at?: string | null;
           created_at?: string;
           difficulty_mode?: string;
@@ -874,8 +1012,16 @@ export type Database = {
           optimization_notes?: string | null;
           phase?: string;
           problem_id?: string;
+          question_content_version?: number | null;
+          requested_difficulties?: string[];
+          requested_topic_id?: string | null;
           result?: string | null;
           retrospective?: string | null;
+          scratchpad?: string | null;
+          selected_topic_id?: string;
+          selection_algorithm_version?: number;
+          selection_metadata?: Json;
+          selection_mode?: string;
           started_at?: string;
           status?: string;
           submitted_space_complexity?: string | null;
@@ -884,6 +1030,8 @@ export type Database = {
           timer_running?: boolean;
           updated_at?: string;
           user_id?: string;
+          workspace_updated_at?: string | null;
+          workspace_version?: number;
         };
         Relationships: [
           {
@@ -893,7 +1041,100 @@ export type Database = {
             referencedRelation: "problems";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "mock_interviews_requested_topic_id_fkey";
+            columns: ["requested_topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mock_interviews_selected_topic_id_fkey";
+            columns: ["selected_topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
         ];
+      };
+      problem_collection_memberships: {
+        Row: {
+          collection_id: string;
+          created_at: string;
+          ordinal: number;
+          primary_topic_id: string;
+          problem_id: string;
+        };
+        Insert: {
+          collection_id: string;
+          created_at?: string;
+          ordinal: number;
+          primary_topic_id: string;
+          problem_id: string;
+        };
+        Update: {
+          collection_id?: string;
+          created_at?: string;
+          ordinal?: number;
+          primary_topic_id?: string;
+          problem_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "problem_collection_memberships_collection_id_fkey";
+            columns: ["collection_id"];
+            isOneToOne: false;
+            referencedRelation: "problem_collections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "problem_collection_memberships_primary_topic_id_fkey";
+            columns: ["primary_topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "problem_collection_memberships_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: false;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      problem_collections: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          expected_primary_topic_count: number;
+          expected_problem_count: number;
+          id: string;
+          name: string;
+          slug: string;
+          version: number;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          expected_primary_topic_count: number;
+          expected_problem_count: number;
+          id?: string;
+          name: string;
+          slug: string;
+          version: number;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          expected_primary_topic_count?: number;
+          expected_problem_count?: number;
+          id?: string;
+          name?: string;
+          slug?: string;
+          version?: number;
+        };
+        Relationships: [];
       };
       problem_prerequisite_topics: {
         Row: {
@@ -1017,6 +1258,9 @@ export type Database = {
           external_id: string | null;
           external_url: string | null;
           id: string;
+          interview_content_provenance: string | null;
+          interview_content_version: number | null;
+          interview_ready: boolean;
           pattern_tags: string[];
           premium: boolean;
           primary_topic_id: string;
@@ -1037,6 +1281,9 @@ export type Database = {
           external_id?: string | null;
           external_url?: string | null;
           id?: string;
+          interview_content_provenance?: string | null;
+          interview_content_version?: number | null;
+          interview_ready?: boolean;
           pattern_tags?: string[];
           premium?: boolean;
           primary_topic_id: string;
@@ -1057,6 +1304,9 @@ export type Database = {
           external_id?: string | null;
           external_url?: string | null;
           id?: string;
+          interview_content_provenance?: string | null;
+          interview_content_version?: number | null;
+          interview_ready?: boolean;
           pattern_tags?: string[];
           premium?: boolean;
           primary_topic_id?: string;
@@ -1493,6 +1743,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      delete_owned_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: string;
+      };
       end_realtime_interview_session: {
         Args: {
           p_mock_interview_id: string;
@@ -1541,6 +1795,17 @@ export type Database = {
         };
         Returns: number;
       };
+      mock_interview_phase_summary: {
+        Args: {
+          p_interview: Database["public"]["Tables"]["mock_interviews"]["Row"];
+          p_phase: string;
+        };
+        Returns: string;
+      };
+      recompute_topic_mastery_from_evidence: {
+        Args: { p_topic_id: string; p_user_id: string };
+        Returns: undefined;
+      };
       replace_daily_plan: {
         Args: {
           p_available_minutes: number;
@@ -1567,6 +1832,15 @@ export type Database = {
           p_provider: string;
         };
         Returns: Json;
+      };
+      save_mock_interview_workspace: {
+        Args: {
+          p_code_snapshot: string;
+          p_expected_version: number;
+          p_mock_interview_id: string;
+          p_scratchpad: string;
+        };
+        Returns: number;
       };
       set_daily_plan_item_completed: {
         Args: { p_completed: boolean; p_item_id: string };
@@ -1600,6 +1874,47 @@ export type Database = {
             };
             Returns: string;
           };
+      start_mock_interview_v2: {
+        Args: {
+          p_coding_language: string;
+          p_duration_minutes: number;
+          p_interview_language: string;
+          p_interviewer_level: string;
+          p_problem_id: string;
+          p_requested_difficulties: string[];
+          p_requested_topic_id: string;
+          p_selected_topic_id: string;
+          p_selection_algorithm_version: number;
+          p_selection_metadata: Json;
+          p_selection_mode: string;
+        };
+        Returns: string;
+      };
+      submit_mock_interview_code: {
+        Args: {
+          p_advance_to_testing: boolean;
+          p_code_snapshot: string;
+          p_elapsed_seconds: number;
+          p_expected_version: number;
+          p_mock_interview_id: string;
+          p_scratchpad: string;
+        };
+        Returns: Json;
+      };
+      suggest_mock_interview_phase: {
+        Args: {
+          p_evidence_event_ids: number[];
+          p_expected_current_phase: string;
+          p_mock_interview_id: string;
+          p_reason_code: string;
+          p_suggested_next_phase: string;
+        };
+        Returns: string;
+      };
+      valid_interview_difficulty_filter: {
+        Args: { p_value: string[] };
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;

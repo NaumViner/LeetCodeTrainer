@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Phase 1 — Repository foundation
 
@@ -463,3 +463,177 @@ No isolated code sandbox or private first-party test bundle exists in this check
 ### Launch boundary
 
 Repository deployment readiness is complete. Creating the Vercel and hosted Supabase projects, entering account-owned secrets, choosing the public domain, and enabling billable AI access remain explicit owner actions; no production account was mutated from this checkout.
+
+## Interview selection and workspace expansion — Stage 1
+
+**Status:** Complete locally; later selection/UI stages remain pending
+
+### Completed
+
+- Canonical, versioned `neetcode-150` problem collection frozen at 150 problems and 18 primary topics
+- Public read-only collection metadata with forced RLS and revoked browser writes
+- Backward-compatible interview selection snapshots for mode, topic, difficulty filter, algorithm version, metadata, coding language, and question-content version
+- Trigger validation that derives legacy snapshots and rejects problem/topic/difficulty mismatches
+- Learner-owned topic-coverage read model based on distinct completed, non-deleted interview topics rather than total interview count
+- Generated database types and focused unit/integration coverage
+
+### Verification
+
+- The additive migration applies locally and database lint reports no schema errors.
+- Unit coverage proves distinct-topic counting, deletion-equivalent removal, recent-topic ordering, and collection isolation.
+- Integration coverage verifies public 150/18 collection metadata and legacy start-RPC snapshot compatibility.
+- Selection algorithms, setup UI, deletion, approved question content, editor, and phase guiding star remain later stages defined in `interview-selection-and-workspace-action-plan.md`.
+
+## Interview selection and workspace expansion — Stage 2
+
+**Status:** Complete locally; setup UI and server wiring remain pending
+
+### Completed
+
+- Pure, typed Coverage, Improvement, Learning, and Custom selection policies outside the interview Server Action
+- Injected random-index dependency for reproducible tests and a future cryptographic server adapter
+- Coverage selection across uncovered topics, then least-covered topics after full coverage
+- Two-topic recency avoidance, fresh-problem preference, and explicit recency/repeat fallback metadata
+- Improvement gating on complete topic coverage and comparable evaluated evidence
+- Deterministic bottom-three Improvement ranking by adjusted score, confidence, evidence age, and canonical topic order
+- Learning selection that preserves the existing adaptive eligibility fallback, score ordering, reasons, and recent-problem avoidance
+- Exact canonical topic-and-difficulty Custom selection with fresh-question preference
+- Explicit invalid-filter, unavailable-inventory, missing-evidence, and policy-prerequisite outcomes without silent topic or difficulty escape
+
+### Verification
+
+- Seventeen focused unit scenarios cover all four policies, deterministic randomness, tie-breaking, recency, repetition, eligibility fallback, and inventory errors.
+- Strict TypeScript and ESLint pass for the additive domain boundary and tests.
+- These policies are intentionally not user-facing yet; Stage 3 will assemble server-owned evidence, use cryptographic randomness, persist snapshots, and expose the four explained setup paths.
+
+## Interview selection and workspace expansion — Stage 3
+
+**Status:** Complete locally; approved full question content remains Stage 5
+
+### Completed
+
+- Server-owned selection context combining the canonical collection, completed history, topic coverage, adaptive scores, and evaluated interview-topic performance
+- Cryptographic production random selection with deterministic domain-test injection retained
+- Versioned `start_mock_interview_v2` RPC with canonical membership, topic, difficulty, language, algorithm-version, metadata-bound, learner-readiness, and concurrency validation
+- Immutable persistence of selection mode, requested difficulty filter, requested/selected topic, selection reasons and fallbacks, coding language, interviewer configuration, and algorithm version
+- Setup header showing completed topic coverage and the exact missing topic list
+- Four explained selection cards for Coverage/Balanced random, Improvement, Learning, and Choose topic
+- Improvement availability and weak-topic evidence; Learning adaptive reasons without mixing interview weakness
+- Multi-difficulty filters for Coverage/Improvement and exact topic/difficulty inventory for Custom
+- Independent 30/45/60-minute duration, Beginner/Tough FAANG persona, automatic/English/Hebrew interview language, and Python/Java coding language
+- Profile-language defaulting to Java when supported and Python otherwise
+- Explicit inventory and evidence errors without silent mode, topic, or difficulty changes
+
+### Verification
+
+- Component coverage verifies pre-coverage locking/explanations, Custom inventory blocking, post-coverage default behavior, Balanced random visibility, and coding-language defaults.
+- Schema coverage exercises every mode across all duration, interviewer, interview-language, and coding-language combinations plus invalid mode-specific inputs.
+- Database integration verifies the new snapshot RPC persists bounded version-one metadata while legacy RPC behavior remains compatible.
+- Stage 3 intentionally preserves the existing active-catalog question boundary. Stage 5 will require reviewed first-party prompt readiness before a problem remains selectable.
+
+## Interview selection and workspace expansion — Stage 4
+
+**Status:** Complete locally; not committed or pushed
+
+### Completed
+
+- Transactional, authenticated deletion for completed and abandoned learner-owned interviews, with active-session and cross-user rejection
+- Cascade cleanup for scorecards, all evaluation versions, realtime sessions, transcripts, and code/context events
+- Deterministic chronological replay of remaining diagnostic, practice, and interview evidence instead of unsafe aggregate decrementing
+- Removal of deleted evidence from topic coverage, mastery, interview profile, trends, recurring signals, readiness, and later recommendations
+- Explicit permanent-delete confirmation on interview history and scorecard pages, followed by safe navigation back to history
+- Cache revalidation for interview setup/history, interview profile, dashboard, progress, practice, and recommendation consumers
+- Privacy-safe operational deletion event containing identifiers only
+
+### Verification
+
+- Database integration covers active and foreign-owner denial, dependent-row cascades, abandoned deletion, interview counters, timestamps, and exact restoration of pre-interview mastery.
+- Component coverage verifies the named interview, irreversible warning, profile/coverage explanation, and required acknowledgement.
+- Desktop and mobile browser coverage completes an interview, deletes it through the history UI, and verifies that both history and interview profile return to their empty states.
+
+## Interview selection and workspace expansion — Stage 5
+
+**Status:** Complete locally; not committed or pushed
+
+### Completed
+
+- Server-only versioned question-content registry with first-party provenance and explicit approved review state
+- Eighteen repository-authored version-one prompts covering every canonical topic, each with constraints, public examples, and private evaluator invariants
+- Database-backed `interview_ready`, content-version, and provenance inventory, with non-ready catalog items excluded from every versioned selection mode
+- Database trigger enforcement that rejects non-legacy starts without approved content and freezes the authoritative content version on the interview snapshot
+- Runtime registry/database version matching so drift fails closed instead of exposing or selecting incomplete content
+- Exact Custom inventory messaging for unavailable topic/difficulty combinations
+- Sticky, collapsible, accessible question panel with prompt, examples, constraints, difficulty, live timer status, and a clearly separated canonical reference
+- Strict learner-visible schema that omits evaluator invariants; the browser and realtime providers receive only the public prompt boundary
+- Version-aware post-interview evidence assembly with `prompt_only` correctness coverage and no private-test correctness claim
+
+### Verification
+
+- Database integration verifies 18 approved rows across 18 distinct topics, frozen version-one snapshots, and rejection of non-ready problems.
+- Component tests cover structured rendering, source separation, hidden evaluator content, one-tap collapse, and preservation of collapsed state across timer rerenders.
+- Realtime instruction tests verify bounded first-party prompt delivery and absence of invariant/private-test fields.
+- Desktop and mobile browser coverage verifies that the approved prompt remains visible, collapsible, and restored during a Tough FAANG Hebrew interview.
+
+## Interview selection and workspace expansion — Stage 6
+
+**Status:** Complete locally; not committed or pushed
+
+### Completed
+
+- Dynamically loaded CodeMirror 6 coding workspace available from Intro onward, with syntax-aware Python and Java editing and a language fixed to the interview snapshot
+- Persistent 10,000-character scratchpad and 30,000-character code snapshot with debounced/blur/manual saves and explicit Saving, Saved, Unsaved, and Save failed states
+- Optimistic workspace versions and serialized saves that reject stale-tab overwrites instead of silently losing newer work
+- Immutable, owner-scoped review/completed code submissions created atomically with the latest workspace state and optional ordered transition to Testing
+- Implementation-only “Send current code to interviewer” and “I’m done coding” actions with explicit no-execution/no-tests-passed disclosure
+- Provider-neutral, JSON-delimited untrusted code-review context implemented consistently for Gemini Live and OpenAI WebRTC
+- Tough FAANG test-case/next-instruction behavior without defect explanation, plus restrained Beginner review behavior
+- Final-code evaluator selection by timestamp across persisted workspace and realtime snapshots, including the no-AI/disconnected path
+- Forced RLS, revoked direct writes, ownership checks, bounded content, submission caps, deletion cascades, and privacy-safe operational events
+
+### Verification
+
+- Unit/component coverage validates language locking, Intro availability, autosave/manual save, exact workspace-version progression, Implementation-only review, no-execution disclosure, bounds, and provider prompt safety.
+- Database integration validates atomic snapshots, stale-version and cross-owner rejection, phase enforcement, final-code evidence selection, direct-write denial, and deletion cascade.
+- Desktop/mobile browser coverage exercises scratchpad/code save, refresh recovery, review fallback without AI, and the explicit transition from Implementation to Testing.
+
+## Interview selection and workspace expansion — Stage 7
+
+**Status:** Complete locally; not committed or pushed
+
+### Completed
+
+- Accessible nine-step Interview process guide with explicit Completed, You are here, Suggested next, Needs confirmation, and Future states
+- Deterministic captured-evidence summaries backed by saved phase fields, bounded realtime event references, and immutable code-submission references
+- Canonical forced-RLS phase-event history with revoked direct writes, ownership-scoped reads, deletion cascade, and safe restoration for existing active interviews
+- Provider-neutral structured phase-suggestion contract implemented for Gemini Live and OpenAI WebRTC without parsing phase commands from transcript text
+- Server validation for authentication, ownership, active session, current-phase evidence, immediate-successor ordering, stale suggestions, and immutable idempotent duplicates
+- Learner-controlled confirmation through the existing ordered state machine; the model can neither advance, complete, nor skip phases
+- Manual interview workflow remains fully usable when realtime AI or structured tool handling is unavailable
+
+### Verification
+
+- Domain/component coverage validates every guide state, the current-step accessibility marker, deterministic summaries, and separation from final scoring.
+- Provider/schema coverage validates immediate-successor suggestions and rejects skipped, malformed, duplicated-evidence, and transcript-like inputs.
+- Database integration validates persisted evidence references, idempotency, stale/cross-owner/direct-write rejection, ordered phase history, code attachment, and deletion cascade.
+- Browser coverage follows the guide from Intro through Clarify and Testing while preserving the existing full interview and deletion flow.
+
+## Interview selection and workspace expansion — Stage 8
+
+**Status:** Complete locally; production rollout and live provider acceptance remain external
+
+### Completed
+
+- Independent server-only rollout controls for expanded selection modes, embedded approved prompts, and the enhanced coding workspace
+- Safe disabled-state paths: adaptive Learning-only selection with server enforcement, canonical question reference, and a bounded LTR Python/Java textarea
+- Structured operational success, rejection, conflict, failure, reason-code, and latency events without prompt, transcript, note, scratchpad, code, token, or profile content
+- Client-bundle security audit that rejects server-only secret identifiers or configured secret values and runs after the production build in CI
+- Security, privacy, accessibility, load, concurrency, rollback, and production-acceptance review documented in `docs/interview-rollout.md`
+- Concurrent phase-suggestion burst coverage proving one immutable idempotent event, alongside existing start/workspace/evaluation/deletion race protections
+- Explicit no-fabricated-evidence boundary: version-zero legacy evaluations remain excluded from profile evidence and active-interview backfill records only the actual current phase
+- Production environment validation and deployment documentation for every rollout flag
+
+### Verification
+
+- Rollout tests validate independent strict-boolean parsing, default behavior, Learning-only fallback, canonical prompt fallback, and bounded language-aware code fallback.
+- Security verification scans the optimized client bundle after build and reports only secret variable labels and asset paths, never secret values.
+- The complete Stage 8 quality-gate results are recorded after the final local run; production provider keys, hosted migration application, canary monitoring, and live microphone/provider acceptance remain deployment-owner tasks.

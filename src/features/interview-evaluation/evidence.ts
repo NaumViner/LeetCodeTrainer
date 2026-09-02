@@ -22,7 +22,10 @@ export async function assembleInterviewEvidencePackage(
     assembledAt: new Date(),
     interview,
     problem: interview.problem,
-    questionContent: getFirstPartyQuestionContent(interview.problem.slug),
+    questionContent: getFirstPartyQuestionContent(
+      interview.problem.slug,
+      interview.question_content_version,
+    ),
     realtimeEvents: interview.realtimeEvents,
     realtimeSession: interview.realtimeSession,
     trustedTests: options.trustedTests,

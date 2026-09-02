@@ -56,6 +56,7 @@ export async function getAdaptiveRecommendationSnapshot(
     catalog,
     context,
     evidence,
+    interviewPerformance,
     interviewRecommendations: buildInterviewFirstRecommendations({
       candidates: catalog.map((problem) => ({
         difficulty: problem.difficulty as "easy" | "hard" | "medium",

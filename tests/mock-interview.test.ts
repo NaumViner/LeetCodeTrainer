@@ -10,7 +10,12 @@ import {
   scoreMockInterview,
 } from "@/domain/mock-interview";
 import type { ScoredRecommendation } from "@/domain/recommendation";
-import { mockInterviewSetupSchema } from "@/features/mock-interviews/schema";
+import {
+  mockInterviewCodeSubmissionSchema,
+  mockInterviewPhaseSuggestionSchema,
+  mockInterviewSetupSchema,
+  mockInterviewWorkspaceSaveSchema,
+} from "@/features/mock-interviews/schema";
 
 const strongInput = {
   bruteForceNotes:
@@ -36,24 +41,130 @@ const strongInput = {
 
 describe("mock interview domain", () => {
   it.each(
-    ["adaptive", "easy", "medium", "hard"].flatMap((difficulty) =>
+    ["coverage", "improvement", "learning", "custom"].flatMap((selectionMode) =>
       [30, 45, 60].flatMap((durationMinutes) =>
         ["beginner", "faang_tough"].flatMap((interviewerLevel) =>
-          ["auto", "english", "hebrew"].map((interviewLanguage) => ({
-            difficulty,
-            durationMinutes,
-            interviewLanguage,
-            interviewerLevel,
-          })),
+          ["auto", "english", "hebrew"].flatMap((interviewLanguage) =>
+            ["python", "java"].map((codingLanguage) => ({
+              codingLanguage,
+              customDifficulty: selectionMode === "custom" ? "hard" : null,
+              difficulties:
+                selectionMode === "coverage" || selectionMode === "improvement"
+                  ? ["easy", "medium", "hard"]
+                  : [],
+              durationMinutes,
+              interviewLanguage,
+              interviewerLevel,
+              requestedTopicId:
+                selectionMode === "custom"
+                  ? "10000000-0000-4000-8000-000000000001"
+                  : null,
+              selectionMode,
+            })),
+          ),
         ),
       ),
     ),
   )(
-    "accepts $difficulty, $durationMinutes minutes, $interviewerLevel, and $interviewLanguage",
+    "accepts $selectionMode, $durationMinutes minutes, $interviewerLevel, $interviewLanguage, and $codingLanguage",
     (setup) => {
       expect(mockInterviewSetupSchema.safeParse(setup).success).toBe(true);
     },
   );
+
+  it("rejects invalid mode-specific selection inputs", () => {
+    const common = {
+      codingLanguage: "python",
+      customDifficulty: null,
+      durationMinutes: 45,
+      interviewLanguage: "auto",
+      interviewerLevel: "beginner",
+      requestedTopicId: null,
+    };
+    expect(
+      mockInterviewSetupSchema.safeParse({
+        ...common,
+        difficulties: [],
+        selectionMode: "coverage",
+      }).success,
+    ).toBe(false);
+    expect(
+      mockInterviewSetupSchema.safeParse({
+        ...common,
+        difficulties: [],
+        selectionMode: "custom",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("bounds conflict-safe workspace saves and code submissions", () => {
+    expect(
+      mockInterviewWorkspaceSaveSchema.safeParse({
+        codeSnapshot: "def solve():\n    pass\n",
+        expectedVersion: 3,
+        scratchpad: "Trace the empty input.",
+      }).success,
+    ).toBe(true);
+    expect(
+      mockInterviewCodeSubmissionSchema.safeParse({
+        advanceToTesting: true,
+        codeSnapshot: "class Solution {}",
+        elapsedSeconds: 120,
+        expectedVersion: 4,
+        scratchpad: "",
+      }).success,
+    ).toBe(true);
+    expect(
+      mockInterviewWorkspaceSaveSchema.safeParse({
+        codeSnapshot: "x".repeat(30_001),
+        expectedVersion: 0,
+        scratchpad: "",
+      }).success,
+    ).toBe(false);
+    expect(
+      mockInterviewWorkspaceSaveSchema.safeParse({
+        codeSnapshot: "",
+        expectedVersion: 0,
+        scratchpad: "x".repeat(10_001),
+      }).success,
+    ).toBe(false);
+    expect(
+      mockInterviewCodeSubmissionSchema.safeParse({
+        advanceToTesting: false,
+        codeSnapshot: "pass",
+        elapsedSeconds: -1,
+        expectedVersion: 0,
+        scratchpad: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts only immediate, evidence-linked phase suggestions", () => {
+    expect(
+      mockInterviewPhaseSuggestionSchema.safeParse({
+        evidenceEventIds: ["12"],
+        expectedCurrentPhase: "clarify",
+        reasonCode: "learner_completed_objective",
+        suggestedNextPhase: "examples",
+      }).success,
+    ).toBe(true);
+    expect(
+      mockInterviewPhaseSuggestionSchema.safeParse({
+        evidenceEventIds: ["12"],
+        expectedCurrentPhase: "clarify",
+        reasonCode: "learner_completed_objective",
+        suggestedNextPhase: "optimization",
+      }).success,
+    ).toBe(false);
+    expect(
+      mockInterviewPhaseSuggestionSchema.safeParse({
+        evidenceEventIds: ["12", "12"],
+        expectedCurrentPhase: "clarify",
+        reasonCode: "learner_completed_objective",
+        suggestedNextPhase: "examples",
+      }).success,
+    ).toBe(false);
+  });
 
   it("lets fixed difficulty bypass learning eligibility", () => {
     const selected = selectInterviewProblem({

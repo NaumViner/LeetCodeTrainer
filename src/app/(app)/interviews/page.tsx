@@ -14,11 +14,12 @@ import { MockInterviewSetupForm } from "@/components/mock-interviews/mock-interv
 import { PageHeader } from "@/components/ui/page-header";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { recommendedInterviewDifficulty } from "@/domain/interview-recommendation";
-import { getInterviewPerformanceProfile } from "@/features/interview-profile/queries";
 import {
   getActiveMockInterview,
   getMockInterviewHistory,
 } from "@/features/mock-interviews/queries";
+import { getInterviewSelectionSetup } from "@/features/mock-interviews/selection";
+import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getProfile } from "@/features/profile/queries";
 
 export default async function MockInterviewsPage({
@@ -27,24 +28,24 @@ export default async function MockInterviewsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireAuthenticatedUser();
-  const [profile, active, history, params, interviewPerformance] =
-    await Promise.all([
-      getProfile(user.id),
-      getActiveMockInterview(user.id),
-      getMockInterviewHistory(user.id),
-      searchParams,
-      getInterviewPerformanceProfile(user.id),
-    ]);
+  const rollout = getInterviewRolloutConfig();
+  const [profile, active, history, params, selectionSetup] = await Promise.all([
+    getProfile(user.id),
+    getActiveMockInterview(user.id),
+    getMockInterviewHistory(user.id),
+    searchParams,
+    getInterviewSelectionSetup(user.id),
+  ]);
   if (!profile?.onboarding_completed) redirect("/onboarding");
   if (!profile.diagnostic_completed) redirect("/diagnostic");
   if (active) redirect(`/interviews/${active.id}`);
-  const recommendedDifficulty = recommendedInterviewDifficulty(
-    interviewPerformance.profile,
-  );
+  const { performanceProfile, ...selectionFormSetup } = selectionSetup;
+  const recommendedDifficulty =
+    recommendedInterviewDifficulty(performanceProfile);
   const recommendedDuration =
-    interviewPerformance.profile.evaluatedInterviews < 2
+    performanceProfile.evaluatedInterviews < 2
       ? "30"
-      : interviewPerformance.profile.allTime.overall.confidence >= 70
+      : performanceProfile.allTime.overall.confidence >= 70
         ? "60"
         : "45";
 
@@ -73,18 +74,22 @@ export default async function MockInterviewsPage({
               <div>
                 <h2 className="text-xl font-semibold">Session setup</h2>
                 <p className="text-muted mt-2 text-sm leading-6">
-                  Adaptive selection uses mastery, prerequisites, recent work,
-                  and failure signals. Fixed difficulty always uses the full
-                  active catalog and never requires an unlock. The chosen topic
-                  remains hidden until completion.
+                  Choose balanced coverage, interview improvement, adaptive
+                  learning readiness, or an exact topic and difficulty. Every
+                  option explains what evidence it uses before you start.
                 </p>
               </div>
             </div>
             <MockInterviewSetupForm
-              defaultDifficulty={difficultyDefault(params.difficulty)}
+              defaultCodingLanguage={codingLanguageDefault(
+                profile.preferred_language,
+              )}
               defaultDurationMinutes={durationDefault(params.duration)}
+              defaultMode={modeDefault(params.mode)}
               recommendedDifficulty={recommendedDifficulty}
               recommendedDurationMinutes={recommendedDuration}
+              selectionModesEnabled={rollout.selectionModesEnabled}
+              setup={selectionFormSetup}
             />
           </CardContent>
         </Card>
@@ -151,11 +156,14 @@ function scalar(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function difficultyDefault(value: string | string[] | undefined) {
+function modeDefault(value: string | string[] | undefined) {
   const candidate = scalar(value);
-  return candidate === "easy" || candidate === "medium" || candidate === "hard"
+  return candidate === "coverage" ||
+    candidate === "improvement" ||
+    candidate === "learning" ||
+    candidate === "custom"
     ? candidate
-    : "adaptive";
+    : undefined;
 }
 
 function durationDefault(value: string | string[] | undefined) {
@@ -163,4 +171,8 @@ function durationDefault(value: string | string[] | undefined) {
   return candidate === "30" || candidate === "45" || candidate === "60"
     ? candidate
     : "45";
+}
+
+function codingLanguageDefault(value: string) {
+  return value === "java" ? "java" : "python";
 }

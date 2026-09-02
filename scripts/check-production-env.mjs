@@ -27,6 +27,10 @@ function enabled(name) {
   return value === "true";
 }
 
+function rolloutEnabled(name) {
+  return environment[name] === undefined ? true : enabled(name);
+}
+
 const appUrl =
   environment.NEXT_PUBLIC_APP_URL?.trim() ||
   (environment.VERCEL_ENV === "preview"
@@ -108,6 +112,16 @@ if (enabled("REALTIME_AI_ENABLED")) {
   }
 }
 
+const interviewSelectionModesEnabled = rolloutEnabled(
+  "INTERVIEW_SELECTION_MODES_ENABLED",
+);
+const interviewPromptContentEnabled = rolloutEnabled(
+  "INTERVIEW_PROMPT_CONTENT_ENABLED",
+);
+const interviewCodingWorkspaceEnabled = rolloutEnabled(
+  "INTERVIEW_CODING_WORKSPACE_ENABLED",
+);
+
 if (errors.length) {
   console.error("Production environment validation failed:");
   for (const error of errors) console.error(`- ${error}`);
@@ -115,5 +129,5 @@ if (errors.length) {
 }
 
 console.log(
-  `Production environment is valid. AI coach: ${environment.AI_COACH_ENABLED === "true" ? "enabled" : "disabled"}; interview evaluator: ${environment.INTERVIEW_EVALUATOR_ENABLED === "true" ? "enabled" : "disabled"}; realtime voice: ${environment.REALTIME_AI_ENABLED === "true" ? "enabled" : "disabled"}.`,
+  `Production environment is valid. AI coach: ${environment.AI_COACH_ENABLED === "true" ? "enabled" : "disabled"}; interview evaluator: ${environment.INTERVIEW_EVALUATOR_ENABLED === "true" ? "enabled" : "disabled"}; realtime voice: ${environment.REALTIME_AI_ENABLED === "true" ? "enabled" : "disabled"}; interview selection modes: ${interviewSelectionModesEnabled ? "enabled" : "disabled"}; embedded prompts: ${interviewPromptContentEnabled ? "enabled" : "disabled"}; coding workspace: ${interviewCodingWorkspaceEnabled ? "enabled" : "disabled"}.`,
 );

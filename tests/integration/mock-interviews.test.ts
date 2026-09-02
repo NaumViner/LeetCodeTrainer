@@ -72,9 +72,11 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   let learnerId = "";
   let otherId = "";
   let problemId = "";
+  let problemTopicId = "";
   const problemIdsByDifficulty = new Map<string, string>();
   let interviewId = "";
   let lastAbandonedInterviewId = "";
+  let masteryBeforeCompletedInterview: number | null = null;
   let realtimeSessionId = "";
 
   beforeAll(async () => {
@@ -118,22 +120,76 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     await Promise.all([completeDiagnostic(learner), completeDiagnostic(other)]);
     const { data: problems } = await learner
       .from("problems")
-      .select("id, difficulty")
+      .select("id, difficulty, primary_topic_id")
       .eq("active", true)
+      .eq("interview_ready", true)
       .in("difficulty", ["easy", "medium", "hard"]);
     for (const problem of problems ?? []) {
       if (!problemIdsByDifficulty.has(problem.difficulty)) {
         problemIdsByDifficulty.set(problem.difficulty, problem.id);
+        if (problem.difficulty === "easy") {
+          problemTopicId = problem.primary_topic_id;
+        }
       }
     }
     problemId = problemIdsByDifficulty.get("easy") ?? "";
     if (
       !problemId ||
+      !problemTopicId ||
       !problemIdsByDifficulty.has("medium") ||
       !problemIdsByDifficulty.has("hard")
     ) {
       throw new Error("Interview inventory is missing a difficulty.");
     }
+  });
+
+  it("publishes the canonical NeetCode 150 collection", async () => {
+    const { data: collection, error } = await anonymous
+      .from("problem_collections")
+      .select("*")
+      .eq("slug", "neetcode-150")
+      .eq("active", true)
+      .single();
+    expect(error).toBeNull();
+    expect(collection).toMatchObject({
+      expected_primary_topic_count: 18,
+      expected_problem_count: 150,
+      version: 1,
+    });
+
+    const {
+      count,
+      data: memberships,
+      error: membershipError,
+    } = await anonymous
+      .from("problem_collection_memberships")
+      .select("primary_topic_id", { count: "exact" })
+      .eq("collection_id", collection!.id);
+    expect(membershipError).toBeNull();
+    expect(count).toBe(150);
+    expect(
+      new Set((memberships ?? []).map((item) => item.primary_topic_id)).size,
+    ).toBe(18);
+
+    const { data: readyProblems, error: readyError } = await anonymous
+      .from("problems")
+      .select(
+        "interview_content_provenance, interview_content_version, primary_topic_id, slug",
+      )
+      .eq("interview_ready", true);
+    expect(readyError).toBeNull();
+    expect(readyProblems).toHaveLength(18);
+    expect(
+      new Set((readyProblems ?? []).map((item) => item.primary_topic_id)).size,
+    ).toBe(18);
+    expect(readyProblems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          interview_content_provenance: "first_party",
+          interview_content_version: 1,
+        }),
+      ]),
+    );
   });
 
   afterAll(async () => {
@@ -180,6 +236,97 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     }
   });
 
+  it("validates and persists the versioned selection snapshot", async () => {
+    const metadata = {
+      candidateProblemCount: 4,
+      candidateTopicCount: 2,
+      reasons: ["Selected from an uncovered topic."],
+      recencyFallbackUsed: false,
+      repeatFallbackUsed: false,
+    } as Json;
+    const { data, error } = await learner.rpc("start_mock_interview_v2", {
+      p_coding_language: "java",
+      p_duration_minutes: 45,
+      p_interview_language: "english",
+      p_interviewer_level: "beginner",
+      p_problem_id: problemId,
+      p_requested_difficulties: ["easy", "medium"],
+      p_requested_topic_id: null!,
+      p_selected_topic_id: problemTopicId,
+      p_selection_algorithm_version: 1,
+      p_selection_metadata: metadata,
+      p_selection_mode: "coverage",
+    });
+    expect(error).toBeNull();
+    const { data: interview, error: readError } = await learner
+      .from("mock_interviews")
+      .select(
+        "coding_language, question_content_version, requested_difficulties, requested_topic_id, selected_topic_id, selection_algorithm_version, selection_metadata, selection_mode",
+      )
+      .eq("id", data!)
+      .single();
+    expect(readError).toBeNull();
+    expect(interview).toMatchObject({
+      coding_language: "java",
+      question_content_version: 1,
+      requested_difficulties: ["easy", "medium"],
+      requested_topic_id: null,
+      selected_topic_id: problemTopicId,
+      selection_algorithm_version: 1,
+      selection_metadata: metadata,
+      selection_mode: "coverage",
+    });
+    lastAbandonedInterviewId = data!;
+    const { error: abandonError } = await learner.rpc(
+      "abandon_mock_interview",
+      { p_mock_interview_id: data! },
+    );
+    expect(abandonError).toBeNull();
+    expect(
+      (
+        await learner.rpc("start_mock_interview_v2", {
+          p_coding_language: "python",
+          p_duration_minutes: 45,
+          p_interview_language: "auto",
+          p_interviewer_level: "beginner",
+          p_problem_id: problemId,
+          p_requested_difficulties: ["hard"],
+          p_requested_topic_id: null!,
+          p_selected_topic_id: problemTopicId,
+          p_selection_algorithm_version: 1,
+          p_selection_metadata: metadata,
+          p_selection_mode: "coverage",
+        })
+      ).error,
+    ).not.toBeNull();
+
+    const { data: unreadyProblem, error: unreadyReadError } = await learner
+      .from("problems")
+      .select("difficulty, id, primary_topic_id")
+      .eq("active", true)
+      .eq("interview_ready", false)
+      .limit(1)
+      .single();
+    expect(unreadyReadError).toBeNull();
+    expect(
+      (
+        await learner.rpc("start_mock_interview_v2", {
+          p_coding_language: "python",
+          p_duration_minutes: 45,
+          p_interview_language: "auto",
+          p_interviewer_level: "beginner",
+          p_problem_id: unreadyProblem!.id,
+          p_requested_difficulties: [unreadyProblem!.difficulty],
+          p_requested_topic_id: null!,
+          p_selected_topic_id: unreadyProblem!.primary_topic_id,
+          p_selection_algorithm_version: 1,
+          p_selection_metadata: metadata,
+          p_selection_mode: "coverage",
+        })
+      ).error,
+    ).not.toBeNull();
+  });
+
   it("starts one private mandatory-timer session", async () => {
     expect(
       (
@@ -188,6 +335,13 @@ describe.sequential("mock interview lifecycle and isolation", () => {
           p_duration_minutes: 45,
           p_interviewer_level: "unknown",
           p_problem_id: problemId,
+        })
+      ).error,
+    ).not.toBeNull();
+    expect(
+      (
+        await learner.rpc("delete_owned_mock_interview", {
+          p_mock_interview_id: interviewId,
         })
       ).error,
     ).not.toBeNull();
@@ -206,10 +360,16 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .eq("id", interviewId)
       .single();
     expect(interview).toMatchObject({
+      coding_language: "python",
       duration_minutes: 45,
       interview_language: "hebrew",
       interviewer_level: "faang_tough",
       phase: "intro",
+      requested_difficulties: ["easy"],
+      selected_topic_id: problemTopicId,
+      selection_algorithm_version: 0,
+      selection_metadata: {},
+      selection_mode: "legacy",
       status: "active",
       timer_running: true,
       user_id: learnerId,
@@ -281,6 +441,108 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     });
     expect(skip.error).not.toBeNull();
 
+    const { data: introEvidence } = await learner
+      .from("realtime_interview_events")
+      .select("id")
+      .eq("session_id", realtimeSessionId)
+      .eq("phase", "intro")
+      .order("id")
+      .limit(1)
+      .single();
+    const suggestionInput = {
+      p_evidence_event_ids: [introEvidence!.id],
+      p_expected_current_phase: "intro",
+      p_mock_interview_id: interviewId,
+      p_reason_code: "learner_completed_objective",
+      p_suggested_next_phase: "clarify",
+    };
+    const { data: suggestionId, error: suggestionError } = await learner.rpc(
+      "suggest_mock_interview_phase",
+      suggestionInput,
+    );
+    expect(suggestionError).toBeNull();
+    expect(suggestionId).not.toBeNull();
+    const suggestionBurst = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        learner.rpc("suggest_mock_interview_phase", suggestionInput),
+      ),
+    );
+    expect(suggestionBurst.every((result) => result.error === null)).toBe(true);
+    expect(new Set(suggestionBurst.map((result) => result.data))).toEqual(
+      new Set([suggestionId]),
+    );
+    expect(
+      (
+        await learner.rpc("suggest_mock_interview_phase", {
+          ...suggestionInput,
+          p_suggested_next_phase: "optimization",
+        })
+      ).data,
+    ).toBeNull();
+    expect(
+      (await other.rpc("suggest_mock_interview_phase", suggestionInput)).error,
+    ).not.toBeNull();
+
+    const { data: firstWorkspaceVersion, error: workspaceError } =
+      await learner.rpc("save_mock_interview_workspace", {
+        p_code_snapshot: "# first Python draft",
+        p_expected_version: 0,
+        p_mock_interview_id: interviewId,
+        p_scratchpad: "Trace: input -> state -> output",
+      });
+    expect(workspaceError).toBeNull();
+    expect(firstWorkspaceVersion).toBe(1);
+    expect(
+      (
+        await learner.rpc("save_mock_interview_workspace", {
+          p_code_snapshot: "# foreign overwrite",
+          p_expected_version: 1,
+          p_mock_interview_id: interviewId,
+          p_scratchpad: "foreign",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await other.rpc("save_mock_interview_workspace", {
+          p_code_snapshot: "# foreign overwrite",
+          p_expected_version: 1,
+          p_mock_interview_id: interviewId,
+          p_scratchpad: "foreign",
+        })
+      ).error,
+    ).not.toBeNull();
+    expect(
+      (
+        await learner.rpc("save_mock_interview_workspace", {
+          p_code_snapshot: "# stale overwrite",
+          p_expected_version: 0,
+          p_mock_interview_id: interviewId,
+          p_scratchpad: "stale",
+        })
+      ).error?.code,
+    ).toBe("40001");
+    expect(
+      (
+        await learner.rpc("save_mock_interview_workspace", {
+          p_code_snapshot: "pass",
+          p_expected_version: 2,
+          p_mock_interview_id: interviewId,
+          p_scratchpad: "x".repeat(10_001),
+        })
+      ).error,
+    ).not.toBeNull();
+    expect(
+      (
+        await learner.rpc("save_mock_interview_workspace", {
+          p_code_snapshot: "x".repeat(30_001),
+          p_expected_version: 2,
+          p_mock_interview_id: interviewId,
+          p_scratchpad: "",
+        })
+      ).error,
+    ).not.toBeNull();
+
     const steps = [
       ["clarify", {}],
       ["examples", { notes: "What are the constraints?" }],
@@ -290,13 +552,62 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         "implementation",
         { notes: "Maintain one invariant and remove repeated work" },
       ],
-      ["testing", { notes: "function solve(input) { return input; }" }],
-      ["complexity", { notes: "Test empty and ordinary input" }],
-      ["retrospective", { spaceComplexity: "O(1)", timeComplexity: "O(n)" }],
     ] as const;
     for (const [index, [target, payload]] of steps.entries()) {
       const { error } = await learner.rpc("advance_mock_interview", {
-        p_elapsed_seconds: index + 2,
+        p_elapsed_seconds: 100 + index,
+        p_mock_interview_id: interviewId,
+        p_payload: payload as Json,
+        p_target_phase: target,
+      });
+      expect(error, target).toBeNull();
+    }
+    const reviewCode =
+      "def solve(values):\n    return values[0] if values else None\n";
+    const { data: reviewSubmission, error: reviewError } = await learner.rpc(
+      "submit_mock_interview_code",
+      {
+        p_advance_to_testing: false,
+        p_code_snapshot: reviewCode,
+        p_elapsed_seconds: 300,
+        p_expected_version: 2,
+        p_mock_interview_id: interviewId,
+        p_scratchpad: "Check the empty case before returning.",
+      },
+    );
+    expect(reviewError).toBeNull();
+    expect(reviewSubmission).toMatchObject({
+      advancedToTesting: false,
+      workspaceVersion: 3,
+    });
+    const finalCode =
+      "def solve(values):\n    if not values:\n        return None\n    return values[0]\n";
+    const { data: finalSubmission, error: finalError } = await learner.rpc(
+      "submit_mock_interview_code",
+      {
+        p_advance_to_testing: true,
+        p_code_snapshot: finalCode,
+        p_elapsed_seconds: 301,
+        p_expected_version: 3,
+        p_mock_interview_id: interviewId,
+        p_scratchpad: "Empty and ordinary cases are covered.",
+      },
+    );
+    expect(finalError).toBeNull();
+    expect(finalSubmission).toMatchObject({
+      advancedToTesting: true,
+      workspaceVersion: 4,
+    });
+    for (const [target, payload, elapsed] of [
+      ["complexity", { notes: "Test empty and ordinary input" }, 302],
+      [
+        "retrospective",
+        { spaceComplexity: "O(1)", timeComplexity: "O(n)" },
+        303,
+      ],
+    ] as const) {
+      const { error } = await learner.rpc("advance_mock_interview", {
+        p_elapsed_seconds: elapsed,
         p_mock_interview_id: interviewId,
         p_payload: payload as Json,
         p_target_phase: target,
@@ -305,14 +616,79 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     }
     const { data: interview } = await learner
       .from("mock_interviews")
-      .select("phase, timer_running, code_snapshot")
+      .select(
+        "code_snapshot, code_submitted_at, coding_language, phase, scratchpad, timer_running, workspace_version",
+      )
       .eq("id", interviewId)
       .single();
     expect(interview).toMatchObject({
-      code_snapshot: "function solve(input) { return input; }",
+      code_snapshot: finalCode,
+      coding_language: "python",
       phase: "retrospective",
+      scratchpad: "Empty and ordinary cases are covered.",
       timer_running: false,
+      workspace_version: 4,
     });
+    expect(interview?.code_submitted_at).not.toBeNull();
+    const { data: submissions, error: submissionsError } = await learner
+      .from("mock_interview_code_submissions")
+      .select(
+        "coding_language, code_snapshot, phase, snapshot_version, submission_kind",
+      )
+      .eq("mock_interview_id", interviewId)
+      .order("snapshot_version");
+    expect(submissionsError).toBeNull();
+    expect(submissions).toEqual([
+      expect.objectContaining({
+        coding_language: "python",
+        phase: "implementation",
+        snapshot_version: 3,
+        submission_kind: "review",
+      }),
+      expect.objectContaining({
+        code_snapshot: finalCode,
+        snapshot_version: 4,
+        submission_kind: "completed",
+      }),
+    ]);
+    expect(
+      (await other.from("mock_interview_code_submissions").select("*")).data,
+    ).toEqual([]);
+    const { data: phaseEvents, error: phaseEventsError } = await learner
+      .from("mock_interview_phase_events")
+      .select(
+        "code_submission_ids, display_summary, evidence_event_ids, evidence_fields, phase, suggested_phase, transition_type",
+      )
+      .eq("mock_interview_id", interviewId)
+      .order("created_at")
+      .order("id");
+    expect(phaseEventsError).toBeNull();
+    expect(
+      phaseEvents?.filter((event) => event.transition_type === "completed"),
+    ).toHaveLength(8);
+    expect(phaseEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          evidence_event_ids: [introEvidence!.id],
+          phase: "intro",
+          suggested_phase: "clarify",
+          transition_type: "suggested",
+        }),
+        expect.objectContaining({
+          code_submission_ids: expect.arrayContaining([expect.any(String)]),
+          display_summary: "Python code snapshot version 4 submitted.",
+          evidence_fields: expect.arrayContaining([
+            "code_snapshot",
+            "workspace_version",
+          ]),
+          phase: "implementation",
+          transition_type: "completed",
+        }),
+      ]),
+    );
+    expect(
+      (await other.from("mock_interview_phase_events").select("*")).data,
+    ).toEqual([]);
   });
 
   it("creates a deterministic scorecard and feeds weakness into mastery", async () => {
@@ -326,11 +702,12 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .select("overall_score")
       .eq("topic_id", problem!.primary_topic_id)
       .single();
+    masteryBeforeCompletedInterview = beforeMastery!.overall_score;
     const { error } = await learner.rpc("complete_mock_interview", {
       p_code_quality_rating: 2,
       p_communication_rating: 2,
       p_complexity_rating: 2,
-      p_elapsed_seconds: 12,
+      p_elapsed_seconds: 304,
       p_independence_rating: 2,
       p_mock_interview_id: interviewId,
       p_result: "partial",
@@ -574,6 +951,10 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       realtimeSession: sessionResult.data,
     });
     expect(evidence).toMatchObject({
+      code: {
+        source: "interview_state",
+        text: expect.stringContaining("def solve(values):"),
+      },
       interview: { id: interviewId },
       learnerOutcome: { result: "partial" },
       version: 2,
@@ -589,6 +970,13 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       p_mock_interview_id: interviewId,
     });
     expect(crossError).not.toBeNull();
+    expect(
+      (
+        await other.rpc("delete_owned_mock_interview", {
+          p_mock_interview_id: interviewId,
+        })
+      ).error,
+    ).not.toBeNull();
     const { error: directError } = await learner
       .from("mock_interviews")
       .insert({
@@ -596,6 +984,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         duration_minutes: 45,
         interview_language: "hebrew",
         problem_id: problemId,
+        selected_topic_id: problemTopicId,
         user_id: learnerId,
       });
     expect(directError?.code).toBe("42501");
@@ -624,6 +1013,29 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         version: 2,
       });
     expect(directEvaluationError?.code).toBe("42501");
+    const { error: directSubmissionError } = await learner
+      .from("mock_interview_code_submissions")
+      .insert({
+        code_snapshot: "forged",
+        coding_language: "python",
+        elapsed_seconds: 1,
+        mock_interview_id: interviewId,
+        phase: "implementation",
+        snapshot_version: 99,
+        submission_kind: "review",
+        user_id: learnerId,
+      });
+    expect(directSubmissionError?.code).toBe("42501");
+    const { error: directPhaseEventError } = await learner
+      .from("mock_interview_phase_events")
+      .insert({
+        mock_interview_id: interviewId,
+        phase: "intro",
+        source: "learner_action",
+        transition_type: "completed",
+        user_id: learnerId,
+      });
+    expect(directPhaseEventError?.code).toBe("42501");
     const { error: anonymousError } = await anonymous.rpc(
       "start_mock_interview",
       {
@@ -633,6 +1045,87 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       },
     );
     expect(anonymousError?.code).toBe("42501");
+  });
+
+  it("deletes owned history, cascades evidence, and removes mastery influence", async () => {
+    const { data: deletedTopicId, error } = await learner.rpc(
+      "delete_owned_mock_interview",
+      { p_mock_interview_id: interviewId },
+    );
+    expect(error).toBeNull();
+    expect(deletedTopicId).toBe(problemTopicId);
+
+    const [
+      interviewResult,
+      scorecardResult,
+      evaluationResult,
+      sessionResult,
+      eventResult,
+      submissionResult,
+      phaseEventResult,
+      masteryResult,
+    ] = await Promise.all([
+      learner
+        .from("mock_interviews")
+        .select("id")
+        .eq("id", interviewId)
+        .maybeSingle(),
+      learner
+        .from("mock_interview_scorecards")
+        .select("mock_interview_id")
+        .eq("mock_interview_id", interviewId),
+      learner
+        .from("mock_interview_evaluations")
+        .select("id")
+        .eq("mock_interview_id", interviewId),
+      learner
+        .from("realtime_interview_sessions")
+        .select("id")
+        .eq("mock_interview_id", interviewId),
+      learner
+        .from("realtime_interview_events")
+        .select("id")
+        .eq("session_id", realtimeSessionId),
+      learner
+        .from("mock_interview_code_submissions")
+        .select("id")
+        .eq("mock_interview_id", interviewId),
+      learner
+        .from("mock_interview_phase_events")
+        .select("id")
+        .eq("mock_interview_id", interviewId),
+      learner
+        .from("topic_mastery")
+        .select("mock_interview_count, last_interviewed_at, overall_score")
+        .eq("topic_id", problemTopicId)
+        .single(),
+    ]);
+    expect(interviewResult.data).toBeNull();
+    expect(scorecardResult.data).toEqual([]);
+    expect(evaluationResult.data).toEqual([]);
+    expect(sessionResult.data).toEqual([]);
+    expect(eventResult.data).toEqual([]);
+    expect(submissionResult.data).toEqual([]);
+    expect(phaseEventResult.data).toEqual([]);
+    expect(masteryResult.data).toMatchObject({
+      last_interviewed_at: null,
+      mock_interview_count: 0,
+      overall_score: masteryBeforeCompletedInterview,
+    });
+
+    const { error: abandonedDeleteError } = await learner.rpc(
+      "delete_owned_mock_interview",
+      { p_mock_interview_id: lastAbandonedInterviewId },
+    );
+    expect(abandonedDeleteError).toBeNull();
+    expect(
+      (
+        await learner
+          .from("mock_interviews")
+          .select("id")
+          .eq("id", lastAbandonedInterviewId)
+      ).data,
+    ).toEqual([]);
   });
 });
 

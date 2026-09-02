@@ -59,6 +59,9 @@ Add the following variables in Vercel. Apply required database variables to Prod
 | `INTERVIEW_EVALUATOR_ENABLED`                                      | Server only         | No                 | Enables post-interview structured evaluation     |
 | `INTERVIEW_EVALUATOR_PROVIDER`, `INTERVIEW_EVALUATOR_MODEL`        | Server only         | When enabled       | Gemini evaluator configuration                   |
 | `INTERVIEW_EVALUATOR_API_KEY`                                      | Server only         | Optional           | Gemini override when shared key is not used      |
+| `INTERVIEW_SELECTION_MODES_ENABLED`                                | Server only         | No                 | Coverage/Improvement/Custom rollout control      |
+| `INTERVIEW_PROMPT_CONTENT_ENABLED`                                 | Server only         | No                 | Embedded approved-prompt rollout control         |
+| `INTERVIEW_CODING_WORKSPACE_ENABLED`                               | Server only         | No                 | CodeMirror workspace rollout control             |
 | `REALTIME_AI_ENABLED`                                              | Server only         | No                 | Set `true` for live voice interviews             |
 | `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, `REALTIME_AI_API_KEY` | Server only         | When voice enabled | Gemini Live or OpenAI Realtime configuration     |
 | `REALTIME_AI_TRANSCRIPTION_MODEL`, `REALTIME_AI_VOICE`             | Server only         | No                 | Optional realtime overrides                      |
@@ -66,7 +69,7 @@ Add the following variables in Vercel. Apply required database variables to Prod
 
 Never prefix a provider secret with `NEXT_PUBLIC_`. Preview deployments automatically use Vercel's deployment URL for Auth redirects when `NEXT_PUBLIC_APP_URL` is not set in Preview.
 
-The production build runs `npm run env:check:production`. It rejects missing database settings, insecure production origins, malformed feature flags, and enabled AI features without their required server key.
+The production build runs `npm run env:check:production`. It rejects missing database settings, insecure production origins, malformed feature flags, and enabled AI features without their required server key. The three interview rollout controls default to enabled when omitted; set them explicitly in production so the intended release state is auditable. See [interview-rollout.md](interview-rollout.md) for staged enablement and rollback behavior.
 
 ## 4. Deploy and verify
 
@@ -86,10 +89,11 @@ Complete these manual acceptance checks in a private browser window:
 4. Complete one lesson and one practice attempt.
 5. Start a mock interview; when realtime voice is enabled, grant microphone access and verify spoken turn-taking, interruption, transcript persistence, and clean hang-up.
 6. Review Vercel function logs and Supabase Auth/database logs for unexpected errors, without logging tokens or learner content.
+7. Run `npm run audit:client-bundle` against the production build output and verify each enabled/disabled interview fallback once.
 
 ## 5. Continuous integration and rollback
 
-`.github/workflows/ci.yml` runs formatting, lint, strict TypeScript, unit/component tests, and a production build. A separate job starts an isolated local Supabase stack, applies every migration, runs all database integration tests, and runs desktop/mobile Chromium journeys. No production secrets are used in CI.
+`.github/workflows/ci.yml` runs formatting, lint, strict TypeScript, unit/component tests, a production build, and the client-bundle secret audit. A separate job starts an isolated local Supabase stack, applies every migration, runs all database integration tests, and runs desktop/mobile Chromium journeys. No production secrets are used in CI.
 
 Vercel can instantly promote a previously healthy deployment if application code regresses. A code rollback does not reverse an already-applied database migration: database changes must remain backward compatible, and corrective schema changes belong in a new reviewed migration. Never repair or reset production migration history without a verified backup and an explicit recovery plan.
 

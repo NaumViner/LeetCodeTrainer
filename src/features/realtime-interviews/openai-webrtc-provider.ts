@@ -1,13 +1,22 @@
 import type { MockInterviewPhase } from "@/domain/mock-interview";
 import type {
+  CodeReviewContext,
   CreateRealtimeSessionInput,
   RealtimeInterviewProvider,
   RealtimeInterviewSession,
 } from "@/features/realtime-interviews/provider";
+import {
+  buildCodeReviewMessage,
+  parsePhaseSuggestionToolArguments,
+  PHASE_SUGGESTION_TOOL,
+} from "@/features/realtime-interviews/provider";
 
 type RealtimeServerEvent = {
+  arguments?: string;
+  call_id?: string;
   delta?: string;
   error?: { message?: string };
+  name?: string;
   text?: string;
   transcript?: string;
   type?: string;
@@ -16,6 +25,11 @@ type RealtimeServerEvent = {
 export type ParsedRealtimeServerEvent = {
   buffer: string;
   error?: string;
+  functionCall?: {
+    args: unknown;
+    callId: string;
+    name: string;
+  };
   role?: "interviewer" | "learner";
   speaking?: boolean;
   transcript?: string;
@@ -60,6 +74,23 @@ export function parseRealtimeServerEvent(
   }
   if (event.type === "response.output_audio.delta") {
     return { buffer: currentBuffer, speaking: true };
+  }
+  if (
+    event.type === "response.function_call_arguments.done" &&
+    event.name &&
+    event.call_id &&
+    event.arguments
+  ) {
+    let args: unknown;
+    try {
+      args = JSON.parse(event.arguments);
+    } catch {
+      args = null;
+    }
+    return {
+      buffer: currentBuffer,
+      functionCall: { args, callId: event.call_id, name: event.name },
+    };
   }
   if (event.type === "response.output_audio.done") {
     return { buffer: currentBuffer, speaking: false };
@@ -168,6 +199,10 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
     );
   }
 
+  sendCodeForReview(context: CodeReviewContext) {
+    this.sendContext(buildCodeReviewMessage(context), true);
+  }
+
   sendInterviewEvent(phase: MockInterviewPhase, context: string) {
     this.sendContext(
       `[INTERVIEW PHASE — ${phase}] ${context.slice(0, 4_000)}`,
@@ -223,6 +258,32 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
     }
     if (parsed.error) {
       this.input?.onStateChange("error", parsed.error);
+    }
+    if (parsed.functionCall && this.input) {
+      const suggestion =
+        parsed.functionCall.name === PHASE_SUGGESTION_TOOL.name
+          ? parsePhaseSuggestionToolArguments(
+              parsed.functionCall.args,
+              this.input.interviewId,
+            )
+          : null;
+      if (suggestion) this.input.onPhaseSuggestion(suggestion);
+      this.send({
+        item: {
+          call_id: parsed.functionCall.callId,
+          output: JSON.stringify(
+            suggestion
+              ? {
+                  status: "pending_learner_confirmation",
+                  transitioned: false,
+                }
+              : { error: "invalid_or_out_of_order_suggestion" },
+          ),
+          type: "function_call_output",
+        },
+        type: "conversation.item.create",
+      });
+      this.send({ type: "response.create" });
     }
   }
 

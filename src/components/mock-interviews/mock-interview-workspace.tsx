@@ -5,16 +5,16 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   Clock3,
-  ExternalLink,
   ShieldQuestion,
 } from "lucide-react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { InterviewPhaseGuide } from "@/components/mock-interviews/interview-phase-guide";
+import { InterviewQuestionPanel } from "@/components/mock-interviews/interview-question-panel";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form-field";
 import {
@@ -23,15 +23,19 @@ import {
   type InterviewLanguage,
   interviewerLevelLabels,
   type InterviewerLevel,
-  mockInterviewPhaseLabels,
   type MockInterviewPhase,
 } from "@/domain/mock-interview";
+import {
+  summarizePhaseEvidence,
+  type InterviewPhaseGuideEvent,
+} from "@/domain/interview-phase-guide";
 import {
   abandonMockInterviewAction,
   advanceMockInterviewAction,
   completeMockInterviewAction,
 } from "@/features/mock-interviews/actions";
 import type { RealtimeContextUpdate } from "@/components/mock-interviews/realtime-interview-panel";
+import type { LearnerVisibleQuestionContent } from "@/features/interview-evaluation/evidence-model";
 import type { RealtimeTranscriptEntry } from "@/features/realtime-interviews/model";
 import type { RealtimeInterviewProviderName } from "@/features/realtime-interviews/provider";
 
@@ -40,26 +44,50 @@ const RealtimeInterviewPanel = dynamic(() =>
     (module) => module.RealtimeInterviewPanel,
   ),
 );
+const InterviewCodingWorkspace = dynamic(
+  () =>
+    import("@/components/mock-interviews/interview-coding-workspace").then(
+      (module) => module.InterviewCodingWorkspace,
+    ),
+  {
+    loading: () => (
+      <Card>
+        <CardContent className="text-muted p-6 text-sm">
+          Loading the coding workspace…
+        </CardContent>
+      </Card>
+    ),
+    ssr: false,
+  },
+);
 
 type InterviewWorkspaceInput = {
+  codeSnapshot: string;
+  codingLanguage: "java" | "python";
+  codingWorkspaceEnabled: boolean;
   difficultyMode: string;
   durationMinutes: number;
   effectiveElapsedSeconds: number;
   id: string;
   interviewerLevel: InterviewerLevel;
   interviewLanguage: InterviewLanguage;
+  phaseEvents: InterviewPhaseGuideEvent[];
   realtimeEnabled: boolean;
+  realtimeEvidenceEventIds: string[];
   realtimeProvider: RealtimeInterviewProviderName | null;
   realtimeTranscript: RealtimeTranscriptEntry[];
+  scratchpad: string;
   phase: MockInterviewPhase;
   problem: {
     canonicalUrl: string;
     difficulty: string;
     externalId: string;
+    questionContent: LearnerVisibleQuestionContent | null;
     title: string;
   };
   startedAt: string;
   timerRunning: boolean;
+  workspaceVersion: number;
 };
 
 const textareaClass =
@@ -72,11 +100,13 @@ export function MockInterviewWorkspace({
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState(interview.phase);
+  const [phaseEvents, setPhaseEvents] = useState(interview.phaseEvents);
   const [seconds, setSeconds] = useState(interview.effectiveElapsedSeconds);
   const [running, setRunning] = useState(interview.timerRunning);
   const [message, setMessage] = useState("");
   const [realtimeContext, setRealtimeContext] =
     useState<RealtimeContextUpdate | null>(null);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [isPending, runAction] = useTransition();
   const textDirection = interviewTextDirection(interview.interviewLanguage);
 
@@ -135,6 +165,20 @@ export function MockInterviewWorkspace({
         id: crypto.randomUUID(),
         phase: sourcePhase,
       });
+      setPhaseEvents((current) =>
+        mergePhaseGuideEvents(current, [
+          {
+            displaySummary: summarizePhaseEvidence(
+              sourcePhase as Exclude<MockInterviewPhase, "completed">,
+              input,
+            ),
+            id: crypto.randomUUID(),
+            phase: sourcePhase as Exclude<MockInterviewPhase, "completed">,
+            suggestedPhase: null,
+            transitionType: "completed",
+          },
+        ]),
+      );
       setPhase(target);
       if (target === "retrospective") setRunning(false);
     });
@@ -158,6 +202,7 @@ export function MockInterviewWorkspace({
 
   const targetSeconds = interview.durationMinutes * 60;
   const remaining = targetSeconds - seconds;
+  const guideEvents = mergePhaseGuideEvents(phaseEvents, interview.phaseEvents);
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -198,39 +243,91 @@ export function MockInterviewWorkspace({
               {formatClock(Math.abs(remaining))}
             </p>
           </div>
-          <Link
-            className={buttonVariants({ variant: "secondary" })}
-            href={interview.problem.canonicalUrl}
-            rel="noreferrer"
-            target="_blank"
-          >
-            Open prompt <ExternalLink aria-hidden="true" className="size-4" />
-          </Link>
         </div>
       </header>
 
-      <ol
-        className="flex gap-2 overflow-x-auto pb-1"
-        aria-label="Interview phases"
-      >
-        {MOCK_INTERVIEW_PHASES.slice(0, -1).map((item, index) => {
-          const currentIndex = MOCK_INTERVIEW_PHASES.indexOf(phase);
-          return (
-            <li
-              className={`min-w-fit rounded-full border px-3 py-1.5 text-xs font-semibold ${index === currentIndex ? "bg-primary text-white" : index < currentIndex ? "bg-success-soft text-success" : "text-muted"}`}
-              key={item}
-            >
-              {index + 1}. {mockInterviewPhaseLabels[item]}
-            </li>
-          );
-        })}
-      </ol>
+      <InterviewQuestionPanel
+        canonicalUrl={interview.problem.canonicalUrl}
+        content={interview.problem.questionContent}
+        difficulty={interview.problem.difficulty}
+        remainingLabel={`${remaining < 0 ? "Overtime" : "Remaining"} ${formatClock(Math.abs(remaining))}`}
+        title={interview.problem.title}
+      />
+
+      {interview.codingWorkspaceEnabled ? (
+        <InterviewCodingWorkspace
+          codingLanguage={interview.codingLanguage}
+          elapsedSeconds={Math.min(14_400, seconds)}
+          initialCode={interview.codeSnapshot}
+          initialScratchpad={interview.scratchpad}
+          initialWorkspaceVersion={interview.workspaceVersion}
+          interviewId={interview.id}
+          interviewerConnected={realtimeConnected}
+          onSubmitted={(submission) => {
+            setRealtimeContext({
+              content: submission.code,
+              eventType: "code_snapshot",
+              id: submission.submissionId,
+              phase: "implementation",
+              review: {
+                advanceToTesting: submission.advanceToTesting,
+                language: submission.language,
+                snapshotVersion: submission.snapshotVersion,
+              },
+            });
+            if (submission.advanceToTesting) {
+              setPhaseEvents((current) =>
+                mergePhaseGuideEvents(current, [
+                  {
+                    displaySummary: summarizePhaseEvidence("implementation", {
+                      codingLanguage: submission.language,
+                      workspaceVersion: submission.snapshotVersion,
+                    }),
+                    id: crypto.randomUUID(),
+                    phase: "implementation",
+                    suggestedPhase: null,
+                    transitionType: "completed",
+                  },
+                ]),
+              );
+              setPhase("testing");
+            }
+          }}
+          phase={phase}
+          startedAt={interview.startedAt}
+        />
+      ) : null}
+
+      <InterviewPhaseGuide currentPhase={phase} events={guideEvents} />
 
       {interview.realtimeEnabled ? (
         <RealtimeInterviewPanel
           contextUpdate={realtimeContext}
+          initialEvidenceEventIds={interview.realtimeEvidenceEventIds}
           initialTranscript={interview.realtimeTranscript}
           interviewId={interview.id}
+          onConnectionStateChange={(state) =>
+            setRealtimeConnected(state === "connected")
+          }
+          onPhaseSuggestionRecorded={(suggestion) => {
+            setPhaseEvents((current) =>
+              mergePhaseGuideEvents(current, [
+                {
+                  displaySummary: `Interviewer suggested ${suggestion.suggestedNextPhase.replaceAll("_", " ")}. Review the evidence and confirm manually.`,
+                  id: suggestion.eventId,
+                  phase: suggestion.expectedCurrentPhase as Exclude<
+                    MockInterviewPhase,
+                    "completed"
+                  >,
+                  suggestedPhase: suggestion.suggestedNextPhase as Exclude<
+                    MockInterviewPhase,
+                    "completed"
+                  >,
+                  transitionType: "suggested",
+                },
+              ]),
+            );
+          }}
           phase={phase}
           providerName={interview.realtimeProvider ?? "openai"}
           textDirection={textDirection}
@@ -247,7 +344,10 @@ export function MockInterviewWorkspace({
       ) : null}
 
       <InterviewPhase
+        codingLanguage={interview.codingLanguage}
+        codingWorkspaceEnabled={interview.codingWorkspaceEnabled}
         disabled={isPending}
+        initialCode={interview.codeSnapshot}
         onAdvance={advance}
         onComplete={complete}
         phase={phase}
@@ -281,14 +381,30 @@ export function MockInterviewWorkspace({
   );
 }
 
+function mergePhaseGuideEvents(
+  ...groups: InterviewPhaseGuideEvent[][]
+): InterviewPhaseGuideEvent[] {
+  const eventsByTransition = new Map<string, InterviewPhaseGuideEvent>();
+  for (const event of groups.flat()) {
+    eventsByTransition.set(`${event.phase}:${event.transitionType}`, event);
+  }
+  return [...eventsByTransition.values()];
+}
+
 function InterviewPhase({
+  codingLanguage,
+  codingWorkspaceEnabled,
   disabled,
+  initialCode,
   onAdvance,
   onComplete,
   phase,
   textDirection,
 }: {
+  codingLanguage: "java" | "python";
+  codingWorkspaceEnabled: boolean;
   disabled: boolean;
+  initialCode: string;
   onAdvance(input: {
     notes?: string;
     spaceComplexity?: string;
@@ -304,10 +420,10 @@ function InterviewPhase({
         <CardContent className="p-6 sm:p-8">
           <h2 className="text-xl font-semibold">Interview briefing</h2>
           <p className="text-muted mt-3 max-w-2xl leading-7">
-            Treat the external prompt as if the interviewer just presented it.
-            Explain your reasoning in each stage, write code in the
-            implementation stage, and resist jumping ahead. The scorecard uses
-            the evidence you record here.
+            Treat the interview prompt above as if the interviewer just
+            presented it. Explain your reasoning in each stage, write code in
+            the implementation stage, and resist jumping ahead. The scorecard
+            uses the evidence you record here.
           </p>
           <Button
             className="mt-6"
@@ -333,12 +449,22 @@ function InterviewPhase({
   if (phase === "complexity") {
     return <ComplexityStep disabled={disabled} onAdvance={onAdvance} />;
   }
+  if (phase === "implementation") {
+    return codingWorkspaceEnabled ? null : (
+      <ImplementationFallback
+        codingLanguage={codingLanguage}
+        disabled={disabled}
+        initialCode={initialCode}
+        onAdvance={onAdvance}
+      />
+    );
+  }
   if (phase === "completed") return null;
 
   const content: Record<
     Exclude<
       MockInterviewPhase,
-      "completed" | "complexity" | "intro" | "retrospective"
+      "completed" | "complexity" | "implementation" | "intro" | "retrospective"
     >,
     {
       button: string;
@@ -374,14 +500,6 @@ function InterviewPhase({
         "Record examples, outputs, and any edge behavior they expose…",
       title: "Validate the problem with examples",
     },
-    implementation: {
-      button: "Move to testing",
-      description:
-        "Implement the optimized plan. Keep the code aligned with the invariant you stated.",
-      label: "Code snapshot",
-      placeholder: "Write your implementation here…",
-      title: "Implement independently",
-    },
     optimization: {
       button: "Begin implementation",
       description:
@@ -408,9 +526,58 @@ function InterviewPhase({
       label={copy.label}
       onAdvance={onAdvance}
       placeholder={copy.placeholder}
-      textDirection={copy.label === "Code snapshot" ? "ltr" : textDirection}
+      textDirection={textDirection}
       title={copy.title}
     />
+  );
+}
+
+export function ImplementationFallback({
+  codingLanguage,
+  disabled,
+  initialCode,
+  onAdvance,
+}: {
+  codingLanguage: "java" | "python";
+  disabled: boolean;
+  initialCode: string;
+  onAdvance(input: { notes: string }): void;
+}) {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onAdvance({
+      notes: String(new FormData(event.currentTarget).get("notes")),
+    });
+  };
+  return (
+    <Card>
+      <CardContent className="p-6 sm:p-8">
+        <h2 className="text-xl font-semibold">Implement your solution</h2>
+        <p className="text-muted mt-2 text-sm leading-6">
+          The enhanced coding workspace is temporarily unavailable. Your bounded{" "}
+          {codingLanguage === "java" ? "Java" : "Python"} source is still saved
+          as interview evidence through this fallback editor.
+        </p>
+        <form className="mt-6" onSubmit={submit}>
+          <label className="block text-sm font-semibold">
+            {codingLanguage === "java" ? "Java" : "Python"} code
+            <textarea
+              className={`${textareaClass} mt-2 min-h-96 font-mono`}
+              defaultValue={initialCode}
+              dir="ltr"
+              maxLength={30_000}
+              name="notes"
+              required
+              spellCheck={false}
+            />
+          </label>
+          <Button className="mt-5" disabled={disabled} type="submit">
+            Continue to testing
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 

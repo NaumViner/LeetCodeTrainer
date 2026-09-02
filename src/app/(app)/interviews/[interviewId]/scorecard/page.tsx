@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { DeleteInterviewForm } from "@/components/mock-interviews/delete-interview-form";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -354,6 +355,10 @@ export default async function MockInterviewScorecardPage({
             >
               Open interview profile
             </Link>
+            <DeleteInterviewForm
+              interviewId={interview.id}
+              interviewTitle={interview.problem.title}
+            />
           </div>
         </CardContent>
       </Card>

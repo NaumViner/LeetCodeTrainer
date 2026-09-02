@@ -23,6 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { MockInterviewPhase } from "@/domain/mock-interview";
 import {
   endRealtimeInterviewSessionAction,
+  recordMockInterviewPhaseSuggestionAction,
   saveRealtimeInterviewEventAction,
 } from "@/features/realtime-interviews/actions";
 import type {
@@ -32,6 +33,7 @@ import type {
 import { GeminiLiveInterviewProvider } from "@/features/realtime-interviews/gemini-live-provider";
 import { OpenAiWebRtcInterviewProvider } from "@/features/realtime-interviews/openai-webrtc-provider";
 import type {
+  InterviewPhaseSuggestion,
   RealtimeInterviewProvider,
   RealtimeInterviewProviderName,
 } from "@/features/realtime-interviews/provider";
@@ -41,19 +43,34 @@ export type RealtimeContextUpdate = {
   eventType: "code_snapshot" | "phase_context";
   id: string;
   phase: MockInterviewPhase;
+  review?: {
+    advanceToTesting: boolean;
+    language: "java" | "python";
+    snapshotVersion: number;
+  };
 };
 
 export function RealtimeInterviewPanel({
   contextUpdate,
   initialTranscript,
+  initialEvidenceEventIds,
   interviewId,
+  onConnectionStateChange,
+  onPhaseSuggestionRecorded,
   phase,
   providerName,
   textDirection,
 }: {
   contextUpdate: RealtimeContextUpdate | null;
+  initialEvidenceEventIds: string[];
   initialTranscript: RealtimeTranscriptEntry[];
   interviewId: string;
+  onConnectionStateChange(state: RealtimeConnectionState): void;
+  onPhaseSuggestionRecorded(input: {
+    eventId: string;
+    expectedCurrentPhase: MockInterviewPhase;
+    suggestedNextPhase: MockInterviewPhase;
+  }): void;
   phase: MockInterviewPhase;
   providerName: RealtimeInterviewProviderName;
   textDirection: "auto" | "ltr" | "rtl";
@@ -63,6 +80,8 @@ export function RealtimeInterviewPanel({
   const phaseRef = useRef(phase);
   const animationRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const evidenceEventIdsRef = useRef(initialEvidenceEventIds.slice(-12));
+  const pendingSuggestionRef = useRef<InterviewPhaseSuggestion | null>(null);
   const [connectionState, setConnectionState] =
     useState<RealtimeConnectionState>("idle");
   const [transcript, setTranscript] = useState(initialTranscript);
@@ -70,6 +89,41 @@ export function RealtimeInterviewPanel({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [inputLevel, setInputLevel] = useState(0);
   const [message, setMessage] = useState("");
+
+  const flushPhaseSuggestion = useCallback(async () => {
+    const suggestion = pendingSuggestionRef.current;
+    const evidenceEventIds = evidenceEventIdsRef.current.slice(-12);
+    if (
+      !suggestion ||
+      suggestion.interviewId !== interviewId ||
+      suggestion.expectedCurrentPhase !== phaseRef.current ||
+      evidenceEventIds.length === 0
+    ) {
+      return;
+    }
+    pendingSuggestionRef.current = null;
+    const result = await recordMockInterviewPhaseSuggestionAction(interviewId, {
+      evidenceEventIds,
+      expectedCurrentPhase: suggestion.expectedCurrentPhase,
+      reasonCode: suggestion.reasonCode,
+      suggestedNextPhase: suggestion.suggestedNextPhase,
+    });
+    if (result.status === "success") {
+      onPhaseSuggestionRecorded({
+        eventId: result.eventId,
+        expectedCurrentPhase: suggestion.expectedCurrentPhase,
+        suggestedNextPhase: result.suggestedNextPhase,
+      });
+    } else if (result.status === "error") {
+      setMessage(
+        "The interviewer suggestion could not be recorded. Manual phase controls remain available.",
+      );
+    }
+  }, [interviewId, onPhaseSuggestionRecorded]);
+
+  useEffect(() => {
+    onConnectionStateChange(connectionState);
+  }, [connectionState, onConnectionStateChange]);
 
   const persistEvent = useCallback(
     async (input: {
@@ -83,12 +137,35 @@ export function RealtimeInterviewPanel({
       phase: MockInterviewPhase;
     }) => {
       const result = await saveRealtimeInterviewEventAction(interviewId, input);
-      if (result.status === "error") setMessage(result.message);
+      if (result.status === "error") {
+        setMessage(result.message);
+        return null;
+      }
+      if (
+        input.phase === phaseRef.current &&
+        [
+          "assistant_transcript",
+          "code_snapshot",
+          "phase_context",
+          "user_transcript",
+        ].includes(input.eventType)
+      ) {
+        evidenceEventIdsRef.current = [
+          ...evidenceEventIdsRef.current,
+          result.eventId,
+        ].slice(-12);
+        void flushPhaseSuggestion();
+      }
+      return result.eventId;
     },
-    [interviewId],
+    [flushPhaseSuggestion, interviewId],
   );
 
   useEffect(() => {
+    if (phaseRef.current !== phase) {
+      evidenceEventIdsRef.current = [];
+      pendingSuggestionRef.current = null;
+    }
     phaseRef.current = phase;
   }, [phase]);
 
@@ -111,10 +188,18 @@ export function RealtimeInterviewPanel({
     }
     persistedContextRef.current = contextUpdate.id;
     if (contextUpdate.eventType === "code_snapshot") {
-      providerRef.current?.sendCodeSnapshot(
-        contextUpdate.content,
-        contextUpdate.phase,
-      );
+      if (contextUpdate.review) {
+        providerRef.current?.sendCodeForReview({
+          ...contextUpdate.review,
+          code: contextUpdate.content,
+          phase: contextUpdate.phase,
+        });
+      } else {
+        providerRef.current?.sendCodeSnapshot(
+          contextUpdate.content,
+          contextUpdate.phase,
+        );
+      }
     } else {
       providerRef.current?.sendInterviewEvent(
         contextUpdate.phase,
@@ -137,6 +222,10 @@ export function RealtimeInterviewPanel({
     try {
       const session = await provider.createSession({
         interviewId,
+        onPhaseSuggestion: (suggestion) => {
+          pendingSuggestionRef.current = suggestion;
+          void flushPhaseSuggestion();
+        },
         onSpeakingChange: setIsSpeaking,
         onStateChange: (state, detail) => {
           setConnectionState(state);

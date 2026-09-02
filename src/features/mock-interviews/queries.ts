@@ -5,6 +5,7 @@ import type { Tables } from "@/types/database";
 
 export type MockInterviewRow = Tables<"mock_interviews">;
 export type MockInterviewEvaluationRow = Tables<"mock_interview_evaluations">;
+export type MockInterviewPhaseEventRow = Tables<"mock_interview_phase_events">;
 export type MockInterviewScorecardRow = Tables<"mock_interview_scorecards">;
 export type RealtimeInterviewEventRow = Tables<"realtime_interview_events">;
 export type RealtimeInterviewSessionRow = Tables<"realtime_interview_sessions">;
@@ -13,6 +14,7 @@ export type MockInterviewDetail = MockInterviewRow & {
   effectiveElapsedSeconds: number;
   evaluation: MockInterviewEvaluationRow | null;
   problem: Awaited<ReturnType<typeof getProblemCatalog>>[number];
+  phaseEvents: MockInterviewPhaseEventRow[];
   realtimeEvents: RealtimeInterviewEventRow[];
   realtimeSession: RealtimeInterviewSessionRow | null;
   scorecard: MockInterviewScorecardRow | null;
@@ -49,6 +51,7 @@ export async function getMockInterview(userId: string, interviewId: string) {
     { data: evaluation, error: evaluationError },
     { data: scorecard, error: scorecardError },
     { data: realtimeSession, error: realtimeSessionError },
+    { data: phaseEvents, error: phaseEventsError },
   ] = await Promise.all([
     supabase
       .from("mock_interview_evaluations")
@@ -66,6 +69,12 @@ export async function getMockInterview(userId: string, interviewId: string) {
       .select("*")
       .eq("mock_interview_id", interview.id)
       .maybeSingle(),
+    supabase
+      .from("mock_interview_phase_events")
+      .select("*")
+      .eq("mock_interview_id", interview.id)
+      .order("created_at")
+      .order("id"),
   ]);
   if (evaluationError)
     throw new Error("The interview evaluation could not be loaded.");
@@ -73,6 +82,8 @@ export async function getMockInterview(userId: string, interviewId: string) {
     throw new Error("The interview scorecard could not be loaded.");
   if (realtimeSessionError)
     throw new Error("The live interview session could not be loaded.");
+  if (phaseEventsError)
+    throw new Error("The interview process guide could not be loaded.");
   const { data: realtimeEvents, error: realtimeEventsError } = realtimeSession
     ? await supabase
         .from("realtime_interview_events")
@@ -92,6 +103,7 @@ export async function getMockInterview(userId: string, interviewId: string) {
       timerRunning: interview.timer_running,
     }),
     evaluation,
+    phaseEvents: phaseEvents ?? [],
     problem,
     realtimeEvents: realtimeEvents ?? [],
     realtimeSession,
@@ -171,5 +183,17 @@ export async function getRecentInterviewProblemIds(userId: string) {
     .order("started_at", { ascending: false })
     .limit(5);
   if (error) throw new Error("Recent interview history could not be loaded.");
+  return new Set((data ?? []).map((item) => item.problem_id));
+}
+
+export async function getCompletedInterviewProblemIds(userId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("mock_interviews")
+    .select("problem_id")
+    .eq("user_id", userId)
+    .eq("status", "completed");
+  if (error)
+    throw new Error("Completed interview history could not be loaded.");
   return new Set((data ?? []).map((item) => item.problem_id));
 }

@@ -10,8 +10,14 @@ import {
 import type { MockInterviewPhase } from "@/domain/mock-interview";
 import type {
   CreateRealtimeSessionInput,
+  CodeReviewContext,
   RealtimeInterviewProvider,
   RealtimeInterviewSession,
+} from "@/features/realtime-interviews/provider";
+import {
+  buildCodeReviewMessage,
+  parsePhaseSuggestionToolArguments,
+  PHASE_SUGGESTION_TOOL,
 } from "@/features/realtime-interviews/provider";
 
 type GeminiSessionCredentials = {
@@ -74,6 +80,13 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     this.sendSilentContext(
       `[CODE SNAPSHOT — ${phase}]\n${code.slice(0, 50_000)}`,
     );
+  }
+
+  sendCodeForReview(context: CodeReviewContext) {
+    this.session?.sendClientContent({
+      turns: buildCodeReviewMessage(context),
+      turnComplete: true,
+    });
   }
 
   sendInterviewEvent(phase: MockInterviewPhase, context: string) {
@@ -160,6 +173,7 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
         },
         systemInstruction: credentials.instructions,
         temperature: 0.5,
+        tools: [{ functionDeclarations: [PHASE_SUGGESTION_TOOL] }],
       },
       model: credentials.model,
     });
@@ -219,6 +233,25 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     }
     if (message.goAway) {
       this.input?.onStateChange("reconnecting");
+    }
+    for (const call of message.toolCall?.functionCalls ?? []) {
+      const suggestion =
+        call.name === PHASE_SUGGESTION_TOOL.name && this.input
+          ? parsePhaseSuggestionToolArguments(call.args, this.input.interviewId)
+          : null;
+      if (suggestion) this.input?.onPhaseSuggestion(suggestion);
+      this.session?.sendToolResponse({
+        functionResponses: {
+          id: call.id,
+          name: call.name,
+          response: suggestion
+            ? {
+                output:
+                  "Suggestion queued for deterministic validation and learner confirmation. The phase was not changed.",
+              }
+            : { error: "Invalid or out-of-order phase suggestion." },
+        },
+      });
     }
 
     const content = message.serverContent;

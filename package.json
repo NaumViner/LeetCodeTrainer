@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "audit:client-bundle": "node scripts/audit-client-bundle.mjs",
     "build:production": "npm run env:check:production && next build",
     "start": "next start",
     "lint": "eslint src tests scripts playwright.config.ts vitest.config.mts vitest.integration.config.mts next.config.ts",
@@ -31,9 +32,13 @@
     "node": "24.x"
   },
   "dependencies": {
+    "@codemirror/lang-java": "^6.0.2",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/view": "^6.43.10",
     "@google/genai": "^2.19.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "@uiw/react-codemirror": "^4.25.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.34.0",

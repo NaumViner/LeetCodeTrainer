@@ -45,7 +45,16 @@ test("a newly diagnosed learner can start a hard tough-FAANG interview", async (
 
     await page.goto("/interviews");
     await page.getByLabel("Duration").selectOption("30");
-    await page.getByLabel("Difficulty").selectOption("hard");
+    await page.getByRole("radio", { name: /Choose topic/ }).check();
+    await page
+      .getByRole("combobox", { name: /NeetCode topic/ })
+      .selectOption({ label: "Trees" });
+    await page
+      .getByRole("combobox", { name: /Exact difficulty/ })
+      .selectOption("hard");
+    await page
+      .getByRole("combobox", { name: /Coding language/ })
+      .selectOption("python");
     await page.getByLabel("Interview language").selectOption("hebrew");
     await page.getByRole("radio", { name: /Tough FAANG interviewer/ }).check();
     await page.getByRole("button", { name: "Start mock interview" }).click();
@@ -54,12 +63,46 @@ test("a newly diagnosed learner can start a hard tough-FAANG interview", async (
     await expect(
       page.getByText("Tough FAANG interviewer", { exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText("Interview prompt", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/Design a Codec with serialize/)).toBeVisible();
+    await expect(page.getByText(/First-party interview prompt/)).toBeVisible();
+    await expect(
+      page.getByText(/encoding records enough boundary/i),
+    ).toHaveCount(0);
+    await page.getByText("Interview prompt", { exact: true }).click();
+    await expect(page.getByText(/Design a Codec with serialize/)).toBeHidden();
+    await page.getByText("Interview prompt", { exact: true }).click();
+    await expect(page.getByText(/Design a Codec with serialize/)).toBeVisible();
+    await expect(page.getByLabel("Interview scratchpad")).toBeVisible();
+    await expect(page.getByLabel("Python code editor")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Interview process guide" }),
+    ).toBeVisible();
+    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
+      "1. Intro",
+    );
+    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
+      "You are here",
+    );
+    await page
+      .getByLabel("Interview scratchpad")
+      .fill("Round-trip empty, one-node, and sparse trees.");
+    await page.getByRole("button", { name: "Save now" }).click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
     await page.reload();
     await expect(
       page.getByText("Tough FAANG interviewer", { exact: true }),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Begin clarification" }).click();
+    await expect(
+      page.locator('li[data-phase-state="completed"]'),
+    ).toContainText("1. Intro");
+    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
+      "2. Clarify",
+    );
     await page
       .getByLabel("Clarifying questions and assumptions")
       .fill("What input bounds and edge cases should I consider?");
@@ -80,10 +123,29 @@ test("a newly diagnosed learner can start a hard tough-FAANG interview", async (
       .getByLabel("Optimized approach and invariant")
       .fill("Maintain state once per input and preserve the stated invariant.");
     await page.getByRole("button", { name: "Begin implementation" }).click();
+    const code = `class Codec:
+    def serialize(self, root):
+        return "" if root is None else str(root.val)
+
+    def deserialize(self, data):
+        return None if data == "" else TreeNode(int(data))`;
+    await page.getByLabel("Python code editor").fill(code);
     await page
-      .getByLabel("Code snapshot")
-      .fill("function solve(input) { return input.length; }");
-    await page.getByRole("button", { name: "Move to testing" }).click();
+      .getByRole("button", { name: /Send current code to interviewer/ })
+      .click();
+    await expect(page.getByText(/AI review is unavailable/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Interview scratchpad")).toHaveValue(
+      "Round-trip empty, one-node, and sparse trees.",
+    );
+    await expect(page.getByLabel("Python code editor")).toContainText(
+      "class Codec",
+    );
+    await page.getByRole("button", { name: /I’m done coding/ }).click();
+    await expect(page.getByText(/You are now in Testing/)).toBeVisible();
+    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
+      "7. Testing",
+    );
     await page
       .getByLabel("Tests and traces")
       .fill("Minimal input\nBoundary input\nOrdinary input");
@@ -132,10 +194,21 @@ test("a newly diagnosed learner can start a hard tough-FAANG interview", async (
     ).toBeVisible();
     await expect(page.getByText(/Profile confidence/i)).toBeVisible();
 
-    await page.goto("/interviews");
+    await page.goto("/interviews/history");
+    await page.getByText("Delete", { exact: true }).click();
+    await page.getByRole("checkbox", { name: /cannot be undone/i }).check();
+    await page.getByRole("button", { name: "Delete permanently" }).click();
     await expect(
-      page.getByLabel("Difficulty").locator('option[value="hard"]'),
-    ).toBeEnabled();
+      page.getByRole("heading", { name: "No mock interviews yet" }),
+    ).toBeVisible();
+
+    await page.goto("/interview-profile");
+    await expect(
+      page.getByRole("heading", { name: "No evaluated interviews yet" }),
+    ).toBeVisible();
+
+    await page.goto("/interviews");
+    await expect(page.getByRole("checkbox", { name: /hard/i })).toBeEnabled();
   } finally {
     const apiUrl = process.env.E2E_SUPABASE_API_URL;
     const secretKey = process.env.E2E_SUPABASE_SECRET_KEY;

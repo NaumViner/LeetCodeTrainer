@@ -1,7 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
 import { getAuthenticatedUser } from "@/features/auth/session";
+import { getLearnerVisibleQuestionContent } from "@/features/interview-evaluation/question-content";
 import { getMockInterview } from "@/features/mock-interviews/queries";
+import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
 import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
 import { geminiRealtimeSessionRequestSchema } from "@/features/realtime-interviews/model";
@@ -46,6 +48,12 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
+  const questionContent = getInterviewRolloutConfig().promptContentEnabled
+    ? getLearnerVisibleQuestionContent(
+        interview.problem.slug,
+        interview.question_content_version,
+      )
+    : null;
 
   const expiresAt = new Date(Date.now() + 70 * 60 * 1_000).toISOString();
   const newSessionExpiresAt = new Date(Date.now() + 60 * 1_000).toISOString();
@@ -102,7 +110,7 @@ export async function POST(request: Request) {
 
   return Response.json({
     expiresAt,
-    instructions: buildInterviewInstructions(interview),
+    instructions: buildInterviewInstructions(interview, questionContent),
     model: config.model,
     token: token.name,
     voice: config.voice,

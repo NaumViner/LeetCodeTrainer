@@ -1,7 +1,10 @@
 import { getAuthenticatedUser } from "@/features/auth/session";
+import { getLearnerVisibleQuestionContent } from "@/features/interview-evaluation/question-content";
 import { getMockInterview } from "@/features/mock-interviews/queries";
+import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
 import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
+import { PHASE_SUGGESTION_TOOL } from "@/features/realtime-interviews/provider";
 import { realtimeSessionRequestSchema } from "@/features/realtime-interviews/model";
 import { createClient } from "@/lib/supabase/server";
 import { recordOperationalEvent } from "@/lib/operational-events";
@@ -48,6 +51,12 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
+  const questionContent = getInterviewRolloutConfig().promptContentEnabled
+    ? getLearnerVisibleQuestionContent(
+        interview.problem.slug,
+        interview.question_content_version,
+      )
+    : null;
 
   const form = new FormData();
   form.append("sdp", parsed.data.sdp);
@@ -65,10 +74,19 @@ export async function POST(request: Request) {
         },
         output: { voice: config.voice },
       },
-      instructions: buildInterviewInstructions(interview),
+      instructions: buildInterviewInstructions(interview, questionContent),
       max_output_tokens: 500,
       model: config.model,
       output_modalities: ["audio"],
+      tool_choice: "auto",
+      tools: [
+        {
+          description: PHASE_SUGGESTION_TOOL.description,
+          name: PHASE_SUGGESTION_TOOL.name,
+          parameters: PHASE_SUGGESTION_TOOL.parametersJsonSchema,
+          type: "function",
+        },
+      ],
       type: "realtime",
     }),
   );

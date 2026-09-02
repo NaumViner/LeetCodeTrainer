@@ -2,6 +2,7 @@ import { BriefcaseBusiness, Clock3 } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/feedback/empty-state";
+import { DeleteInterviewForm } from "@/components/mock-interviews/delete-interview-form";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -93,7 +94,7 @@ export default async function MockInterviewHistoryPage() {
                     }).format(new Date(interview.started_at))}
                   </p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                   <p className="text-muted flex items-center gap-2 text-sm">
                     <Clock3 aria-hidden="true" className="size-4" />{" "}
                     {formatMinutes(interview.elapsed_seconds)}
@@ -107,6 +108,10 @@ export default async function MockInterviewHistoryPage() {
                       {Math.round(interview.scorecard.overall_score)}
                     </Link>
                   ) : null}
+                  <DeleteInterviewForm
+                    interviewId={interview.id}
+                    interviewTitle={interview.problem.title}
+                  />
                 </div>
               </CardContent>
             </Card>

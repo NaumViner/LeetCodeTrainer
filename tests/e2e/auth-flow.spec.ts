@@ -339,7 +339,16 @@ test("a learner can onboard, return, and persist lesson progress", async ({
       page.getByRole("heading", { name: "Run a realistic mock interview" }),
     ).toBeVisible();
     await page.getByLabel("Duration").selectOption("30");
-    await page.getByLabel("Difficulty").selectOption("easy");
+    await page.getByRole("radio", { name: /Choose topic/ }).check();
+    await page
+      .getByRole("combobox", { name: /NeetCode topic/ })
+      .selectOption({ label: "Arrays & Hashing" });
+    await page
+      .getByRole("combobox", { name: /Exact difficulty/ })
+      .selectOption("easy");
+    await page
+      .getByRole("combobox", { name: /Coding language/ })
+      .selectOption("python");
     await page.getByRole("radio", { name: /Tough FAANG interviewer/ }).check();
     await page.getByRole("button", { name: "Start mock interview" }).click();
 
@@ -371,9 +380,9 @@ test("a learner can onboard, return, and persist lesson progress", async ({
       );
     await page.getByRole("button", { name: "Begin implementation" }).click();
     await page
-      .getByLabel("Code snapshot")
-      .fill("function solve(input) {\n  return input.length;\n}");
-    await page.getByRole("button", { name: "Move to testing" }).click();
+      .getByLabel("Python code editor")
+      .fill("def solve(values):\n    return len(values)\n");
+    await page.getByRole("button", { name: /I’m done coding/ }).click();
     await page
       .getByLabel("Tests and traces")
       .fill("Empty input\nOne element\nDuplicates\nLarge input");
