@@ -21,6 +21,7 @@ import {
 import { getInterviewSelectionSetup } from "@/features/mock-interviews/selection";
 import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getProfile } from "@/features/profile/queries";
+import { getRealtimeInterviewProviderName } from "@/features/realtime-interviews/config";
 
 export default async function MockInterviewsPage({
   searchParams,
@@ -31,7 +32,7 @@ export default async function MockInterviewsPage({
   const rollout = getInterviewRolloutConfig();
   const [profile, active, history, params, selectionSetup] = await Promise.all([
     getProfile(user.id),
-    getActiveMockInterview(user.id),
+    getActiveMockInterview(),
     getMockInterviewHistory(user.id),
     searchParams,
     getInterviewSelectionSetup(user.id),
@@ -90,6 +91,7 @@ export default async function MockInterviewsPage({
               recommendedDurationMinutes={recommendedDuration}
               selectionModesEnabled={rollout.selectionModesEnabled}
               setup={selectionFormSetup}
+              voiceAvailable={getRealtimeInterviewProviderName() !== null}
             />
           </CardContent>
         </Card>
@@ -117,6 +119,13 @@ export default async function MockInterviewsPage({
                   className="text-primary mt-1 size-4 shrink-0"
                 />{" "}
                 Nine ordered interview phases
+              </li>
+              <li className="flex gap-3">
+                <BriefcaseBusiness
+                  aria-hidden="true"
+                  className="text-primary mt-1 size-4 shrink-0"
+                />{" "}
+                Full voice connection required
               </li>
             </ul>
             <p className="bg-surface-subtle text-muted mt-5 rounded-lg border p-3 text-xs leading-5">

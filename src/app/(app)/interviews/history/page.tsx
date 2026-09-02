@@ -82,16 +82,15 @@ export default async function MockInterviewHistoryPage() {
                     ) : null}
                   </div>
                   <h2 className="mt-3 text-lg font-semibold">
-                    {interview.problem.title}
+                    Mock interview ·{" "}
+                    {new Intl.DateTimeFormat("en", {
+                      dateStyle: "medium",
+                    }).format(new Date(interview.started_at))}
                   </h2>
                   <p className="text-muted mt-1 text-sm">
                     {interview.status === "completed"
                       ? interview.problem.primaryTopic.name
-                      : "Topic remained hidden"}{" "}
-                    ·{" "}
-                    {new Intl.DateTimeFormat("en", {
-                      dateStyle: "medium",
-                    }).format(new Date(interview.started_at))}
+                      : "Topic remained hidden"}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4">
@@ -108,10 +107,15 @@ export default async function MockInterviewHistoryPage() {
                       {Math.round(interview.scorecard.overall_score)}
                     </Link>
                   ) : null}
-                  <DeleteInterviewForm
-                    interviewId={interview.id}
-                    interviewTitle={interview.problem.title}
-                  />
+                  {interview.status === "completed" ? (
+                    <Link
+                      className={buttonVariants({ variant: "secondary" })}
+                      href={`/interviews/${interview.id}/review`}
+                    >
+                      Review interview
+                    </Link>
+                  ) : null}
+                  <DeleteInterviewForm interviewId={interview.id} />
                 </div>
               </CardContent>
             </Card>

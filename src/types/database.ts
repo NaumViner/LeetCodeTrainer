@@ -950,6 +950,10 @@ export type Database = {
           timer_running: boolean;
           updated_at: string;
           user_id: string;
+          voice_activated_at: string | null;
+          voice_activation_deadline: string | null;
+          voice_last_heartbeat_at: string | null;
+          voice_required: boolean;
           workspace_updated_at: string | null;
           workspace_version: number;
         };
@@ -990,6 +994,10 @@ export type Database = {
           timer_running?: boolean;
           updated_at?: string;
           user_id: string;
+          voice_activated_at?: string | null;
+          voice_activation_deadline?: string | null;
+          voice_last_heartbeat_at?: string | null;
+          voice_required?: boolean;
           workspace_updated_at?: string | null;
           workspace_version?: number;
         };
@@ -1030,6 +1038,10 @@ export type Database = {
           timer_running?: boolean;
           updated_at?: string;
           user_id?: string;
+          voice_activated_at?: string | null;
+          voice_activation_deadline?: string | null;
+          voice_last_heartbeat_at?: string | null;
+          voice_required?: boolean;
           workspace_updated_at?: string | null;
           workspace_version?: number;
         };
@@ -1694,6 +1706,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      activate_voice_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: Json;
+      };
       abandon_mock_interview: {
         Args: { p_mock_interview_id: string };
         Returns: undefined;
@@ -1728,6 +1744,10 @@ export type Database = {
       };
       complete_diagnostic: {
         Args: { p_answers: Json; p_attempt_id: string };
+        Returns: undefined;
+      };
+      cancel_pending_voice_interview: {
+        Args: { p_mock_interview_id: string };
         Returns: undefined;
       };
       complete_mock_interview: {
@@ -1786,6 +1806,19 @@ export type Database = {
           p_total_tokens: number;
         };
         Returns: undefined;
+      };
+      get_active_mock_interview_id: { Args: never; Returns: string };
+      get_owned_active_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: Json;
+      };
+      get_recent_active_interview_transcript: {
+        Args: { p_limit?: number; p_mock_interview_id: string };
+        Returns: Json;
+      };
+      heartbeat_voice_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: string;
       };
       mock_interview_evidence_score: {
         Args: {

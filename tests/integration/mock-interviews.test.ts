@@ -75,6 +75,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   let problemTopicId = "";
   const problemIdsByDifficulty = new Map<string, string>();
   let interviewId = "";
+  let introEvidenceEventId = 0;
   let lastAbandonedInterviewId = "";
   let masteryBeforeCompletedInterview: number | null = null;
   let realtimeSessionId = "";
@@ -236,7 +237,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     }
   });
 
-  it("validates and persists the versioned selection snapshot", async () => {
+  it("validates selection and returns only a sanitized active snapshot", async () => {
     const metadata = {
       candidateProblemCount: 4,
       candidateTopicCount: 2,
@@ -258,24 +259,26 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       p_selection_mode: "coverage",
     });
     expect(error).toBeNull();
-    const { data: interview, error: readError } = await learner
+    const { data: rawInterview, error: readError } = await learner
       .from("mock_interviews")
-      .select(
-        "coding_language, question_content_version, requested_difficulties, requested_topic_id, selected_topic_id, selection_algorithm_version, selection_metadata, selection_mode",
-      )
+      .select("*")
       .eq("id", data!)
-      .single();
+      .maybeSingle();
     expect(readError).toBeNull();
+    expect(rawInterview).toBeNull();
+    const { data: interview, error: snapshotError } = await learner.rpc(
+      "get_owned_active_mock_interview",
+      { p_mock_interview_id: data! },
+    );
+    expect(snapshotError).toBeNull();
     expect(interview).toMatchObject({
-      coding_language: "java",
-      question_content_version: 1,
-      requested_difficulties: ["easy", "medium"],
-      requested_topic_id: null,
-      selected_topic_id: problemTopicId,
-      selection_algorithm_version: 1,
-      selection_metadata: metadata,
-      selection_mode: "coverage",
+      codingLanguage: "java",
+      questionContentVersion: 1,
+      voiceActivated: false,
     });
+    expect(interview).not.toHaveProperty("problemId");
+    expect(interview).not.toHaveProperty("selectionMetadata");
+    expect(interview).not.toHaveProperty("selectedTopicId");
     lastAbandonedInterviewId = data!;
     const { error: abandonError } = await learner.rpc(
       "abandon_mock_interview",
@@ -327,7 +330,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     ).not.toBeNull();
   });
 
-  it("starts one private mandatory-timer session", async () => {
+  it("starts one private voice-pending session with its timer stopped", async () => {
     expect(
       (
         await learner.rpc("start_mock_interview", {
@@ -354,26 +357,28 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     });
     expect(error).toBeNull();
     interviewId = data!;
-    const { data: interview } = await learner
+    const { data: rawInterview } = await learner
       .from("mock_interviews")
       .select("*")
       .eq("id", interviewId)
-      .single();
+      .maybeSingle();
+    expect(rawInterview).toBeNull();
+    const { data: interview } = await learner.rpc(
+      "get_owned_active_mock_interview",
+      { p_mock_interview_id: interviewId },
+    );
     expect(interview).toMatchObject({
-      coding_language: "python",
-      duration_minutes: 45,
-      interview_language: "hebrew",
-      interviewer_level: "faang_tough",
+      codingLanguage: "python",
+      durationMinutes: 45,
+      interviewLanguage: "hebrew",
+      interviewerLevel: "faang_tough",
       phase: "intro",
-      requested_difficulties: ["easy"],
-      selected_topic_id: problemTopicId,
-      selection_algorithm_version: 0,
-      selection_metadata: {},
-      selection_mode: "legacy",
-      status: "active",
-      timer_running: true,
-      user_id: learnerId,
+      timerRunning: false,
+      voiceActivated: false,
     });
+    expect(interview).not.toHaveProperty("problemId");
+    expect(interview).not.toHaveProperty("status");
+    expect(interview).not.toHaveProperty("userId");
     expect(
       (
         await learner.rpc("start_mock_interview", {
@@ -401,29 +406,70 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     );
     expect(sessionError).toBeNull();
     realtimeSessionId = sessionId!;
+    const { data: activation, error: activationError } = await learner.rpc(
+      "activate_voice_mock_interview",
+      { p_mock_interview_id: interviewId },
+    );
+    expect(activationError).toBeNull();
+    expect(activation).toMatchObject({
+      elapsedSeconds: 0,
+      timerRunning: true,
+    });
+    expect(
+      (
+        await learner.rpc("heartbeat_voice_mock_interview", {
+          p_mock_interview_id: interviewId,
+        })
+      ).error,
+    ).toBeNull();
     for (const [eventType, phase, content] of [
       ["user_transcript", "intro", "I will clarify the constraints."],
       ["assistant_transcript", "intro", "What assumptions would you check?"],
       ["code_snapshot", "implementation", "function solve() { return 1; }"],
     ] as const) {
-      const { error } = await learner.rpc("append_realtime_interview_event", {
-        p_content: content,
-        p_event_type: eventType,
-        p_mock_interview_id: interviewId,
-        p_phase: phase,
-      });
+      const { data, error } = await learner.rpc(
+        "append_realtime_interview_event",
+        {
+          p_content: content,
+          p_event_type: eventType,
+          p_mock_interview_id: interviewId,
+          p_phase: phase,
+        },
+      );
       expect(error, eventType).toBeNull();
+      if (eventType === "user_transcript") introEvidenceEventId = data!;
     }
     const { data: events } = await learner
       .from("realtime_interview_events")
       .select("event_type, content")
       .eq("session_id", realtimeSessionId)
       .order("id");
-    expect(events?.map((event) => event.event_type)).toEqual([
-      "user_transcript",
-      "assistant_transcript",
-      "code_snapshot",
+    expect(events).toEqual([]);
+    expect(introEvidenceEventId).toBeGreaterThan(0);
+    const { data: recentTranscript, error: recentTranscriptError } =
+      await learner.rpc("get_recent_active_interview_transcript", {
+        p_limit: 6,
+        p_mock_interview_id: interviewId,
+      });
+    expect(recentTranscriptError).toBeNull();
+    expect(recentTranscript).toEqual([
+      expect.objectContaining({
+        role: "learner",
+        text: "I will clarify the constraints.",
+      }),
+      expect.objectContaining({
+        role: "interviewer",
+        text: "What assumptions would you check?",
+      }),
     ]);
+    expect(
+      (
+        await other.rpc("get_recent_active_interview_transcript", {
+          p_limit: 6,
+          p_mock_interview_id: interviewId,
+        })
+      ).data,
+    ).toEqual([]);
     expect(
       (await other.from("realtime_interview_sessions").select("*")).data,
     ).toEqual([]);
@@ -441,16 +487,8 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     });
     expect(skip.error).not.toBeNull();
 
-    const { data: introEvidence } = await learner
-      .from("realtime_interview_events")
-      .select("id")
-      .eq("session_id", realtimeSessionId)
-      .eq("phase", "intro")
-      .order("id")
-      .limit(1)
-      .single();
     const suggestionInput = {
-      p_evidence_event_ids: [introEvidence!.id],
+      p_evidence_event_ids: [introEvidenceEventId],
       p_expected_current_phase: "intro",
       p_mock_interview_id: interviewId,
       p_reason_code: "learner_completed_objective",
@@ -614,22 +652,18 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       });
       expect(error, target).toBeNull();
     }
-    const { data: interview } = await learner
-      .from("mock_interviews")
-      .select(
-        "code_snapshot, code_submitted_at, coding_language, phase, scratchpad, timer_running, workspace_version",
-      )
-      .eq("id", interviewId)
-      .single();
+    const { data: interview } = await learner.rpc(
+      "get_owned_active_mock_interview",
+      { p_mock_interview_id: interviewId },
+    );
     expect(interview).toMatchObject({
-      code_snapshot: finalCode,
-      coding_language: "python",
+      codeSnapshot: finalCode,
+      codingLanguage: "python",
       phase: "retrospective",
       scratchpad: "Empty and ordinary cases are covered.",
-      timer_running: false,
-      workspace_version: 4,
+      timerRunning: false,
+      workspaceVersion: 4,
     });
-    expect(interview?.code_submitted_at).not.toBeNull();
     const { data: submissions, error: submissionsError } = await learner
       .from("mock_interview_code_submissions")
       .select(
@@ -638,19 +672,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .eq("mock_interview_id", interviewId)
       .order("snapshot_version");
     expect(submissionsError).toBeNull();
-    expect(submissions).toEqual([
-      expect.objectContaining({
-        coding_language: "python",
-        phase: "implementation",
-        snapshot_version: 3,
-        submission_kind: "review",
-      }),
-      expect.objectContaining({
-        code_snapshot: finalCode,
-        snapshot_version: 4,
-        submission_kind: "completed",
-      }),
-    ]);
+    expect(submissions).toEqual([]);
     expect(
       (await other.from("mock_interview_code_submissions").select("*")).data,
     ).toEqual([]);
@@ -663,29 +685,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .order("created_at")
       .order("id");
     expect(phaseEventsError).toBeNull();
-    expect(
-      phaseEvents?.filter((event) => event.transition_type === "completed"),
-    ).toHaveLength(8);
-    expect(phaseEvents).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          evidence_event_ids: [introEvidence!.id],
-          phase: "intro",
-          suggested_phase: "clarify",
-          transition_type: "suggested",
-        }),
-        expect.objectContaining({
-          code_submission_ids: expect.arrayContaining([expect.any(String)]),
-          display_summary: "Python code snapshot version 4 submitted.",
-          evidence_fields: expect.arrayContaining([
-            "code_snapshot",
-            "workspace_version",
-          ]),
-          phase: "implementation",
-          transition_type: "completed",
-        }),
-      ]),
-    );
+    expect(phaseEvents).toEqual([]);
     expect(
       (await other.from("mock_interview_phase_events").select("*")).data,
     ).toEqual([]);
@@ -1117,7 +1117,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       "delete_owned_mock_interview",
       { p_mock_interview_id: lastAbandonedInterviewId },
     );
-    expect(abandonedDeleteError).toBeNull();
+    expect(abandonedDeleteError).not.toBeNull();
     expect(
       (
         await learner

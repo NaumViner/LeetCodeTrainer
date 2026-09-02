@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
 import { getAuthenticatedUser } from "@/features/auth/session";
-import { getLearnerVisibleQuestionContent } from "@/features/interview-evaluation/question-content";
-import { getMockInterview } from "@/features/mock-interviews/queries";
+import { getActiveInterviewQuestionPrompt } from "@/features/interview-evaluation/question-content";
+import { getOwnedActiveMockInterview } from "@/features/mock-interviews/queries";
 import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
 import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
@@ -41,19 +41,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const interview = await getMockInterview(user.id, parsed.data.interviewId);
-  if (!interview || interview.status !== "active") {
+  const interview = await getOwnedActiveMockInterview(parsed.data.interviewId);
+  if (!interview) {
     return Response.json(
       { message: "The active interview is unavailable." },
       { status: 404 },
     );
   }
-  const questionContent = getInterviewRolloutConfig().promptContentEnabled
-    ? getLearnerVisibleQuestionContent(
-        interview.problem.slug,
-        interview.question_content_version,
+  const questionPrompt = getInterviewRolloutConfig().promptContentEnabled
+    ? getActiveInterviewQuestionPrompt(
+        interview.questionContentKey,
+        interview.questionContentVersion,
       )
     : null;
+  if (!questionPrompt) {
+    return Response.json(
+      { message: "The approved interview prompt is unavailable." },
+      { status: 409 },
+    );
+  }
 
   const expiresAt = new Date(Date.now() + 70 * 60 * 1_000).toISOString();
   const newSessionExpiresAt = new Date(Date.now() + 60 * 1_000).toISOString();
@@ -110,7 +116,14 @@ export async function POST(request: Request) {
 
   return Response.json({
     expiresAt,
-    instructions: buildInterviewInstructions(interview, questionContent),
+    instructions: buildInterviewInstructions(
+      {
+        interview_language: interview.interviewLanguage,
+        interviewer_level: interview.interviewerLevel,
+        phase: interview.phase,
+      },
+      questionPrompt,
+    ),
     model: config.model,
     token: token.name,
     voice: config.voice,

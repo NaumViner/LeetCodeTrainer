@@ -15,15 +15,13 @@ afterEach(cleanup);
 describe("delete interview form", () => {
   it("requires an explicit acknowledgement and explains every consequence", () => {
     render(
-      <DeleteInterviewForm
-        interviewId="00000000-0000-4000-8000-000000000001"
-        interviewTitle="Two Sum"
-      />,
+      <DeleteInterviewForm interviewId="00000000-0000-4000-8000-000000000001" />,
     );
 
     fireEvent.click(screen.getByText("Delete"));
 
-    expect(screen.getByText("Delete Two Sum?")).toBeVisible();
+    expect(screen.getByText("Delete this mock interview?")).toBeVisible();
+    expect(screen.queryByText("Two Sum")).not.toBeInTheDocument();
     expect(
       screen.getByText(/permanently removes the interview, transcript/),
     ).toBeVisible();

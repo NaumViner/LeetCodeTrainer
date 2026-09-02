@@ -3,6 +3,7 @@
 import {
   realtimeEventInputSchema,
   realtimeSessionEndSchema,
+  voiceActivationResultSchema,
 } from "@/features/realtime-interviews/model";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { mockInterviewIdSchema } from "@/features/mock-interviews/schema";
@@ -15,6 +16,49 @@ import { recordOperationalEvent } from "@/lib/operational-events";
 
 type RealtimeActionResult =
   { eventId: string; status: "success" } | { message: string; status: "error" };
+
+export type VoiceActivationActionResult =
+  | {
+      elapsedSeconds: number;
+      startedAt: string;
+      status: "success";
+      timerRunning: boolean;
+    }
+  | { message: string; status: "error" };
+
+export async function activateVoiceMockInterviewAction(
+  interviewId: string,
+): Promise<VoiceActivationActionResult> {
+  const id = mockInterviewIdSchema.safeParse(interviewId);
+  if (!id.success) return invalidVoiceActivation();
+  await requireAuthenticatedUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("activate_voice_mock_interview", {
+    p_mock_interview_id: id.data,
+  });
+  const activation = voiceActivationResultSchema.safeParse(data);
+  if (error || !activation.success) return invalidVoiceActivation();
+  return {
+    elapsedSeconds: activation.data.elapsedSeconds,
+    startedAt: activation.data.startedAt,
+    status: "success",
+    timerRunning: activation.data.timerRunning,
+  };
+}
+
+export async function heartbeatVoiceMockInterviewAction(
+  interviewId: string,
+): Promise<{ status: "success" } | { message: string; status: "error" }> {
+  const id = mockInterviewIdSchema.safeParse(interviewId);
+  if (!id.success) return invalidVoiceActivation();
+  await requireAuthenticatedUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("heartbeat_voice_mock_interview", {
+    p_mock_interview_id: id.data,
+  });
+  if (error) return invalidVoiceActivation();
+  return { status: "success" };
+}
 
 export async function saveRealtimeInterviewEventAction(
   interviewId: string,
@@ -129,5 +173,12 @@ function realtimeSaveError(): RealtimeActionResult {
   return {
     message: "The live interview transcript could not be saved.",
     status: "error",
+  };
+}
+
+function invalidVoiceActivation() {
+  return {
+    message: "The required live voice connection could not be verified.",
+    status: "error" as const,
   };
 }

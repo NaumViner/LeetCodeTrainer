@@ -40,6 +40,13 @@ export const realtimeSessionEndSchema = z.object({
   summary: z.string().trim().max(2_000).optional(),
 });
 
+export const voiceActivationResultSchema = z.object({
+  elapsedSeconds: z.number().int().min(0).max(14_400),
+  startedAt: z.iso.datetime({ offset: true }),
+  timerRunning: z.boolean(),
+  voiceActivatedAt: z.iso.datetime({ offset: true }),
+});
+
 export type RealtimeEventInput = z.infer<typeof realtimeEventInputSchema>;
 
 export type RealtimeTranscriptEntry = {

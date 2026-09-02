@@ -1,34 +1,48 @@
 # Realtime interviewer
 
-## Experience
+## Product contract
 
-The existing text mock interview remains the source of truth for timer, ordered phases, evidence, and scorecard. When realtime is configured, an optional Live interviewer panel adds:
+Mock interviews are full-voice only. Realtime voice is not an enhancement or an optional fallback: an interview cannot start, advance phases, submit code for review, or complete unless an authenticated provider session has activated the interview and is maintaining a current voice lease.
 
-- microphone permission and mute/unmute controls;
-- a live input-level meter and interviewer-speaking indicator;
-- speech-to-speech interaction with a completed-turn transcript;
-- a typed-message fallback;
-- phase-note and code-snapshot context updates;
-- visible connecting, reconnecting, disconnected, and error states;
-- explicit voice-session ending and transcript recovery after refresh.
+The active workspace exposes only:
 
-Voice failure never blocks the structured interview. The learner can reconnect or continue the normal text workflow.
+- compact Guiding Star tiles containing phase names and state at the top of the page;
+- the approved question wording, without its title, difficulty, topic, examples, constraints, or external reference;
+- the Live interviewer directly below the question;
+- the six most recent completed learner/interviewer transcript turns;
+- the Python or Java coding workspace;
 
-Before starting, the learner selects one persisted interviewer level. **Beginner interviewer** keeps the original restrained, gently redirecting behavior. **Tough FAANG interviewer** applies the “blank wall” behavior: one short turn at a time, zero hints or validation, cold optimization prompts, silent code review, and bug-revealing test cases that the learner must dry-run without an explanation. The choice is fixed for the interview and survives refreshes, reconnects, and provider changes. Existing interview records default to Beginner.
+There is no typed-message fallback, live transcript, learner-controlled “End voice” action, or non-voice interview mode. The learner may mute and reconnect. If voice cannot be restored, the learner can abandon the interview; an interview that never activated is cancelled without creating history.
+
+The persisted interviewer level remains fixed for the interview. **Beginner interviewer** uses restrained questions and gentle redirection. **Tough FAANG interviewer** stays terse, avoids hints and validation, reviews code silently, and asks the learner to dry-run revealing tests without explaining the defect.
+
+## Start and lease lifecycle
+
+Setup is unavailable unless a realtime provider is configured. Before creating an interview, the browser performs microphone capability and permission preflight. The server independently rejects start requests when full voice is unavailable.
+
+A successful start creates a voice-pending row. Its timer is stopped and it is not counted in history or profile evidence. The browser obtains a provider session and then calls the authenticated activation function. Activation starts the interview timer and the voice lease. The client refreshes the lease every 30 seconds; the server treats it as expired after 90 seconds without a heartbeat.
+
+Ordered phase changes, code-review submissions, coding completion, and interview completion all validate the current lease. Scratchpad and code autosave remain available during a temporary reconnect so the learner does not lose work. Cancelling a voice-pending row deletes it; abandoning an activated row records an abandoned interview and closes its realtime session.
 
 ## Provider and browser architecture
 
-The realtime interface is independent from the learning-coach provider, although both can use the same Gemini key. Gemini Live is the default browser adapter. The application verifies the learner and active interview, then creates a short-lived, one-use ephemeral token; the long-lived API key never reaches the browser. The browser connects directly to Gemini Live, streams 16 kHz PCM microphone audio, plays 24 kHz PCM responses, and receives input/output transcriptions. It also supports interruption, automatic reconnection with session resumption, typed messages, and silent phase/code context updates.
+Gemini Live is the default browser adapter. The application authenticates the learner and the sanitized active-interview snapshot, then creates a short-lived, one-use ephemeral token; the long-lived provider key never reaches the browser. The browser streams microphone audio and plays provider audio, supports interruption and session resumption, and sends bounded phase/code context updates.
 
-An OpenAI WebRTC adapter remains available as an alternative. It creates a local audio track and SDP offer, sends the offer and owned mock-interview ID to an authenticated application endpoint, applies the returned SDP answer, and uses the WebRTC data channel for text and context events. The application endpoint forwards the SDP with a server-owned configuration to the [OpenAI Realtime call API](https://developers.openai.com/api/reference/typescript/resources/realtime/subresources/calls/methods/create).
+An OpenAI WebRTC adapter remains available. It sends a local SDP offer and the owned interview ID to an authenticated application route. That route creates the provider call with server-owned instructions and returns the SDP answer.
 
-The prompt identifies only the approved learner-visible question, difficulty, current phase, and the persisted interviewer level. Shared rules prevent revealing the hidden topic/pattern or solution, prohibit invented constraints, and treat transcript and code as untrusted evidence. A provider-neutral code-review context encloses the fixed language, snapshot version, phase, submission kind, and JSON-escaped source. The provider is explicitly told that the source was not executed and may not claim that tests passed. Tough FAANG responds with a concise test case or next instruction without explaining the defect; Beginner uses one restrained question or redirect. The same contract is implemented by Gemini Live and OpenAI WebRTC.
+Both providers receive the same bounded contract: approved question wording, current phase, selected interview language, interviewer level, and explicitly submitted code context. They do not receive the question title, difficulty, topic, pattern, public examples, constraints, canonical URL, evaluator invariants, or private tests. Transcript and code are treated as untrusted learner evidence. Code is never represented as executed, and the interviewer may not claim that tests passed.
 
-Both adapters also expose one provider-neutral structured phase-suggestion tool. The model supplies only the expected current phase, its immediate successor, and a bounded reason code; the application injects the trusted interview ID and associates already-persisted current-phase evidence IDs. The server then revalidates authentication, ownership, active session, exact phase order, evidence ownership/type, and staleness. A valid call creates a “Needs confirmation” guide event only. It cannot complete a phase, skip ahead, or mutate interview state, and malformed or unavailable tool calls fall back to the manual ordered controls.
+Both adapters expose one structured phase-suggestion tool. The provider can suggest only the immediate successor of the expected current phase with a bounded reason code. The application injects trusted identifiers and revalidates authentication, ownership, lease, phase order, evidence ownership, and staleness. A valid suggestion creates a “Needs confirmation” event only; it cannot advance the interview.
+
+## Active-data boundary
+
+Browser roles cannot read the raw active `mock_interviews` row or active interview evidence. Active pages use ownership-checking RPCs that return a sanitized snapshot and an opaque question-content key. Only server code resolves that key to approved question wording. The active provider routes use the same boundary.
+
+Transcript turns, phase events, notes, and submission snapshots are persisted privately. During an active interview, one ownership-checking RPC returns only the six most recent completed learner/interviewer transcript turns so they remain visible above the coding workspace after refresh or reconnect. All older transcript and other evidence become learner-visible only after completion on `/interviews/[interviewId]/review`. The scorecard remains a separate result surface.
 
 ## Configuration
 
-Realtime is disabled unless both the explicit feature flag and a server-only key are present. For Gemini, the only secret required is the shared key:
+Full voice requires the feature flag and the selected provider's server-only secret. For Gemini:
 
 ```env
 GEMINI_API_KEY=replace-with-your-gemini-api-key
@@ -38,8 +52,12 @@ REALTIME_AI_MODEL=gemini-3.1-flash-live-preview
 REALTIME_AI_VOICE=Kore
 ```
 
-OpenAI can be selected instead with `REALTIME_AI_PROVIDER=openai`, `REALTIME_AI_API_KEY`, an OpenAI realtime model, transcription model, and voice. None of the secret variables may use a `NEXT_PUBLIC_` prefix. HTTPS is required for browser microphone access outside localhost. Provider access, model availability, and sufficient free-tier quota or billing must be enabled in the selected provider project.
+OpenAI can be selected with `REALTIME_AI_PROVIDER=openai`, `REALTIME_AI_API_KEY`, a realtime model, transcription model, and voice. Secret variables must not use a `NEXT_PUBLIC_` prefix. HTTPS is required for microphone access outside localhost. The selected provider project must have model access and sufficient quota or billing.
+
+Production configuration validation fails when mock interviews are enabled without realtime voice and approved prompt content.
 
 ## Persistence and recovery
 
-Completed transcript turns and submitted context events are persisted through authenticated database functions. A code-review request first creates the owned immutable submission snapshot independently of provider availability; when realtime is connected, the corresponding bounded code event and completed interviewer response are also persisted. Forced RLS permits only the owner to read them and browser roles cannot write tables directly. Reconnecting reuses the interview's session record while creating a fresh provider connection or resuming the Gemini session when possible. Ending the voice connection stores a bounded deterministic summary; completing or abandoning the parent interview also closes any still-active realtime record.
+Completed transcript turns and context events are written only through authenticated database functions. Code-review submission first persists an immutable, bounded snapshot; provider delivery can then reference that snapshot. Forced Row Level Security prevents browser roles from writing the underlying tables directly.
+
+Reconnect creates a fresh provider connection or resumes the provider session when supported. Refreshing the page never exposes the stored transcript. Completing or abandoning the parent interview closes any active realtime record, and deleting an interview cascades its transcript, phase evidence, submissions, scorecard, evaluation, and profile impact.

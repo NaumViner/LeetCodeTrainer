@@ -112,12 +112,23 @@ if (enabled("REALTIME_AI_ENABLED")) {
   }
 }
 
+if (!enabled("REALTIME_AI_ENABLED")) {
+  errors.push(
+    "REALTIME_AI_ENABLED must be true because mock interviews require full voice.",
+  );
+}
+
 const interviewSelectionModesEnabled = rolloutEnabled(
   "INTERVIEW_SELECTION_MODES_ENABLED",
 );
 const interviewPromptContentEnabled = rolloutEnabled(
   "INTERVIEW_PROMPT_CONTENT_ENABLED",
 );
+if (!interviewPromptContentEnabled) {
+  errors.push(
+    "INTERVIEW_PROMPT_CONTENT_ENABLED must be true because mock interviews cannot use external prompt fallbacks.",
+  );
+}
 const interviewCodingWorkspaceEnabled = rolloutEnabled(
   "INTERVIEW_CODING_WORKSPACE_ENABLED",
 );

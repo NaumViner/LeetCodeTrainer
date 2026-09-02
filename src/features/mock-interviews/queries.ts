@@ -2,6 +2,7 @@ import { effectiveInterviewElapsed } from "@/domain/mock-interview";
 import { getProblemCatalog } from "@/features/problems/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database";
+import { z } from "zod";
 
 export type MockInterviewRow = Tables<"mock_interviews">;
 export type MockInterviewEvaluationRow = Tables<"mock_interview_evaluations">;
@@ -20,16 +21,83 @@ export type MockInterviewDetail = MockInterviewRow & {
   scorecard: MockInterviewScorecardRow | null;
 };
 
-export async function getActiveMockInterview(userId: string) {
+const activeMockInterviewSchema = z.object({
+  codeSnapshot: z.string().nullable(),
+  codingLanguage: z.enum(["python", "java"]),
+  durationMinutes: z.number().int().positive(),
+  elapsedSeconds: z.number().int().min(0).max(14_400),
+  id: z.uuid(),
+  interviewLanguage: z.string(),
+  interviewerLevel: z.string(),
+  phase: z.string(),
+  questionContentKey: z.string().regex(/^[a-f0-9]{32}$/),
+  questionContentVersion: z.number().int().positive().nullable(),
+  scratchpad: z.string().nullable(),
+  startedAt: z.iso.datetime({ offset: true }),
+  timerRunning: z.boolean(),
+  voiceActivated: z.boolean(),
+  workspaceVersion: z.number().int().min(0),
+});
+
+const recentActiveTranscriptSchema = z
+  .array(
+    z.object({
+      id: z.string(),
+      role: z.enum(["interviewer", "learner"]),
+      text: z.string().min(1).max(8_000),
+    }),
+  )
+  .max(6);
+
+export type RecentActiveTranscriptEntry = z.infer<
+  typeof recentActiveTranscriptSchema
+>[number];
+
+export type ActiveMockInterviewDetail = z.infer<
+  typeof activeMockInterviewSchema
+> & { effectiveElapsedSeconds: number };
+
+export function parseActiveMockInterviewSnapshot(value: unknown) {
+  const parsed = activeMockInterviewSchema.safeParse(value);
+  if (!parsed.success) return null;
+  return {
+    ...parsed.data,
+    effectiveElapsedSeconds: effectiveInterviewElapsed({
+      elapsedSeconds: parsed.data.elapsedSeconds,
+      now: new Date(),
+      startedAt: parsed.data.startedAt,
+      timerRunning: parsed.data.timerRunning,
+    }),
+  } satisfies ActiveMockInterviewDetail;
+}
+
+export async function getActiveMockInterview() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("mock_interviews")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_active_mock_interview_id");
   if (error) throw new Error("The active mock interview could not be loaded.");
-  return data;
+  return data ? { id: data } : null;
+}
+
+export async function getOwnedActiveMockInterview(interviewId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "get_owned_active_mock_interview",
+    { p_mock_interview_id: interviewId },
+  );
+  if (error) throw new Error("The active mock interview could not be loaded.");
+  return parseActiveMockInterviewSnapshot(data);
+}
+
+export async function getRecentActiveInterviewTranscript(interviewId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "get_recent_active_interview_transcript",
+    { p_limit: 6, p_mock_interview_id: interviewId },
+  );
+  if (error)
+    throw new Error("The recent interview conversation could not be loaded.");
+  const parsed = recentActiveTranscriptSchema.safeParse(data);
+  return parsed.success ? parsed.data : [];
 }
 
 export async function getMockInterview(userId: string, interviewId: string) {

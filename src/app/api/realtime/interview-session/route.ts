@@ -1,6 +1,6 @@
 import { getAuthenticatedUser } from "@/features/auth/session";
-import { getLearnerVisibleQuestionContent } from "@/features/interview-evaluation/question-content";
-import { getMockInterview } from "@/features/mock-interviews/queries";
+import { getActiveInterviewQuestionPrompt } from "@/features/interview-evaluation/question-content";
+import { getOwnedActiveMockInterview } from "@/features/mock-interviews/queries";
 import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
 import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
@@ -44,19 +44,25 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const interview = await getMockInterview(user.id, parsed.data.interviewId);
-  if (!interview || interview.status !== "active") {
+  const interview = await getOwnedActiveMockInterview(parsed.data.interviewId);
+  if (!interview) {
     return Response.json(
       { message: "The active interview is unavailable." },
       { status: 404 },
     );
   }
-  const questionContent = getInterviewRolloutConfig().promptContentEnabled
-    ? getLearnerVisibleQuestionContent(
-        interview.problem.slug,
-        interview.question_content_version,
+  const questionPrompt = getInterviewRolloutConfig().promptContentEnabled
+    ? getActiveInterviewQuestionPrompt(
+        interview.questionContentKey,
+        interview.questionContentVersion,
       )
     : null;
+  if (!questionPrompt) {
+    return Response.json(
+      { message: "The approved interview prompt is unavailable." },
+      { status: 409 },
+    );
+  }
 
   const form = new FormData();
   form.append("sdp", parsed.data.sdp);
@@ -74,7 +80,14 @@ export async function POST(request: Request) {
         },
         output: { voice: config.voice },
       },
-      instructions: buildInterviewInstructions(interview, questionContent),
+      instructions: buildInterviewInstructions(
+        {
+          interview_language: interview.interviewLanguage,
+          interviewer_level: interview.interviewerLevel,
+          phase: interview.phase,
+        },
+        questionPrompt,
+      ),
       max_output_tokens: 500,
       model: config.model,
       output_modalities: ["audio"],

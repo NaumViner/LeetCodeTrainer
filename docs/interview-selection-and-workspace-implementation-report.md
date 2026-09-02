@@ -1,5 +1,7 @@
 # Interview selection and workspace implementation report
 
+> Historical implementation report. Active mock-interview display, full-voice enforcement, evidence visibility, and Review behavior are superseded by [full-voice-mock-interview-redesign-action-plan.md](full-voice-mock-interview-redesign-action-plan.md).
+
 ## 1. Delivered behavior
 
 - Coverage chooses randomly from missing topics until all 18 NeetCode 150 topics have completed interview evidence, then balances least-covered topics.

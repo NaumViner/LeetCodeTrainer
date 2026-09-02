@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
 import {
   downsampleToPcm16,
+  GEMINI_EPHEMERAL_LIVE_API_VERSION,
   mergeTranscript,
 } from "@/features/realtime-interviews/gemini-live-provider";
 import {
   geminiRealtimeSessionRequestSchema,
   realtimeEventInputSchema,
   realtimeSessionRequestSchema,
+  voiceActivationResultSchema,
 } from "@/features/realtime-interviews/model";
 import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
 import { parseRealtimeServerEvent } from "@/features/realtime-interviews/openai-webrtc-provider";
@@ -60,6 +62,21 @@ describe("realtime interviewer configuration", () => {
 });
 
 describe("realtime interviewer protocol", () => {
+  it("uses the constrained API version required by SDK ephemeral tokens", () => {
+    expect(GEMINI_EPHEMERAL_LIVE_API_VERSION).toBe("v1alpha");
+  });
+
+  it("accepts PostgreSQL timestamps returned by voice activation", () => {
+    expect(
+      voiceActivationResultSchema.safeParse({
+        elapsedSeconds: 0,
+        startedAt: "2026-09-02T13:10:16.521414+00:00",
+        timerRunning: true,
+        voiceActivatedAt: "2026-09-02T13:15:00.123456+00:00",
+      }).success,
+    ).toBe(true);
+  });
+
   it("accepts only an immediate structured phase tool signal", () => {
     expect(
       parsePhaseSuggestionToolArguments(
@@ -128,7 +145,6 @@ describe("realtime interviewer protocol", () => {
       interview_language: "auto",
       interviewer_level: "beginner",
       phase: "intro",
-      problem: { difficulty: "easy", title: "Two Sum" },
     });
     expect(instructions).toContain("entry-level technical coding interview");
     expect(instructions).toContain("gently redirect");
@@ -140,7 +156,6 @@ describe("realtime interviewer protocol", () => {
       interview_language: "hebrew",
       interviewer_level: "faang_tough",
       phase: "intro",
-      problem: { difficulty: "medium", title: "Remove Nth Node" },
     });
     expect(instructions).toContain("CRITICAL BLANK WALL RULE");
     expect(instructions).toContain("Give zero hints");
@@ -154,27 +169,22 @@ describe("realtime interviewer protocol", () => {
     expect(instructions).toContain("never translate or rewrite source code");
   });
 
-  it("passes only learner-visible approved prompt content to the provider", () => {
+  it("passes only the question wording to the provider", () => {
     const instructions = buildInterviewInstructions(
       {
         interview_language: "english",
         interviewer_level: "beginner",
         phase: "clarify",
-        problem: { difficulty: "easy", title: "Contains Duplicate" },
       },
-      {
-        constraints: ["1 <= nums.length <= 100"],
-        contentVersion: 1,
-        examples: [
-          { explanation: null, input: "nums = [2, 2]", output: "true" },
-        ],
-        prompt: "Return whether a value is repeated.",
-      },
+      "Return whether a value is repeated.",
     );
 
     expect(instructions).toContain("<FIRST_PARTY_PROMPT>");
     expect(instructions).toContain("Return whether a value is repeated.");
-    expect(instructions).toContain("nums = [2, 2]");
+    expect(instructions).not.toContain("Contains Duplicate");
+    expect(instructions).not.toContain("Difficulty:");
+    expect(instructions).not.toContain("nums = [2, 2]");
+    expect(instructions).not.toContain("1 <= nums.length <= 100");
     expect(instructions).not.toContain("expectedInvariants");
     expect(instructions).not.toContain("privateEvaluatorTests");
   });

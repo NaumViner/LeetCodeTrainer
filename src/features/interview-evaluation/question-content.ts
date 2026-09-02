@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import {
@@ -470,6 +471,28 @@ export function getLearnerVisibleQuestionContent(
   const { expectedInvariants, ...learnerVisible } = content;
   void expectedInvariants;
   return learnerVisibleQuestionContentSchema.parse(learnerVisible);
+}
+
+const activeQuestionSlugByContentKey = new Map(
+  Object.keys(approvedQuestions).map((slug) => [
+    activeInterviewContentKey(slug),
+    slug,
+  ]),
+);
+
+export function getActiveInterviewQuestionPrompt(
+  contentKey: string,
+  contentVersion?: number | null,
+) {
+  const slug = activeQuestionSlugByContentKey.get(contentKey);
+  if (!slug) return null;
+  return getLearnerVisibleQuestionContent(slug, contentVersion)?.prompt ?? null;
+}
+
+function activeInterviewContentKey(problemSlug: string) {
+  return createHash("md5")
+    .update(`${problemSlug}:mock-interview-active-v1:8f4d23ac`)
+    .digest("hex");
 }
 
 function question(content: QuestionDraft): ApprovedInterviewQuestion {

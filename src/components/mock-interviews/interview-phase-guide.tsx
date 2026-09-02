@@ -1,14 +1,7 @@
 "use client";
 
-import {
-  AlertCircle,
-  ArrowRight,
-  Check,
-  CircleDot,
-  LockKeyhole,
-} from "lucide-react";
+import { AlertCircle, Check, CircleDot, LockKeyhole } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { mockInterviewPhaseLabels } from "@/domain/mock-interview";
 import {
   buildInterviewPhaseGuide,
@@ -19,74 +12,34 @@ import type { MockInterviewPhase } from "@/domain/mock-interview";
 
 export function InterviewPhaseGuide({
   currentPhase,
-  events,
+  events = [],
 }: {
   currentPhase: MockInterviewPhase;
-  events: InterviewPhaseGuideEvent[];
+  events?: InterviewPhaseGuideEvent[];
 }) {
   const items = buildInterviewPhaseGuide({ currentPhase, events });
   return (
     <section aria-labelledby="interview-process-guide-title">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-primary text-xs font-semibold tracking-wide uppercase">
-            Guiding star
-          </p>
-          <h2
-            className="mt-1 text-xl font-semibold"
-            id="interview-process-guide-title"
-          >
-            Interview process guide
-          </h2>
-        </div>
-        <p className="text-muted max-w-xl text-sm leading-6">
-          This tracks your process and captured evidence. Final scoring remains
-          separate on the scorecard.
-        </p>
-      </div>
-
+      <h2
+        className="text-primary text-xs font-semibold tracking-wide uppercase"
+        id="interview-process-guide-title"
+      >
+        Guiding star
+      </h2>
       <ol
         aria-label="Live interview process"
-        className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-5 lg:grid-cols-9"
       >
-        {items.map((item, index) => (
+        {items.map((item) => (
           <li
             aria-current={item.state === "current" ? "step" : undefined}
-            className={`rounded-xl border p-4 ${stateClassName(item.state)}`}
+            className={`flex min-h-12 min-w-28 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center text-xs font-semibold sm:min-w-0 ${stateClassName(item.state)}`}
             data-phase-state={item.state}
             key={item.phase}
           >
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5" aria-hidden="true">
-                <StateIcon state={item.state} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">
-                    {index + 1}. {mockInterviewPhaseLabels[item.phase]}
-                  </h3>
-                  <StateBadge state={item.state} />
-                </div>
-                {item.state === "current" ? (
-                  <span className="sr-only">You are here.</span>
-                ) : null}
-                <p className="text-muted mt-2 text-sm leading-5">
-                  {item.objective}
-                </p>
-                {item.summary ? (
-                  <p className="bg-surface mt-3 rounded-lg px-3 py-2 text-sm leading-5">
-                    <span className="font-semibold">Captured:</span>{" "}
-                    {item.summary}
-                  </p>
-                ) : null}
-                {item.state === "needs_confirmation" ? (
-                  <p className="mt-3 text-sm font-medium">
-                    The interviewer suggested this step. Use the phase action
-                    below to confirm it.
-                  </p>
-                ) : null}
-              </div>
-            </div>
+            <StateIcon state={item.state} />
+            <span>{mockInterviewPhaseLabels[item.phase]}</span>
+            <span className="sr-only">{stateLabel(item.state)}</span>
           </li>
         ))}
       </ol>
@@ -95,27 +48,31 @@ export function InterviewPhaseGuide({
 }
 
 function StateIcon({ state }: { state: InterviewPhaseGuideState }) {
-  if (state === "completed") return <Check className="text-success size-5" />;
-  if (state === "current") return <CircleDot className="text-primary size-5" />;
+  const className = "size-3.5 shrink-0";
+  if (state === "completed") {
+    return <Check aria-hidden="true" className={`${className} text-success`} />;
+  }
+  if (state === "current") {
+    return (
+      <CircleDot aria-hidden="true" className={`${className} text-primary`} />
+    );
+  }
   if (state === "needs_confirmation") {
-    return <AlertCircle className="text-warning size-5" />;
+    return (
+      <AlertCircle aria-hidden="true" className={`${className} text-warning`} />
+    );
   }
-  if (state === "suggested_next") {
-    return <ArrowRight className="text-primary size-5" />;
-  }
-  return <LockKeyhole className="text-muted size-4" />;
+  return (
+    <LockKeyhole aria-hidden="true" className={`${className} text-muted`} />
+  );
 }
 
-function StateBadge({ state }: { state: InterviewPhaseGuideState }) {
-  if (state === "completed") return <Badge variant="success">Completed</Badge>;
-  if (state === "current") return <Badge variant="primary">You are here</Badge>;
-  if (state === "needs_confirmation") {
-    return <Badge variant="warning">Needs confirmation</Badge>;
-  }
-  if (state === "suggested_next") {
-    return <Badge variant="neutral">Suggested next</Badge>;
-  }
-  return <Badge variant="neutral">Future</Badge>;
+function stateLabel(state: InterviewPhaseGuideState) {
+  if (state === "completed") return "Completed";
+  if (state === "current") return "Current step";
+  if (state === "needs_confirmation") return "Needs confirmation";
+  if (state === "suggested_next") return "Suggested next";
+  return "Future step";
 }
 
 function stateClassName(state: InterviewPhaseGuideState) {

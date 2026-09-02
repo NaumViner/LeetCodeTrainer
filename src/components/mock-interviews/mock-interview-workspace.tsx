@@ -5,7 +5,6 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   Clock3,
-  ShieldQuestion,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -14,6 +13,7 @@ import { type FormEvent, useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { InterviewPhaseGuide } from "@/components/mock-interviews/interview-phase-guide";
 import { InterviewQuestionPanel } from "@/components/mock-interviews/interview-question-panel";
+import { RecentInterviewConversation } from "@/components/mock-interviews/recent-interview-conversation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form-field";
@@ -21,23 +21,17 @@ import {
   MOCK_INTERVIEW_PHASES,
   interviewTextDirection,
   type InterviewLanguage,
-  interviewerLevelLabels,
-  type InterviewerLevel,
   type MockInterviewPhase,
 } from "@/domain/mock-interview";
-import {
-  summarizePhaseEvidence,
-  type InterviewPhaseGuideEvent,
-} from "@/domain/interview-phase-guide";
+import type { InterviewPhaseGuideEvent } from "@/domain/interview-phase-guide";
 import {
   abandonMockInterviewAction,
   advanceMockInterviewAction,
   completeMockInterviewAction,
 } from "@/features/mock-interviews/actions";
 import type { RealtimeContextUpdate } from "@/components/mock-interviews/realtime-interview-panel";
-import type { LearnerVisibleQuestionContent } from "@/features/interview-evaluation/evidence-model";
-import type { RealtimeTranscriptEntry } from "@/features/realtime-interviews/model";
 import type { RealtimeInterviewProviderName } from "@/features/realtime-interviews/provider";
+import type { RealtimeTranscriptEntry } from "@/features/realtime-interviews/model";
 
 const RealtimeInterviewPanel = dynamic(() =>
   import("@/components/mock-interviews/realtime-interview-panel").then(
@@ -65,26 +59,16 @@ type InterviewWorkspaceInput = {
   codeSnapshot: string;
   codingLanguage: "java" | "python";
   codingWorkspaceEnabled: boolean;
-  difficultyMode: string;
   durationMinutes: number;
   effectiveElapsedSeconds: number;
   id: string;
-  interviewerLevel: InterviewerLevel;
+  initialRecentTranscript: RealtimeTranscriptEntry[];
   interviewLanguage: InterviewLanguage;
-  phaseEvents: InterviewPhaseGuideEvent[];
+  questionPrompt: string;
   realtimeEnabled: boolean;
-  realtimeEvidenceEventIds: string[];
   realtimeProvider: RealtimeInterviewProviderName | null;
-  realtimeTranscript: RealtimeTranscriptEntry[];
   scratchpad: string;
   phase: MockInterviewPhase;
-  problem: {
-    canonicalUrl: string;
-    difficulty: string;
-    externalId: string;
-    questionContent: LearnerVisibleQuestionContent | null;
-    title: string;
-  };
   startedAt: string;
   timerRunning: boolean;
   workspaceVersion: number;
@@ -100,26 +84,32 @@ export function MockInterviewWorkspace({
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState(interview.phase);
-  const [phaseEvents, setPhaseEvents] = useState(interview.phaseEvents);
+  const [phaseEvents, setPhaseEvents] = useState<InterviewPhaseGuideEvent[]>(
+    [],
+  );
   const [seconds, setSeconds] = useState(interview.effectiveElapsedSeconds);
   const [running, setRunning] = useState(interview.timerRunning);
+  const [sessionStartedAt, setSessionStartedAt] = useState(interview.startedAt);
   const [message, setMessage] = useState("");
   const [realtimeContext, setRealtimeContext] =
     useState<RealtimeContextUpdate | null>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [recentTranscript, setRecentTranscript] = useState(
+    interview.initialRecentTranscript.slice(-6),
+  );
   const [isPending, runAction] = useTransition();
   const textDirection = interviewTextDirection(interview.interviewLanguage);
 
-  const authoritativeElapsedSeconds = () =>
-    Math.min(
+  const authoritativeElapsedSeconds = () => {
+    if (!running) return seconds;
+    return Math.min(
       14_400,
       Math.max(
         seconds,
-        Math.floor(
-          (Date.now() - new Date(interview.startedAt).getTime()) / 1_000,
-        ),
+        Math.floor((Date.now() - new Date(sessionStartedAt).getTime()) / 1_000),
       ),
     );
+  };
 
   useEffect(() => {
     if (!running) return;
@@ -135,6 +125,10 @@ export function MockInterviewWorkspace({
     spaceComplexity?: string;
     timeComplexity?: string;
   }) => {
+    if (!realtimeConnected) {
+      setMessage("Reconnect the live interviewer before continuing.");
+      return;
+    }
     const index = MOCK_INTERVIEW_PHASES.indexOf(phase);
     const target = MOCK_INTERVIEW_PHASES[index + 1];
     if (!target || target === "completed") return;
@@ -165,26 +159,18 @@ export function MockInterviewWorkspace({
         id: crypto.randomUUID(),
         phase: sourcePhase,
       });
-      setPhaseEvents((current) =>
-        mergePhaseGuideEvents(current, [
-          {
-            displaySummary: summarizePhaseEvidence(
-              sourcePhase as Exclude<MockInterviewPhase, "completed">,
-              input,
-            ),
-            id: crypto.randomUUID(),
-            phase: sourcePhase as Exclude<MockInterviewPhase, "completed">,
-            suggestedPhase: null,
-            transitionType: "completed",
-          },
-        ]),
-      );
       setPhase(target);
       if (target === "retrospective") setRunning(false);
     });
   };
 
   const complete = (input: Record<string, unknown>) => {
+    if (!realtimeConnected) {
+      setMessage(
+        "Reconnect the live interviewer before completing the interview.",
+      );
+      return;
+    }
     setMessage("");
     runAction(async () => {
       const result = await completeMockInterviewAction(interview.id, {
@@ -202,34 +188,14 @@ export function MockInterviewWorkspace({
 
   const targetSeconds = interview.durationMinutes * 60;
   const remaining = targetSeconds - seconds;
-  const guideEvents = mergePhaseGuideEvents(phaseEvents, interview.phaseEvents);
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-primary text-sm font-semibold">Mock interview</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">
-            {interview.problem.title}
-          </h1>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>#{interview.problem.externalId}</Badge>
-            <Badge className="capitalize">{interview.problem.difficulty}</Badge>
-            <Badge variant="primary">
-              <ShieldQuestion aria-hidden="true" className="size-3.5" />
-              Topic hidden
-            </Badge>
-            <Badge>Hints disabled</Badge>
-            <Badge
-              variant={
-                interview.interviewerLevel === "faang_tough"
-                  ? "warning"
-                  : "neutral"
-              }
-            >
-              {interviewerLevelLabels[interview.interviewerLevel]}
-            </Badge>
-          </div>
-        </div>
+      <InterviewPhaseGuide currentPhase={phase} events={phaseEvents} />
+
+      <header className="flex items-center justify-between gap-4">
+        <p className="text-primary text-sm font-semibold">
+          Mock interview in progress
+        </p>
         <div className="flex flex-wrap items-center gap-3">
           <div
             aria-live="polite"
@@ -246,13 +212,52 @@ export function MockInterviewWorkspace({
         </div>
       </header>
 
-      <InterviewQuestionPanel
-        canonicalUrl={interview.problem.canonicalUrl}
-        content={interview.problem.questionContent}
-        difficulty={interview.problem.difficulty}
-        remainingLabel={`${remaining < 0 ? "Overtime" : "Remaining"} ${formatClock(Math.abs(remaining))}`}
-        title={interview.problem.title}
-      />
+      <InterviewQuestionPanel prompt={interview.questionPrompt} />
+
+      {interview.realtimeEnabled ? (
+        <RealtimeInterviewPanel
+          contextUpdate={realtimeContext}
+          interviewId={interview.id}
+          onConnectionStateChange={(state) =>
+            setRealtimeConnected(state === "connected")
+          }
+          onPhaseSuggestionRecorded={(suggestion) => {
+            setPhaseEvents((current) =>
+              mergePhaseGuideEvents(current, [
+                {
+                  displaySummary: "",
+                  id: suggestion.eventId,
+                  phase: suggestion.expectedCurrentPhase as Exclude<
+                    MockInterviewPhase,
+                    "completed"
+                  >,
+                  suggestedPhase: suggestion.suggestedNextPhase as Exclude<
+                    MockInterviewPhase,
+                    "completed"
+                  >,
+                  transitionType: "suggested",
+                },
+              ]),
+            );
+          }}
+          onTranscript={(entry) => {
+            setRecentTranscript((current) =>
+              [...current.filter((item) => item.id !== entry.id), entry].slice(
+                -6,
+              ),
+            );
+          }}
+          onVoiceActivated={(activation) => {
+            setSessionStartedAt(activation.startedAt);
+            setSeconds(activation.elapsedSeconds);
+            setRunning(activation.timerRunning);
+          }}
+          phase={phase}
+          providerName={interview.realtimeProvider ?? "openai"}
+        />
+      ) : null}
+
+      <RecentInterviewConversation entries={recentTranscript} />
 
       {interview.codingWorkspaceEnabled ? (
         <InterviewCodingWorkspace
@@ -276,61 +281,11 @@ export function MockInterviewWorkspace({
               },
             });
             if (submission.advanceToTesting) {
-              setPhaseEvents((current) =>
-                mergePhaseGuideEvents(current, [
-                  {
-                    displaySummary: summarizePhaseEvidence("implementation", {
-                      codingLanguage: submission.language,
-                      workspaceVersion: submission.snapshotVersion,
-                    }),
-                    id: crypto.randomUUID(),
-                    phase: "implementation",
-                    suggestedPhase: null,
-                    transitionType: "completed",
-                  },
-                ]),
-              );
               setPhase("testing");
             }
           }}
           phase={phase}
-          startedAt={interview.startedAt}
-        />
-      ) : null}
-
-      <InterviewPhaseGuide currentPhase={phase} events={guideEvents} />
-
-      {interview.realtimeEnabled ? (
-        <RealtimeInterviewPanel
-          contextUpdate={realtimeContext}
-          initialEvidenceEventIds={interview.realtimeEvidenceEventIds}
-          initialTranscript={interview.realtimeTranscript}
-          interviewId={interview.id}
-          onConnectionStateChange={(state) =>
-            setRealtimeConnected(state === "connected")
-          }
-          onPhaseSuggestionRecorded={(suggestion) => {
-            setPhaseEvents((current) =>
-              mergePhaseGuideEvents(current, [
-                {
-                  displaySummary: `Interviewer suggested ${suggestion.suggestedNextPhase.replaceAll("_", " ")}. Review the evidence and confirm manually.`,
-                  id: suggestion.eventId,
-                  phase: suggestion.expectedCurrentPhase as Exclude<
-                    MockInterviewPhase,
-                    "completed"
-                  >,
-                  suggestedPhase: suggestion.suggestedNextPhase as Exclude<
-                    MockInterviewPhase,
-                    "completed"
-                  >,
-                  transitionType: "suggested",
-                },
-              ]),
-            );
-          }}
-          phase={phase}
-          providerName={interview.realtimeProvider ?? "openai"}
-          textDirection={textDirection}
+          startedAt={sessionStartedAt}
         />
       ) : null}
 
@@ -346,7 +301,7 @@ export function MockInterviewWorkspace({
       <InterviewPhase
         codingLanguage={interview.codingLanguage}
         codingWorkspaceEnabled={interview.codingWorkspaceEnabled}
-        disabled={isPending}
+        disabled={isPending || !realtimeConnected}
         initialCode={interview.codeSnapshot}
         onAdvance={advance}
         onComplete={complete}

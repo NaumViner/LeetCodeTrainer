@@ -49,19 +49,19 @@ describe("interview phase guide", () => {
     );
   });
 
-  it("renders an accessible current step and separates the guide from scoring", () => {
+  it("renders compact phase-name-only tiles with accessible state", () => {
     render(<InterviewPhaseGuide currentPhase="clarify" events={events} />);
-    expect(
-      screen.getByRole("heading", { name: "Interview process guide" }),
-    ).toBeVisible();
-    expect(screen.getByText(/Final scoring remains separate/)).toBeVisible();
-    expect(
-      screen.getByText("You are here", { selector: "span" }),
-    ).toBeVisible();
-    expect(screen.getByText("Needs confirmation")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Guiding star" })).toBeVisible();
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent(
       "Clarify",
     );
+    expect(screen.getByText("Current step")).toHaveClass("sr-only");
+    expect(screen.getByText("Needs confirmation")).toHaveClass("sr-only");
+    expect(
+      screen.queryByText(/Resolve constraints, edge cases/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Captured:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Final scoring/i)).not.toBeInTheDocument();
   });
 
   it("creates bounded deterministic summaries from saved evidence", () => {

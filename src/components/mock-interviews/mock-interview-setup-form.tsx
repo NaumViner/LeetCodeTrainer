@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, LockKeyhole } from "lucide-react";
-import { useActionState, useState } from "react";
+import { type FormEvent, useActionState, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form-field";
@@ -53,6 +53,7 @@ export function MockInterviewSetupForm({
   recommendedDurationMinutes = "30",
   selectionModesEnabled = true,
   setup,
+  voiceAvailable = true,
 }: {
   defaultCodingLanguage?: "java" | "python";
   defaultDurationMinutes?: "30" | "45" | "60";
@@ -61,6 +62,7 @@ export function MockInterviewSetupForm({
   recommendedDurationMinutes?: "30" | "45" | "60";
   selectionModesEnabled?: boolean;
   setup: SelectionSetup;
+  voiceAvailable?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     startMockInterviewAction,
@@ -82,11 +84,14 @@ export function MockInterviewSetupForm({
   );
   const [customDifficulty, setCustomDifficulty] =
     useState<InterviewDifficulty>("easy");
+  const [microphoneError, setMicrophoneError] = useState("");
+  const microphonePreflightPassedRef = useRef(false);
   const selectedTopic = setup.topics.find(
     (topic) => topic.id === requestedTopicId,
   );
   const customInventory = selectedTopic?.inventory[customDifficulty] ?? 0;
   const blocked =
+    !voiceAvailable ||
     (selectionMode === "improvement" && !setup.improvement.available) ||
     ((selectionMode === "coverage" || selectionMode === "improvement") &&
       selectedDifficulties.length === 0) ||
@@ -105,6 +110,28 @@ export function MockInterviewSetupForm({
             (item) => item === difficulty || current.includes(item),
           ),
     );
+  }
+
+  async function preflightMicrophone(event: FormEvent<HTMLFormElement>) {
+    if (microphonePreflightPassedRef.current) return;
+    event.preventDefault();
+    setMicrophoneError("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicrophoneError(
+        "This browser cannot provide the microphone access required for a mock interview.",
+      );
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const track of stream.getTracks()) track.stop();
+      microphonePreflightPassedRef.current = true;
+      event.currentTarget.requestSubmit();
+    } catch {
+      setMicrophoneError(
+        "Microphone access is required. Allow it in the browser and try again.",
+      );
+    }
   }
 
   return (
@@ -152,7 +179,21 @@ export function MockInterviewSetupForm({
         </p>
       </div>
 
-      <form action={formAction} className="mt-6 space-y-7">
+      <form
+        action={formAction}
+        className="mt-6 space-y-7"
+        onSubmit={preflightMicrophone}
+      >
+        <section
+          className={`rounded-xl border p-4 ${voiceAvailable ? "bg-primary-soft" : "bg-danger-soft text-danger"}`}
+        >
+          <p className="font-semibold">Full voice interview</p>
+          <p className="mt-1 text-sm leading-6">
+            {voiceAvailable
+              ? "A live microphone connection is required for the entire interview. The browser will verify access before creating the session."
+              : "Mock interviews are unavailable until a realtime voice provider is configured."}
+          </p>
+        </section>
         {selectionModesEnabled ? (
           <fieldset>
             <legend className="text-base font-semibold">
@@ -403,6 +444,15 @@ export function MockInterviewSetupForm({
             role="alert"
           >
             {state.message}
+          </p>
+        ) : null}
+        {microphoneError ? (
+          <p
+            aria-live="polite"
+            className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
+            role="alert"
+          >
+            {microphoneError}
           </p>
         ) : null}
         {aboveRecommendation ? (

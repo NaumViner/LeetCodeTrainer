@@ -28,6 +28,8 @@ type GeminiSessionCredentials = {
   voice: string;
 };
 
+export const GEMINI_EPHEMERAL_LIVE_API_VERSION = "v1alpha";
+
 export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
   private captureContext: AudioContext | null = null;
   private captureProcessor: ScriptProcessorNode | null = null;
@@ -131,11 +133,11 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     if (!credentials) throw new Error("The Gemini session is unavailable.");
     const ai = new GoogleGenAI({
       apiKey: credentials.token,
-      httpOptions: { apiVersion: "v1beta" },
+      httpOptions: { apiVersion: GEMINI_EPHEMERAL_LIVE_API_VERSION },
     });
     const session = await ai.live.connect({
       callbacks: {
-        onclose: () => this.handleClose(),
+        onclose: (event) => this.handleClose(event),
         onerror: (event) => {
           this.input?.onStateChange(
             "error",
@@ -350,7 +352,7 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     });
   }
 
-  private handleClose() {
+  private handleClose(event?: CloseEvent) {
     this.session = null;
     this.input?.onSpeakingChange(false);
     if (this.intentionalClose || this.reconnecting) return;
@@ -366,8 +368,17 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
       });
       return;
     }
-    this.input?.onStateChange("disconnected");
+    this.input?.onStateChange("disconnected", describeGeminiClose(event));
   }
+}
+
+function describeGeminiClose(event?: CloseEvent) {
+  if (!event || (event.code === 1000 && !event.reason)) return undefined;
+  const code = event.code ? ` (code ${event.code})` : "";
+  const reason = event.reason.trim();
+  return reason
+    ? `Gemini closed the voice connection${code}: ${reason}`
+    : `Gemini closed the voice connection${code}.`;
 }
 
 async function requestGeminiSession(interviewId: string) {

@@ -1,5 +1,7 @@
 # Interview Selection and Workspace Expansion — LLM Action Plan
 
+> Historical plan. Active mock-interview display, full-voice enforcement, evidence visibility, and Review behavior are superseded by [full-voice-mock-interview-redesign-action-plan.md](full-voice-mock-interview-redesign-action-plan.md).
+
 ## Purpose
 
 This document instructs an implementation LLM to extend the interview-first product with:

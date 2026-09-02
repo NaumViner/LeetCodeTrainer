@@ -15,7 +15,10 @@ import {
 } from "@/domain/interview-selection";
 import { requireAuthenticatedUser } from "@/features/auth/session";
 import { evaluateAndPersistCompletedInterview } from "@/features/interview-evaluation/service";
-import { getActiveMockInterview } from "@/features/mock-interviews/queries";
+import {
+  getActiveMockInterview,
+  getOwnedActiveMockInterview,
+} from "@/features/mock-interviews/queries";
 import {
   canUseInterviewSelectionMode,
   getInterviewRolloutConfig,
@@ -42,6 +45,7 @@ import { getProfile } from "@/features/profile/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
 import { recordOperationalEvent } from "@/lib/operational-events";
+import { isRealtimeInterviewEnabled } from "@/features/realtime-interviews/config";
 
 export async function startMockInterviewAction(
   _previousState: MockInterviewStartActionState,
@@ -71,6 +75,17 @@ export async function startMockInterviewAction(
   }
 
   const rollout = getInterviewRolloutConfig();
+  if (!rollout.promptContentEnabled || !isRealtimeInterviewEnabled()) {
+    recordOperationalEvent("mock_interview_start_rejected", {
+      latencyMs: Date.now() - startedAt,
+      reason: "full_voice_unavailable",
+    });
+    return {
+      message:
+        "Mock interviews require an approved prompt and a configured live voice provider.",
+      status: "error",
+    };
+  }
   if (!canUseInterviewSelectionMode(rollout, setup.data.selectionMode)) {
     recordOperationalEvent("mock_interview_start_rejected", {
       latencyMs: Date.now() - startedAt,
@@ -88,7 +103,7 @@ export async function startMockInterviewAction(
   if (!profile?.onboarding_completed) redirect("/onboarding");
   if (!profile.diagnostic_completed) redirect("/diagnostic");
   const [activeInterview, activeAttempt] = await Promise.all([
-    getActiveMockInterview(user.id),
+    getActiveMockInterview(),
     getActiveAttempt(user.id),
   ]);
   if (activeInterview) redirect(`/interviews/${activeInterview.id}`);
@@ -424,16 +439,26 @@ export async function abandonMockInterviewAction(formData: FormData) {
   if (!id.success) throw new Error("The mock interview is invalid.");
   await requireAuthenticatedUser();
   const supabase = await createClient();
+  const interview = await getOwnedActiveMockInterview(id.data);
+  if (!interview) {
+    throw new Error("The mock interview could not be ended.");
+  }
+  const pendingVoice = !interview.voiceActivated;
   const { error } = await supabase.rpc("abandon_mock_interview", {
     p_mock_interview_id: id.data,
   });
   if (error) throw new Error("The mock interview could not be ended.");
-  recordOperationalEvent("mock_interview_abandoned", {
-    interviewId: id.data,
-  });
+  recordOperationalEvent(
+    pendingVoice
+      ? "mock_interview_voice_pending_cancelled"
+      : "mock_interview_abandoned",
+    {
+      interviewId: id.data,
+    },
+  );
   revalidatePath("/interviews");
   revalidatePath("/interviews/history");
-  redirect("/interviews/history");
+  redirect(pendingVoice ? "/interviews" : "/interviews/history");
 }
 
 export async function deleteMockInterviewAction(

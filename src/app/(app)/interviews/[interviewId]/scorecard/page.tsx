@@ -1,10 +1,4 @@
-import {
-  ArrowRight,
-  CheckCircle2,
-  Lightbulb,
-  MessageCircle,
-  Target,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Lightbulb, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -15,9 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { buildInterviewPerformanceProfile } from "@/domain/interview-profile";
 import {
-  interviewTextDirection,
   interviewerLevelLabels,
-  normalizeInterviewLanguage,
   normalizeInterviewerLevel,
 } from "@/domain/mock-interview";
 import { requireAuthenticatedUser } from "@/features/auth/session";
@@ -110,12 +102,23 @@ export default async function MockInterviewScorecardPage({
             <p className="mt-1 text-xl font-semibold">
               {interview.problem.primaryTopic.name}
             </p>
-            <p className="text-muted mt-1 text-sm">{interview.problem.title}</p>
           </div>
         </div>
         <p className="text-muted mt-5 text-xs">
           Training estimate, not a prediction of interview outcome.
         </p>
+        <nav
+          aria-label="Interview result views"
+          className="mt-5 flex flex-wrap gap-2"
+        >
+          <span className={buttonVariants()}>Scorecard</span>
+          <Link
+            className={buttonVariants({ variant: "secondary" })}
+            href={`/interviews/${interview.id}/review`}
+          >
+            Review interview
+          </Link>
+        </nav>
       </div>
       {evaluation?.success && interview.evaluation ? (
         <Card>
@@ -275,57 +278,6 @@ export default async function MockInterviewScorecardPage({
           </CardContent>
         </Card>
       </div>
-      {interview.realtimeSession ? (
-        <Card>
-          <CardContent className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <MessageCircle
-                aria-hidden="true"
-                className="text-primary size-5"
-              />
-              <h2 className="text-xl font-semibold">Voice interview record</h2>
-              <Badge variant="primary">Transcript saved</Badge>
-            </div>
-            {interview.realtimeSession.summary ? (
-              <p className="text-muted mt-3 text-sm leading-6">
-                {interview.realtimeSession.summary}
-              </p>
-            ) : null}
-            <div
-              className="bg-surface-subtle mt-5 max-h-96 space-y-4 overflow-y-auto rounded-xl border p-4"
-              dir={interviewTextDirection(
-                normalizeInterviewLanguage(interview.interview_language),
-              )}
-            >
-              {interview.realtimeEvents
-                .filter((event) =>
-                  ["user_transcript", "assistant_transcript"].includes(
-                    event.event_type,
-                  ),
-                )
-                .map((event) => (
-                  <div key={event.id}>
-                    <p className="text-muted text-xs font-semibold uppercase">
-                      {event.event_type === "user_transcript"
-                        ? "You"
-                        : "Interviewer"}
-                    </p>
-                    <p className="mt-1 text-sm leading-6">{event.content}</p>
-                  </div>
-                ))}
-              {interview.realtimeEvents.every(
-                (event) =>
-                  event.event_type !== "user_transcript" &&
-                  event.event_type !== "assistant_transcript",
-              ) ? (
-                <p className="text-muted text-sm">
-                  No completed transcript turns were recorded.
-                </p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
       <Card>
         <CardContent className="p-6">
           <h2 className="font-semibold">Pattern reveal</h2>
@@ -355,10 +307,7 @@ export default async function MockInterviewScorecardPage({
             >
               Open interview profile
             </Link>
-            <DeleteInterviewForm
-              interviewId={interview.id}
-              interviewTitle={interview.problem.title}
-            />
+            <DeleteInterviewForm interviewId={interview.id} />
           </div>
         </CardContent>
       </Card>
