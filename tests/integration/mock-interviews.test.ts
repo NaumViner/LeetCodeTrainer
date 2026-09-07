@@ -75,6 +75,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   let problemTopicId = "";
   const problemIdsByDifficulty = new Map<string, string>();
   let interviewId = "";
+  let interviewerTranscriptEventId = 0;
   let introEvidenceEventId = 0;
   let lastAbandonedInterviewId = "";
   let masteryBeforeCompletedInterview: number | null = null;
@@ -395,9 +396,19 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   });
 
   it("persists a private realtime transcript and code context", async () => {
-    const { data: sessionId, error: sessionError } = await learner.rpc(
-      "begin_realtime_interview_session",
+    const connectionAttemptId = randomUUID();
+    const { error: preparationError } = await learner.rpc(
+      "prepare_realtime_interview_connection",
       {
+        p_connection_attempt_id: connectionAttemptId,
+        p_mock_interview_id: interviewId,
+      },
+    );
+    expect(preparationError).toBeNull();
+    const { data: confirmation, error: sessionError } = await learner.rpc(
+      "confirm_realtime_interview_connection",
+      {
+        p_connection_attempt_id: connectionAttemptId,
         p_mock_interview_id: interviewId,
         p_model: "gpt-realtime",
         p_provider: "openai",
@@ -405,7 +416,9 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       },
     );
     expect(sessionError).toBeNull();
-    realtimeSessionId = sessionId!;
+    realtimeSessionId = String(
+      (confirmation as { realtimeSessionId: string }).realtimeSessionId,
+    );
     const { data: activation, error: activationError } = await learner.rpc(
       "activate_voice_mock_interview",
       { p_mock_interview_id: interviewId },
@@ -438,6 +451,9 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       );
       expect(error, eventType).toBeNull();
       if (eventType === "user_transcript") introEvidenceEventId = data!;
+      if (eventType === "assistant_transcript") {
+        interviewerTranscriptEventId = data!;
+      }
     }
     const { data: events } = await learner
       .from("realtime_interview_events")
@@ -476,6 +492,114 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     expect(
       (await other.from("realtime_interview_events").select("*")).data,
     ).toEqual([]);
+  });
+
+  it("tracks the latest accepted conversational phase without affecting workflow", async () => {
+    const { data: context, error: contextError } = await learner.rpc(
+      "get_interview_phase_classification_context",
+      {
+        p_mock_interview_id: interviewId,
+        p_transcript_event_id: interviewerTranscriptEventId,
+      },
+    );
+    expect(contextError).toBeNull();
+    expect(context).toMatchObject({
+      currentObservedPhase: "intro",
+      triggerEventId: String(interviewerTranscriptEventId),
+      workflowPhase: "intro",
+    });
+    expect((context as { transcript: unknown[] }).transcript).toHaveLength(2);
+
+    const { data: implementation, error: implementationError } =
+      await learner.rpc("record_mock_interview_phase_observation", {
+        p_confidence: 0.91,
+        p_mock_interview_id: interviewId,
+        p_observed_phase: "implementation",
+        p_signal: "explicit",
+        p_transcript_event_id: interviewerTranscriptEventId,
+      });
+    expect(implementationError).toBeNull();
+    expect(implementation).toMatchObject({
+      accepted: true,
+      observedPhase: "implementation",
+      observedPhaseEventId: String(interviewerTranscriptEventId),
+    });
+
+    const { data: staleResult, error: staleError } = await learner.rpc(
+      "record_mock_interview_phase_observation",
+      {
+        p_confidence: 0.95,
+        p_mock_interview_id: interviewId,
+        p_observed_phase: "clarify",
+        p_signal: "explicit",
+        p_transcript_event_id: introEvidenceEventId,
+      },
+    );
+    expect(staleError).toBeNull();
+    expect(staleResult).toMatchObject({
+      accepted: true,
+      observedPhase: "implementation",
+      observedPhaseEventId: String(interviewerTranscriptEventId),
+    });
+
+    const { data: ambiguousEventId, error: ambiguousEventError } =
+      await learner.rpc("append_realtime_interview_event", {
+        p_content: "Maybe later we can discuss testing.",
+        p_event_type: "user_transcript",
+        p_mock_interview_id: interviewId,
+        p_phase: "intro",
+      });
+    expect(ambiguousEventError).toBeNull();
+    const { data: ambiguousResult, error: ambiguousError } = await learner.rpc(
+      "record_mock_interview_phase_observation",
+      {
+        p_confidence: 0.99,
+        p_mock_interview_id: interviewId,
+        p_observed_phase: "testing",
+        p_signal: "ambiguous",
+        p_transcript_event_id: ambiguousEventId!,
+      },
+    );
+    expect(ambiguousError).toBeNull();
+    expect(ambiguousResult).toMatchObject({
+      accepted: false,
+      observedPhase: "implementation",
+    });
+
+    expect(
+      (
+        await other.rpc("get_interview_phase_classification_context", {
+          p_mock_interview_id: interviewId,
+          p_transcript_event_id: interviewerTranscriptEventId,
+        })
+      ).error,
+    ).not.toBeNull();
+    expect(
+      (
+        await other.rpc("record_mock_interview_phase_observation", {
+          p_confidence: 0.99,
+          p_mock_interview_id: interviewId,
+          p_observed_phase: "testing",
+          p_signal: "explicit",
+          p_transcript_event_id: interviewerTranscriptEventId,
+        })
+      ).error,
+    ).not.toBeNull();
+    expect(
+      (await learner.from("mock_interview_phase_observations").select("*"))
+        .error,
+    ).not.toBeNull();
+
+    const { data: snapshot, error: snapshotError } = await learner.rpc(
+      "get_owned_active_mock_interview",
+      { p_mock_interview_id: interviewId },
+    );
+    expect(snapshotError).toBeNull();
+    expect(snapshot).toMatchObject({
+      observedPhase: "implementation",
+      observedPhaseEventId: String(interviewerTranscriptEventId),
+      phase: "intro",
+    });
   });
 
   it("rejects phase skipping and persists every ordered stage", async () => {
@@ -739,7 +863,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .single();
     expect(realtimeSession?.status).toBe("completed");
     expect(realtimeSession?.ended_at).not.toBeNull();
-    expect(realtimeSession?.summary).toContain("1 learner turns");
+    expect(realtimeSession?.summary).toContain("2 learner turns");
     expect(scorecard?.overall_score).toBeLessThan(60);
     expect(scorecard?.improvements.length).toBeGreaterThan(0);
     const { data: mastery } = await learner
@@ -1063,6 +1187,8 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       eventResult,
       submissionResult,
       phaseEventResult,
+      conversationStateResult,
+      conversationEventResult,
       masteryResult,
     ] = await Promise.all([
       learner
@@ -1095,6 +1221,14 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         .select("id")
         .eq("mock_interview_id", interviewId),
       learner
+        .from("mock_interview_conversation_state")
+        .select("mock_interview_id")
+        .eq("mock_interview_id", interviewId),
+      learner
+        .from("mock_interview_conversation_events")
+        .select("id")
+        .eq("mock_interview_id", interviewId),
+      learner
         .from("topic_mastery")
         .select("mock_interview_count, last_interviewed_at, overall_score")
         .eq("topic_id", problemTopicId)
@@ -1107,6 +1241,8 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     expect(eventResult.data).toEqual([]);
     expect(submissionResult.data).toEqual([]);
     expect(phaseEventResult.data).toEqual([]);
+    expect(conversationStateResult.data).toEqual([]);
+    expect(conversationEventResult.data).toEqual([]);
     expect(masteryResult.data).toMatchObject({
       last_interviewed_at: null,
       mock_interview_count: 0,
@@ -1126,6 +1262,556 @@ describe.sequential("mock interview lifecycle and isolation", () => {
           .eq("id", lastAbandonedInterviewId)
       ).data,
     ).toEqual([]);
+  });
+
+  it("persists live control state, restores reconnects, and enforces one follow-up", async () => {
+    const { data: controlledInterviewId, error: startError } =
+      await learner.rpc("start_mock_interview", {
+        p_difficulty_mode: "easy",
+        p_duration_minutes: 45,
+        p_interview_language: "english",
+        p_interviewer_level: "faang_tough",
+        p_problem_id: problemId,
+      });
+    expect(startError).toBeNull();
+
+    const failedAttemptId = randomUUID();
+    const confirmedAttemptId = randomUUID();
+    const competingAttemptId = randomUUID();
+    const resumedAttemptId = randomUUID();
+    const { data: firstConnection, error: firstConnectionError } =
+      await learner.rpc("prepare_realtime_interview_connection", {
+        p_connection_attempt_id: failedAttemptId,
+        p_mock_interview_id: controlledInterviewId!,
+      });
+    expect(firstConnectionError).toBeNull();
+    expect(firstConnection).toMatchObject({
+      connectionAttemptId: failedAttemptId,
+      connectionCount: 0,
+      connectionMode: "start",
+      lifecycle: "primary_question",
+      observedPhase: null,
+      questionCycle: "primary",
+    });
+    expect(
+      (
+        await learner
+          .from("mock_interview_conversation_state")
+          .select("mock_interview_id")
+          .eq("mock_interview_id", controlledInterviewId!)
+      ).data,
+    ).toEqual([]);
+    expect(
+      (
+        await learner
+          .from("mock_interview_conversation_events")
+          .select("id")
+          .eq("mock_interview_id", controlledInterviewId!)
+      ).data,
+    ).toEqual([]);
+
+    expect(
+      (
+        await learner.rpc("prepare_realtime_interview_connection", {
+          p_connection_attempt_id: confirmedAttemptId,
+          p_mock_interview_id: controlledInterviewId!,
+        })
+      ).error,
+    ).not.toBeNull();
+    expect(
+      (
+        await learner.rpc("cancel_realtime_interview_connection", {
+          p_connection_attempt_id: failedAttemptId,
+          p_mock_interview_id: controlledInterviewId!,
+          p_reason_code: "provider_connection_failed",
+        })
+      ).data,
+    ).toBe(true);
+
+    const competingStarts = await Promise.all([
+      learner.rpc("prepare_realtime_interview_connection", {
+        p_connection_attempt_id: confirmedAttemptId,
+        p_mock_interview_id: controlledInterviewId!,
+      }),
+      learner.rpc("prepare_realtime_interview_connection", {
+        p_connection_attempt_id: competingAttemptId,
+        p_mock_interview_id: controlledInterviewId!,
+      }),
+    ]);
+    const successfulStarts = competingStarts.filter((result) => !result.error);
+    expect(successfulStarts).toHaveLength(1);
+    expect(competingStarts.filter((result) => result.error)).toHaveLength(1);
+    const retriedStart = successfulStarts[0]!.data;
+    const winningStartAttemptId = (
+      retriedStart as { connectionAttemptId: string }
+    ).connectionAttemptId;
+    expect(retriedStart).toMatchObject({
+      connectionCount: 0,
+      connectionMode: "start",
+    });
+    const firstConfirmation = await learner.rpc(
+      "confirm_realtime_interview_connection",
+      {
+        p_connection_attempt_id: winningStartAttemptId,
+        p_mock_interview_id: controlledInterviewId!,
+        p_model: "test-live-model",
+        p_provider: "gemini",
+      },
+    );
+    expect(firstConfirmation.data).toMatchObject({
+      connectionCount: 1,
+      connectionMode: "start",
+    });
+    expect(
+      (
+        await learner.rpc("confirm_realtime_interview_connection", {
+          p_connection_attempt_id: winningStartAttemptId,
+          p_mock_interview_id: controlledInterviewId!,
+          p_model: "test-live-model",
+          p_provider: "gemini",
+        })
+      ).data,
+    ).toEqual(firstConfirmation.data);
+    expect(
+      (
+        await learner.rpc("activate_voice_mock_interview", {
+          p_mock_interview_id: controlledInterviewId!,
+        })
+      ).error,
+    ).toBeNull();
+    const { data: transcriptEventId, error: transcriptError } =
+      await learner.rpc("append_realtime_interview_event", {
+        p_content: "I will now describe the complete algorithm.",
+        p_event_type: "user_transcript",
+        p_mock_interview_id: controlledInterviewId!,
+        p_phase: "optimization",
+      });
+    expect(transcriptError).toBeNull();
+
+    const { data: resumedConnection, error: resumedConnectionError } =
+      await learner.rpc("prepare_realtime_interview_connection", {
+        p_connection_attempt_id: resumedAttemptId,
+        p_mock_interview_id: controlledInterviewId!,
+      });
+    expect(resumedConnectionError).toBeNull();
+    expect(resumedConnection).toMatchObject({
+      connectionAttemptId: resumedAttemptId,
+      connectionCount: 1,
+      connectionMode: "resume",
+      recentTranscript: [
+        expect.objectContaining({
+          questionCycle: "primary",
+          text: "I will now describe the complete algorithm.",
+        }),
+      ],
+    });
+    expect(
+      (
+        await learner.rpc("confirm_realtime_interview_connection", {
+          p_connection_attempt_id: resumedAttemptId,
+          p_mock_interview_id: controlledInterviewId!,
+          p_model: "test-live-model",
+          p_provider: "gemini",
+        })
+      ).data,
+    ).toMatchObject({ connectionCount: 2, connectionMode: "resume" });
+    expect(
+      (
+        await other.rpc("prepare_realtime_interview_connection", {
+          p_connection_attempt_id: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+        })
+      ).error,
+    ).not.toBeNull();
+
+    const stageCallId = randomUUID();
+    const { data: stage, error: stageError } = await learner.rpc(
+      "execute_realtime_interview_control",
+      {
+        p_idempotency_key: stageCallId,
+        p_mock_interview_id: controlledInterviewId!,
+        p_payload: {
+          phase: "optimization",
+          questionCycle: "primary",
+          reasonCode: "optimized_plan_discussed",
+          signal: "explicit",
+          transcriptEventId: String(transcriptEventId),
+        },
+        p_tool_name: "report_current_stage",
+      },
+    );
+    expect(stageError).toBeNull();
+    expect(stage).toMatchObject({
+      accepted: true,
+      observedPhase: "optimization",
+    });
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: stageCallId,
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: {
+            phase: "intro",
+            questionCycle: "primary",
+            reasonCode: "changed_retry_payload",
+            signal: "inferred",
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "report_current_stage",
+        })
+      ).data,
+    ).toEqual(stage);
+    expect(
+      (
+        await admin
+          .from("mock_interview_control_receipts")
+          .select("id", { count: "exact" })
+          .eq("mock_interview_id", controlledInterviewId!)
+          .eq("tool_name", "report_current_stage")
+          .eq("idempotency_key", stageCallId)
+      ).count,
+    ).toBe(1);
+    expect(
+      (
+        await learner.rpc("record_live_interview_stage", {
+          p_mock_interview_id: controlledInterviewId!,
+          p_observed_phase: "intro",
+          p_question_cycle: "primary",
+          p_reason_code: "bypass_attempt",
+          p_signal: "inferred",
+          p_transcript_event_id: transcriptEventId!,
+        })
+      ).error,
+    ).not.toBeNull();
+
+    const { data: implementationEventId, error: implementationEventError } =
+      await learner.rpc("append_realtime_interview_event", {
+        p_content: "I am ready to implement the described algorithm.",
+        p_event_type: "user_transcript",
+        p_mock_interview_id: controlledInterviewId!,
+        p_phase: "implementation",
+      });
+    expect(implementationEventError).toBeNull();
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: {
+            phase: "implementation",
+            questionCycle: "primary",
+            reasonCode: "implementation_started",
+            signal: "explicit",
+            transcriptEventId: String(implementationEventId),
+          },
+          p_tool_name: "report_current_stage",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("submit_mock_interview_code", {
+          p_advance_to_testing: false,
+          p_code_snapshot: "def solve():\n    return None",
+          p_elapsed_seconds: 2_100,
+          p_expected_version: 0,
+          p_mock_interview_id: controlledInterviewId!,
+          p_scratchpad: "",
+        })
+      ).error,
+    ).toBeNull();
+
+    const partialReadiness = await learner.rpc(
+      "execute_realtime_interview_control",
+      {
+        p_idempotency_key: randomUUID(),
+        p_mock_interview_id: controlledInterviewId!,
+        p_payload: {
+          algorithmComplete: true,
+          complexityConsistent: true,
+          correctnessReasoningComplete: false,
+          edgeCasesAddressed: true,
+          operationOrderComplete: true,
+          reasonCode: "correctness_not_explained",
+          stateComplete: true,
+          transcriptEventId: String(transcriptEventId),
+        },
+        p_tool_name: "report_solution_readiness",
+      },
+    );
+    expect(partialReadiness.error).toBeNull();
+    expect(partialReadiness.data).toMatchObject({ ready: false });
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: {
+            reasonCode: "primary_work_complete",
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "complete_primary_question",
+        })
+      ).error,
+    ).not.toBeNull();
+
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: {
+            algorithmComplete: true,
+            complexityConsistent: true,
+            correctnessReasoningComplete: true,
+            edgeCasesAddressed: true,
+            operationOrderComplete: true,
+            reasonCode: "complete_solution_stated",
+            stateComplete: true,
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "report_solution_readiness",
+        })
+      ).data,
+    ).toMatchObject({ ready: true });
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: {
+            reasonCode: "primary_work_complete",
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "complete_primary_question",
+        })
+      ).error,
+    ).toBeNull();
+
+    const { data: allowedFollowUp, error: allowedFollowUpError } =
+      await learner.rpc("execute_realtime_interview_control", {
+        p_idempotency_key: randomUUID(),
+        p_mock_interview_id: controlledInterviewId!,
+        p_payload: { reasonCode: "additional_evidence_useful" },
+        p_tool_name: "request_follow_up",
+      });
+    expect(allowedFollowUpError).toBeNull();
+    expect(allowedFollowUp).toMatchObject({
+      allowed: true,
+      lifecycle: "follow_up",
+      questionCycle: "follow_up",
+    });
+    expect(
+      (allowedFollowUp as { remainingSeconds: number }).remainingSeconds,
+    ).toBe(600);
+    expect(
+      (allowedFollowUp as { followUpPrompt: string }).followUpPrompt.length,
+    ).toBeGreaterThan(20);
+
+    const { data: followUpEventId } = await learner.rpc(
+      "append_realtime_interview_event",
+      {
+        p_content: "I completed the follow-up implementation.",
+        p_event_type: "user_transcript",
+        p_mock_interview_id: controlledInterviewId!,
+        p_phase: "implementation",
+      },
+    );
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: {
+            reasonCode: "follow_up_work_complete",
+            transcriptEventId: String(followUpEventId),
+          },
+          p_tool_name: "complete_follow_up_question",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: controlledInterviewId!,
+          p_payload: { reasonCode: "another_follow_up" },
+          p_tool_name: "request_follow_up",
+        })
+      ).error,
+    ).not.toBeNull();
+
+    const { data: conclusion, error: conclusionError } = await learner.rpc(
+      "execute_realtime_interview_control",
+      {
+        p_idempotency_key: randomUUID(),
+        p_mock_interview_id: controlledInterviewId!,
+        p_payload: { reasonCode: "follow_up_complete" },
+        p_tool_name: "conclude_interview",
+      },
+    );
+    expect(conclusionError).toBeNull();
+    expect(conclusion).toMatchObject({ lifecycle: "concluding" });
+    const { data: finalSnapshot } = await learner.rpc(
+      "get_owned_active_mock_interview",
+      { p_mock_interview_id: controlledInterviewId! },
+    );
+    expect(finalSnapshot).toMatchObject({
+      conversationLifecycle: "concluding",
+      followUpPrompt: (allowedFollowUp as { followUpPrompt: string })
+        .followUpPrompt,
+      phase: "retrospective",
+      questionCycle: "follow_up",
+      timerRunning: false,
+    });
+
+    expect(
+      (
+        await learner
+          .from("mock_interview_conversation_state")
+          .update({ lifecycle: "primary_question" })
+          .eq("mock_interview_id", controlledInterviewId!)
+      ).error,
+    ).not.toBeNull();
+    await learner.rpc("abandon_mock_interview", {
+      p_mock_interview_id: controlledInterviewId!,
+    });
+  });
+
+  it("rejects a follow-up at exactly 9:59 remaining", async () => {
+    const { data: boundaryInterviewId, error: startError } = await learner.rpc(
+      "start_mock_interview",
+      {
+        p_difficulty_mode: "easy",
+        p_duration_minutes: 30,
+        p_interview_language: "english",
+        p_interviewer_level: "faang_tough",
+        p_problem_id: problemId,
+      },
+    );
+    expect(startError).toBeNull();
+
+    const attemptId = randomUUID();
+    expect(
+      (
+        await learner.rpc("prepare_realtime_interview_connection", {
+          p_connection_attempt_id: attemptId,
+          p_mock_interview_id: boundaryInterviewId!,
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("confirm_realtime_interview_connection", {
+          p_connection_attempt_id: attemptId,
+          p_mock_interview_id: boundaryInterviewId!,
+          p_model: "test-live-model",
+          p_provider: "gemini",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("activate_voice_mock_interview", {
+          p_mock_interview_id: boundaryInterviewId!,
+        })
+      ).error,
+    ).toBeNull();
+
+    const { data: transcriptEventId, error: transcriptError } =
+      await learner.rpc("append_realtime_interview_event", {
+        p_content: "Here is the complete implementation-ready solution.",
+        p_event_type: "user_transcript",
+        p_mock_interview_id: boundaryInterviewId!,
+        p_phase: "implementation",
+      });
+    expect(transcriptError).toBeNull();
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: boundaryInterviewId!,
+          p_payload: {
+            phase: "implementation",
+            questionCycle: "primary",
+            reasonCode: "implementation_started",
+            signal: "explicit",
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "report_current_stage",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("submit_mock_interview_code", {
+          p_advance_to_testing: false,
+          p_code_snapshot: "def solve():\n    return None",
+          p_elapsed_seconds: 1_201,
+          p_expected_version: 0,
+          p_mock_interview_id: boundaryInterviewId!,
+          p_scratchpad: "",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: boundaryInterviewId!,
+          p_payload: {
+            algorithmComplete: true,
+            complexityConsistent: true,
+            correctnessReasoningComplete: true,
+            edgeCasesAddressed: true,
+            operationOrderComplete: true,
+            reasonCode: "complete_solution_stated",
+            stateComplete: true,
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "report_solution_readiness",
+        })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: boundaryInterviewId!,
+          p_payload: {
+            reasonCode: "primary_work_complete",
+            transcriptEventId: String(transcriptEventId),
+          },
+          p_tool_name: "complete_primary_question",
+        })
+      ).error,
+    ).toBeNull();
+
+    const followUp = await learner.rpc("execute_realtime_interview_control", {
+      p_idempotency_key: randomUUID(),
+      p_mock_interview_id: boundaryInterviewId!,
+      p_payload: { reasonCode: "boundary_below_ten_minutes" },
+      p_tool_name: "request_follow_up",
+    });
+    expect(followUp.error).toBeNull();
+    expect(followUp.data).toMatchObject({
+      allowed: false,
+      lifecycle: "primary_completed",
+      remainingSeconds: 599,
+    });
+    expect(
+      (
+        await learner.rpc("execute_realtime_interview_control", {
+          p_idempotency_key: randomUUID(),
+          p_mock_interview_id: boundaryInterviewId!,
+          p_payload: { reasonCode: "time_low" },
+          p_tool_name: "conclude_interview",
+        })
+      ).error,
+    ).toBeNull();
+    await learner.rpc("abandon_mock_interview", {
+      p_mock_interview_id: boundaryInterviewId!,
+    });
   });
 });
 

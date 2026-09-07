@@ -24,26 +24,6 @@ export function AuthForm({ action, configured, mode }: AuthFormProps) {
 
   return (
     <form action={formAction} className="space-y-5">
-      {isSignup ? (
-        <FieldShell
-          error={state.fieldErrors?.displayName?.[0]}
-          htmlFor="displayName"
-          label="Display name"
-        >
-          <Input
-            aria-describedby={
-              state.fieldErrors?.displayName ? "displayName-error" : undefined
-            }
-            autoComplete="name"
-            disabled={!configured}
-            id="displayName"
-            name="displayName"
-            placeholder="Ada Lovelace"
-            required
-          />
-        </FieldShell>
-      ) : null}
-
       <FieldShell
         error={state.fieldErrors?.email?.[0]}
         htmlFor="email"

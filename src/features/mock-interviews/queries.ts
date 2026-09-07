@@ -7,6 +7,10 @@ import { z } from "zod";
 export type MockInterviewRow = Tables<"mock_interviews">;
 export type MockInterviewEvaluationRow = Tables<"mock_interview_evaluations">;
 export type MockInterviewPhaseEventRow = Tables<"mock_interview_phase_events">;
+export type MockInterviewConversationStateRow =
+  Tables<"mock_interview_conversation_state">;
+export type MockInterviewConversationEventRow =
+  Tables<"mock_interview_conversation_events">;
 export type MockInterviewScorecardRow = Tables<"mock_interview_scorecards">;
 export type RealtimeInterviewEventRow = Tables<"realtime_interview_events">;
 export type RealtimeInterviewSessionRow = Tables<"realtime_interview_sessions">;
@@ -14,6 +18,8 @@ export type RealtimeInterviewSessionRow = Tables<"realtime_interview_sessions">;
 export type MockInterviewDetail = MockInterviewRow & {
   effectiveElapsedSeconds: number;
   evaluation: MockInterviewEvaluationRow | null;
+  conversationEvents: MockInterviewConversationEventRow[];
+  conversationState: MockInterviewConversationStateRow | null;
   problem: Awaited<ReturnType<typeof getProblemCatalog>>[number];
   phaseEvents: MockInterviewPhaseEventRow[];
   realtimeEvents: RealtimeInterviewEventRow[];
@@ -24,14 +30,39 @@ export type MockInterviewDetail = MockInterviewRow & {
 const activeMockInterviewSchema = z.object({
   codeSnapshot: z.string().nullable(),
   codingLanguage: z.enum(["python", "java"]),
+  connectionCount: z.number().int().min(0),
+  conversationLifecycle: z.enum([
+    "primary_question",
+    "primary_completed",
+    "follow_up",
+    "follow_up_completed",
+    "concluding",
+  ]),
   durationMinutes: z.number().int().positive(),
   elapsedSeconds: z.number().int().min(0).max(14_400),
   id: z.uuid(),
   interviewLanguage: z.string(),
   interviewerLevel: z.string(),
+  followUpPrompt: z.string().min(1).max(2_000).nullable(),
+  observedPhase: z
+    .enum([
+      "intro",
+      "clarify",
+      "examples",
+      "brute_force",
+      "optimization",
+      "implementation",
+      "testing",
+      "complexity",
+      "retrospective",
+    ])
+    .nullable(),
+  observedPhaseEventId: z.string().regex(/^\d+$/).nullable(),
   phase: z.string(),
+  primaryReadiness: z.enum(["incomplete", "ready", "completed"]),
   questionContentKey: z.string().regex(/^[a-f0-9]{32}$/),
   questionContentVersion: z.number().int().positive().nullable(),
+  questionCycle: z.enum(["primary", "follow_up"]),
   scratchpad: z.string().nullable(),
   startedAt: z.iso.datetime({ offset: true }),
   timerRunning: z.boolean(),
@@ -120,6 +151,8 @@ export async function getMockInterview(userId: string, interviewId: string) {
     { data: scorecard, error: scorecardError },
     { data: realtimeSession, error: realtimeSessionError },
     { data: phaseEvents, error: phaseEventsError },
+    { data: conversationState, error: conversationStateError },
+    { data: conversationEvents, error: conversationEventsError },
   ] = await Promise.all([
     supabase
       .from("mock_interview_evaluations")
@@ -143,6 +176,16 @@ export async function getMockInterview(userId: string, interviewId: string) {
       .eq("mock_interview_id", interview.id)
       .order("created_at")
       .order("id"),
+    supabase
+      .from("mock_interview_conversation_state")
+      .select("*")
+      .eq("mock_interview_id", interview.id)
+      .maybeSingle(),
+    supabase
+      .from("mock_interview_conversation_events")
+      .select("*")
+      .eq("mock_interview_id", interview.id)
+      .order("id"),
   ]);
   if (evaluationError)
     throw new Error("The interview evaluation could not be loaded.");
@@ -152,6 +195,10 @@ export async function getMockInterview(userId: string, interviewId: string) {
     throw new Error("The live interview session could not be loaded.");
   if (phaseEventsError)
     throw new Error("The interview process guide could not be loaded.");
+  if (conversationStateError)
+    throw new Error("The interview conversation state could not be loaded.");
+  if (conversationEventsError)
+    throw new Error("The interview conversation timeline could not be loaded.");
   const { data: realtimeEvents, error: realtimeEventsError } = realtimeSession
     ? await supabase
         .from("realtime_interview_events")
@@ -171,6 +218,8 @@ export async function getMockInterview(userId: string, interviewId: string) {
       timerRunning: interview.timer_running,
     }),
     evaluation,
+    conversationEvents: conversationEvents ?? [],
+    conversationState,
     phaseEvents: phaseEvents ?? [],
     problem,
     realtimeEvents: realtimeEvents ?? [],

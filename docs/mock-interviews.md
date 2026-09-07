@@ -15,7 +15,7 @@ The active workspace never reveals the question name, difficulty, topic, pattern
 1. compact Guiding Star phase tiles at the top of the page;
 2. always-visible approved question wording;
 3. Live interviewer;
-4. the six most recent completed learner/interviewer transcript turns;
+4. the six most recent completed learner/interviewer transcript turns, newest first;
 5. Python or Java code editor and scratchpad.
 
 The question card is not collapsible. The Live interviewer provides microphone, mute, speaking, connection, and reconnection state but no text box, live transcript, or “End voice” control.
@@ -27,7 +27,7 @@ intro → clarify → examples → brute force → optimization
 → implementation → testing → complexity → retrospective
 ```
 
-Guiding Star tiles show only the phase name and visual/semantic state. They do not reveal phase descriptions, captured notes, summaries, or rubric evidence during the interview. Exactly one tile is current, earlier phases are completed, the immediate successor can be suggested or await confirmation, and later phases remain future.
+Guiding Star tiles show only the phase name and visual/semantic state. They do not reveal phase descriptions, captured notes, summaries, or rubric evidence during the interview. Every completed learner or interviewer utterance triggers a bounded server-side classification of the current conversational stage. Exactly one tile is lit; all others remain neutral, so the guide makes no claim that earlier stages were completed or completed well. The observed stage may jump forward or move backward as the conversation changes.
 
 The countdown cannot be paused, survives refreshes, and shows overtime without blocking completion. It starts at voice activation, not row creation. The code workspace is available from Intro onward with a fixed Python or Java language, a 10,000-character scratchpad, and a 30,000-character code limit. It autosaves with workspace-version conflict protection. Autosave remains usable during a temporary voice reconnect.
 
@@ -35,7 +35,7 @@ During Implementation, the learner can submit the current code for interviewer r
 
 ## Completion, Review, and scorecard
 
-Interview notes, phase events, code submissions, tests, and complexity reasoning are persisted during the session but hidden from the learner while it is active. A security-definer RPC exposes only the six most recent completed learner/interviewer transcript turns for the owned active interview, including after refresh or reconnect. After completion, `/interviews/[interviewId]/review` provides the full post-interview process review, including phase evidence, scratchpad, final code, submissions, and transcript. Legacy completed interviews without preserved prompt content remain reviewable with an explicit legacy-content notice.
+Interview notes, phase events, code submissions, tests, and complexity reasoning are persisted during the session but hidden from the learner while it is active. A security-definer RPC exposes only the six most recent completed learner/interviewer transcript turns for the owned active interview, newest first in the UI, including after refresh or reconnect. Conversational-stage observations are display-only and excluded from scoring and evaluation evidence. After completion, `/interviews/[interviewId]/review` provides the full post-interview process review, including phase evidence, scratchpad, final code, submissions, and transcript. Legacy completed interviews without preserved prompt content remain reviewable with an explicit legacy-content notice.
 
 The scorecard remains separate from Review. It contains 1–5 ratings for problem understanding, clarification, approach quality, optimization, correctness, code quality, testing, complexity reasoning, communication, and independence, plus bounded strengths and improvements. A configured evaluator can produce a completed evaluation; missing or invalid provider output produces a labeled deterministic provisional result.
 

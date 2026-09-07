@@ -11,20 +11,25 @@ import type { MockInterviewPhase } from "@/domain/mock-interview";
 import type {
   CreateRealtimeSessionInput,
   CodeReviewContext,
+  InterviewControlToolName,
   RealtimeInterviewProvider,
   RealtimeInterviewSession,
 } from "@/features/realtime-interviews/provider";
 import {
   buildCodeReviewMessage,
-  parsePhaseSuggestionToolArguments,
-  PHASE_SUGGESTION_TOOL,
+  INTERVIEW_CONTROL_TOOLS,
+  parseInterviewControlToolCall,
 } from "@/features/realtime-interviews/provider";
 
 type GeminiSessionCredentials = {
+  connectionAttemptId: string;
+  connectionDirective: string;
+  connectionMode: "start" | "resume";
   expiresAt: string;
   instructions: string;
   model: string;
   token: string;
+  toolNames: InterviewControlToolName[];
   voice: string;
 };
 
@@ -41,6 +46,7 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
   private muted = false;
   private nextPlaybackTime = 0;
   private outputContext: AudioContext | null = null;
+  private pendingConnectionAttemptId: string | null = null;
   private playbackSources = new Set<AudioBufferSourceNode>();
   private reconnecting = false;
   private resumptionHandle: string | null = null;
@@ -65,6 +71,11 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     try {
       input.onStateChange("connecting");
       this.sessionCredentials = await requestGeminiSession(input.interviewId);
+      this.pendingConnectionAttemptId =
+        this.sessionCredentials.connectionAttemptId;
+      if (this.sessionCredentials.connectionMode === "resume") {
+        input.onStateChange("reconnecting", "Restoring interview context…");
+      }
       await this.connectLiveSession(false);
       this.startCapture(localStream);
       return { localStream };
@@ -106,6 +117,11 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
   }
 
   async closeSession() {
+    const pendingConnectionAttemptId = this.pendingConnectionAttemptId;
+    this.pendingConnectionAttemptId = null;
+    if (pendingConnectionAttemptId && this.input) {
+      await this.input.onTransportFailed(pendingConnectionAttemptId);
+    }
     this.intentionalClose = true;
     this.input?.onSpeakingChange(false);
     try {
@@ -117,6 +133,10 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     this.session = null;
     this.stopCapture();
     this.stopPlayback();
+    const outputContext = this.outputContext;
+    this.outputContext = null;
+    this.nextPlaybackTime = 0;
+    await outputContext?.close();
     for (const track of this.localStream?.getTracks() ?? []) track.stop();
     this.localStream = null;
     this.input = null;
@@ -175,18 +195,40 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
         },
         systemInstruction: credentials.instructions,
         temperature: 0.5,
-        tools: [{ functionDeclarations: [PHASE_SUGGESTION_TOOL] }],
+        tools: [
+          {
+            functionDeclarations: INTERVIEW_CONTROL_TOOLS.filter((tool) =>
+              credentials.toolNames.includes(tool.name),
+            ),
+          },
+        ],
       },
       model: credentials.model,
     });
     this.session = session;
+    if (!resume) {
+      try {
+        await this.input?.onTransportReady({
+          connectionAttemptId: credentials.connectionAttemptId,
+        });
+        this.pendingConnectionAttemptId = null;
+      } catch (error) {
+        session.close();
+        this.session = null;
+        throw error;
+      }
+    }
     this.reconnecting = false;
-    this.input?.onStateChange("connected");
+    this.input?.onStateChange(
+      "connected",
+      resume || credentials.connectionMode === "resume"
+        ? "Interview context restored."
+        : undefined,
+    );
     if (!resume) {
       session.sendClientContent({
         turnComplete: true,
-        turns:
-          "[SYSTEM START] Begin the interview now. Follow the opening behavior required by your system instructions exactly.",
+        turns: credentials.connectionDirective,
       });
     }
   }
@@ -237,23 +279,7 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
       this.input?.onStateChange("reconnecting");
     }
     for (const call of message.toolCall?.functionCalls ?? []) {
-      const suggestion =
-        call.name === PHASE_SUGGESTION_TOOL.name && this.input
-          ? parsePhaseSuggestionToolArguments(call.args, this.input.interviewId)
-          : null;
-      if (suggestion) this.input?.onPhaseSuggestion(suggestion);
-      this.session?.sendToolResponse({
-        functionResponses: {
-          id: call.id,
-          name: call.name,
-          response: suggestion
-            ? {
-                output:
-                  "Suggestion queued for deterministic validation and learner confirmation. The phase was not changed.",
-              }
-            : { error: "Invalid or out-of-order phase suggestion." },
-        },
-      });
+      void this.handleControlToolCall(call);
     }
 
     const content = message.serverContent;
@@ -276,6 +302,35 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
       this.flushTranscript("interviewer");
     }
     if (content.turnComplete) this.flushTranscript("learner");
+  }
+
+  private async handleControlToolCall(call: {
+    args?: Record<string, unknown>;
+    id?: string;
+    name?: string;
+  }) {
+    const input = this.input;
+    const parsed = call.name
+      ? parseInterviewControlToolCall(call.name, call.args)
+      : null;
+    const result =
+      parsed && input
+        ? await input.onControlToolCall({
+            ...parsed,
+            idempotencyKey: call.id ?? crypto.randomUUID(),
+          })
+        : {
+            code: "invalid_control_tool",
+            message: "Invalid or unavailable interview control action.",
+            status: "error" as const,
+          };
+    this.session?.sendToolResponse({
+      functionResponses: {
+        id: call.id,
+        name: call.name,
+        response: result,
+      },
+    });
   }
 
   private consumeTranscription(
@@ -324,6 +379,7 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
     this.playbackSources.add(source);
     this.input?.onSpeakingChange(true);
     source.onended = () => {
+      source.disconnect();
       this.playbackSources.delete(source);
       if (!this.playbackSources.size) this.input?.onSpeakingChange(false);
     };
@@ -332,17 +388,19 @@ export class GeminiLiveInterviewProvider implements RealtimeInterviewProvider {
 
   private stopPlayback() {
     for (const source of this.playbackSources) {
+      source.onended = null;
       try {
         source.stop();
       } catch {
         // A source can already be stopped by the browser.
       }
+      source.disconnect();
     }
     this.playbackSources.clear();
     this.nextPlaybackTime = this.outputContext?.currentTime ?? 0;
     this.input?.onSpeakingChange(false);
-    void this.outputContext?.close();
-    this.outputContext = null;
+    // Interruptions clear queued speech but retain the context and its clock.
+    // Only closing the interview disposes of the context and resets the clock.
   }
 
   private sendSilentContext(text: string) {
@@ -399,7 +457,15 @@ async function requestGeminiSession(interviewId: string) {
     !data.model ||
     !data.voice ||
     !data.instructions ||
-    !data.expiresAt
+    !data.connectionDirective ||
+    !data.connectionAttemptId ||
+    !["start", "resume"].includes(data.connectionMode ?? "") ||
+    !data.expiresAt ||
+    !Array.isArray(data.toolNames) ||
+    data.toolNames.some(
+      (name) =>
+        !INTERVIEW_CONTROL_TOOLS.some((definition) => definition.name === name),
+    )
   ) {
     throw new Error("The Gemini session response is incomplete.");
   }

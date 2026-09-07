@@ -7,6 +7,17 @@ const duration = z.number().int().min(0).max(86_400);
 
 export const attemptIdSchema = z.uuid();
 
+export const abandonPracticeAttemptSchema = z.object({
+  confirmation: z.literal("abandon"),
+  attemptId: attemptIdSchema,
+});
+
+export type AbandonPracticeAttemptActionState =
+  { message: string; status: "error" } | { status: "idle" | "success" };
+
+export const initialAbandonPracticeAttemptActionState: AbandonPracticeAttemptActionState =
+  { status: "idle" };
+
 export const timerInputSchema = z.object({
   durationSeconds: duration,
   running: z.boolean(),

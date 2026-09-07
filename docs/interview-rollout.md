@@ -9,6 +9,9 @@ The interview selection and coding capabilities retain independent server-only c
 | `INTERVIEW_SELECTION_MODES_ENABLED`  | Setup offers adaptive Learning only; the server rejects tampered Coverage, Improvement, and Custom submissions.                         |
 | `INTERVIEW_PROMPT_CONTENT_ENABLED`   | New mock interviews cannot start. There is no canonical-link fallback because it could reveal question identity or extra prompt detail. |
 | `INTERVIEW_CODING_WORKSPACE_ENABLED` | CodeMirror is replaced by the bounded, accessible Python/Java fallback editor. Full voice remains required.                             |
+| `INTERVIEW_LIVE_STAGE_ENABLED`       | The live stage tool is omitted and Guiding Star stays neutral; voice, readiness, and continuity continue.                               |
+| `INTERVIEW_FOLLOW_UP_ENABLED`        | No new follow-up may start. An already-persisted follow-up can still finish, then the interview concludes.                              |
+| `INTERVIEW_REVIEW_TIMELINE_ENABLED`  | The new conversation-control timeline is hidden in Review without deleting its durable events.                                          |
 | `REALTIME_AI_ENABLED`                | New mock interviews cannot start. Existing finished history, Review, and scorecards remain readable.                                    |
 
 All variables are server-only and must not use a `NEXT_PUBLIC_` prefix. Existing completed and abandoned records remain readable regardless of rollout state.
@@ -36,8 +39,9 @@ Monitor at least:
 - voice pending, activation latency, heartbeat success, lease expiry, reconnect, and abandonment;
 - phase advance and code-submission lease rejections;
 - workspace conflicts and save failures;
-- phase-suggestion success/rejection, especially stale and invalid-contract reasons;
-- provider connection success/failure and latency;
+- live stage/control success and failure, especially stale evidence, unknown-stage duration, and rejected control calls;
+- provider connection preparation, confirmation, resume failure, and latency;
+- follow-up eligible/selected/skipped/rejected counts and conclusion reasons;
 - completion, Review loading, evaluation failure, deletion rejection, and profile rebuild failure.
 
 Alert thresholds belong to the hosting/analytics provider. A practical initial review is any sustained error ratio above 5%, workspace conflicts above 2%, elevated voice-lease expiry, or a sharp rise in stale phase suggestions.
@@ -45,6 +49,7 @@ Alert thresholds belong to the hosting/analytics provider. A practical initial r
 ## Security and privacy review
 
 - Active raw interview rows and evidence are hidden from browser roles. Active pages use sanitized, ownership-checking RPCs for the active snapshot and the six most recent completed transcript turns, plus an opaque prompt-content key resolved only on the server.
+- Live conversational-stage observations are stored separately from workflow phase events and are excluded from scorecards, evaluation evidence, mastery, and coverage. Only observations tied to owned transcript events can affect the active guide, and the newest accepted transcript event wins.
 - All mutations use authenticated ownership-checking functions with forced RLS and revoked direct browser writes.
 - Prompt, transcript, scratchpad, and code are untrusted data; none can invoke a structured phase transition.
 - Provider secrets remain in server routes. `npm run audit:client-bundle` scans built assets for secret identifiers/configured values without printing a secret.
@@ -59,7 +64,7 @@ Alert thresholds belong to the hosting/analytics provider. A practical initial r
 - The question wording is always visible and is not hidden behind a disclosure control.
 - Live interviewer connection/reconnection states are conveyed with text, not color alone.
 - CodeMirror and the fallback editor have language-specific accessible names; code remains left-to-right in Hebrew sessions.
-- Guiding Star is a compact semantic ordered list, identifies the current item with `aria-current="step"`, and exposes only phase names and state.
+- Guiding Star is a compact semantic ordered list, identifies the currently observed conversational stage with `aria-current="step"`, and exposes only phase names and state. Skips and backtracking are valid; unlit stages do not imply failure and previously lit stages do not imply completion quality.
 - When voice cannot be restored, the interface offers reconnect or abandonment rather than a hidden text fallback.
 
 ## Load and concurrency review
@@ -80,7 +85,7 @@ After deployment, run `npm run verify:deployment -- https://<production-domain>`
 - the timer starts only after voice activation;
 - lease expiry blocks phase/code/completion mutations but not autosave;
 - the active page and provider receive no question identity or disallowed content;
-- refresh/reconnect does not reveal transcript or phase evidence;
+- refresh/reconnect exposes only the bounded six-turn conversation and current display stage, not older transcript, readiness details, or raw control events;
 - completed Review contains the preserved evidence;
 - deletion removes the interview and its profile impact;
 - provider secrets do not appear in responses or browser assets.

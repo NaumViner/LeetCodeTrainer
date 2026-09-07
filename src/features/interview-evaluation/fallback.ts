@@ -203,6 +203,15 @@ function fallbackCorrectness(
       `${evidence.trustedTests.passedTests} of ${evidence.trustedTests.totalTests} trusted tests passed.`,
     );
   }
+  if (evidence.learnerOutcome.result === null) {
+    return dimension(
+      1,
+      0,
+      "Correctness was not assessed: no learner-selected outcome or trusted test results are available.",
+      "phase_note",
+      "No correctness outcome was supplied.",
+    );
+  }
   const score =
     evidence.learnerOutcome.result === "solved"
       ? 4

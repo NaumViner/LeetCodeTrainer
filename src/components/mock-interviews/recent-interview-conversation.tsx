@@ -8,6 +8,7 @@ export function RecentInterviewConversation({
 }: {
   entries: RealtimeTranscriptEntry[];
 }) {
+  const newestFirst = [...entries].reverse();
   return (
     <Card aria-labelledby="recent-interview-conversation-title">
       <CardContent className="p-5 sm:p-6">
@@ -34,7 +35,7 @@ export function RecentInterviewConversation({
             aria-live="polite"
             className="mt-4 max-h-56 space-y-2 overflow-y-auto"
           >
-            {entries.map((entry) => (
+            {newestFirst.map((entry) => (
               <li
                 className="bg-surface-subtle rounded-lg border px-3 py-2.5 text-sm leading-6"
                 key={entry.id}

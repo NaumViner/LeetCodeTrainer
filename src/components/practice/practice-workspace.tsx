@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState, useTransition } from "react";
 
 import { DifficultyBadge } from "@/components/problems/difficulty-badge";
+import { AbandonPracticeForm } from "@/components/practice/abandon-practice-form";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -350,6 +351,12 @@ export function PracticeWorkspace({
                 Running state and elapsed time are saved on every control and
                 workflow transition.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-none">
+            <CardContent className="p-5">
+              <AbandonPracticeForm attemptId={attempt.id} />
             </CardContent>
           </Card>
 

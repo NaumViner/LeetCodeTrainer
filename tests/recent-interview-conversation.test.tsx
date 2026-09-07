@@ -25,6 +25,12 @@ describe("recent interview conversation", () => {
     expect(
       screen.getByLabelText("Recent interview conversation"),
     ).toHaveTextContent("You:I would clarify the input.");
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent(
+      "You:I would clarify the input.",
+    );
+    expect(screen.getAllByRole("listitem")[1]).toHaveTextContent(
+      "Interviewer:How would you begin?",
+    );
   });
 
   it("shows a stable empty state before the first completed turn", () => {

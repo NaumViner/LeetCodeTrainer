@@ -20,7 +20,7 @@ export function Brand({ compact = false, className }: BrandProps) {
       <span className="bg-primary flex size-8 items-center justify-center rounded-lg text-white">
         <Braces aria-hidden="true" className="size-4" strokeWidth={2.4} />
       </span>
-      <span className={cn(compact && "sr-only")}>Interview Academy</span>
+      <span className={cn(compact && "sr-only")}>AI Mock Interview</span>
     </Link>
   );
 }

@@ -1,7 +1,14 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MockInterviewWorkspace } from "@/components/mock-interviews/mock-interview-workspace";
+import { finishConcludedMockInterviewAction } from "@/features/mock-interviews/actions";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -22,11 +29,57 @@ vi.mock("@/features/mock-interviews/actions", () => ({
   abandonMockInterviewAction: vi.fn(),
   advanceMockInterviewAction: vi.fn(),
   completeMockInterviewAction: vi.fn(),
+  finishConcludedMockInterviewAction: vi.fn(async () => ({
+    status: "success",
+  })),
 }));
 
 afterEach(cleanup);
 
 describe("mock interview workspace layout", () => {
+  it("opens feedback after a persisted conclusion without reconnecting or self-ratings", async () => {
+    render(
+      <MockInterviewWorkspace
+        interview={{
+          codeSnapshot: "",
+          codingLanguage: "python",
+          codingWorkspaceEnabled: true,
+          connectionCount: 1,
+          conversationLifecycle: "concluding",
+          durationMinutes: 30,
+          effectiveElapsedSeconds: 1800,
+          id: "00000000-0000-4000-8000-000000000001",
+          initialRecentTranscript: [],
+          interviewLanguage: "english",
+          followUpPrompt: null,
+          observedPhase: "retrospective",
+          observedPhaseEventId: null,
+          phase: "retrospective",
+          questionPrompt: "Return whether a repeated value exists.",
+          questionCycle: "primary",
+          realtimeEnabled: true,
+          realtimeProvider: "gemini",
+          scratchpad: "",
+          startedAt: "2026-09-02T13:00:00.000Z",
+          timerRunning: false,
+          workspaceVersion: 0,
+        }}
+      />,
+    );
+    const button = screen.getByRole("button", {
+      name: "View feedback & save interview",
+    });
+    expect(button).toBeEnabled();
+    expect(
+      screen.queryByLabelText("Communication rating"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(finishConcludedMockInterviewAction).toHaveBeenCalledWith(
+        "00000000-0000-4000-8000-000000000001",
+      ),
+    );
+  });
   it("renders guide, question, voice, recent speech, then code", () => {
     render(
       <MockInterviewWorkspace
@@ -34,6 +87,8 @@ describe("mock interview workspace layout", () => {
           codeSnapshot: "",
           codingLanguage: "python",
           codingWorkspaceEnabled: true,
+          connectionCount: 0,
+          conversationLifecycle: "primary_question",
           durationMinutes: 45,
           effectiveElapsedSeconds: 0,
           id: "00000000-0000-4000-8000-000000000001",
@@ -41,8 +96,12 @@ describe("mock interview workspace layout", () => {
             { id: "1", role: "interviewer", text: "Tell me your approach." },
           ],
           interviewLanguage: "english",
+          followUpPrompt: null,
+          observedPhase: "intro",
+          observedPhaseEventId: null,
           phase: "intro",
           questionPrompt: "Return whether a repeated value exists.",
+          questionCycle: "primary",
           realtimeEnabled: true,
           realtimeProvider: "gemini",
           scratchpad: "",
@@ -53,7 +112,9 @@ describe("mock interview workspace layout", () => {
       />,
     );
 
-    const guide = screen.getByRole("heading", { name: "Guiding star" });
+    const guide = screen.getByRole("heading", {
+      name: /Guiding star.*Primary question/i,
+    });
     const question = screen.getByText(
       "Return whether a repeated value exists.",
     );

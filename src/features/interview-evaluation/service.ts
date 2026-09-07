@@ -70,6 +70,14 @@ export async function evaluateAndPersistCompletedInterview(
     }
     const reservation = evaluationReservationSchema.parse(reservationValue);
     if (!reservation.shouldEvaluate) return null;
+    const { data: allowed, error: leaseError } = await supabase.rpc(
+      "reserve_interview_evaluation_request",
+      {
+        p_evaluation_id: reservation.evaluationId,
+      },
+    );
+    if (leaseError) throw new Error("Interview evaluation lease unavailable.");
+    if (allowed !== true) return null;
 
     const run = await runInterviewEvaluation(evidence, provider);
     await persistEvaluationResult(reservation.evaluationId, evidence, run);

@@ -37,6 +37,11 @@ jobs:
 
   database-and-browser:
     runs-on: ubuntu-latest
+    env:
+      REALTIME_AI_ENABLED: "true"
+      REALTIME_AI_PROVIDER: gemini
+      REALTIME_AI_API_KEY: ci-server-only-secret-sentinel
+      INTERVIEW_EVALUATOR_ENABLED: "false"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v7

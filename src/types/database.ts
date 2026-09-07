@@ -68,6 +68,41 @@ export type Database = {
           },
         ];
       };
+      approved_interview_follow_ups: {
+        Row: {
+          active: boolean;
+          content_version: number;
+          created_at: string;
+          problem_id: string;
+          prompt: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          content_version: number;
+          created_at?: string;
+          problem_id: string;
+          prompt: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          content_version?: number;
+          created_at?: string;
+          problem_id?: string;
+          prompt?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "approved_interview_follow_ups_problem_id_fkey";
+            columns: ["problem_id"];
+            isOneToOne: true;
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       attempt_hints: {
         Row: {
           attempt_id: string;
@@ -671,6 +706,203 @@ export type Database = {
           },
         ];
       };
+      mock_interview_control_receipts: {
+        Row: {
+          created_at: string;
+          id: number;
+          idempotency_key: string;
+          mock_interview_id: string;
+          result: Json;
+          tool_name: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: never;
+          idempotency_key: string;
+          mock_interview_id: string;
+          result: Json;
+          tool_name: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: never;
+          idempotency_key?: string;
+          mock_interview_id?: string;
+          result?: Json;
+          tool_name?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_control_receipts_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: false;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mock_interview_conversation_events: {
+        Row: {
+          created_at: string;
+          details: Json;
+          event_type: string;
+          id: number;
+          mock_interview_id: string;
+          phase: string | null;
+          question_cycle: string;
+          reason_code: string | null;
+          transcript_event_id: number | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          details?: Json;
+          event_type: string;
+          id?: never;
+          mock_interview_id: string;
+          phase?: string | null;
+          question_cycle: string;
+          reason_code?: string | null;
+          transcript_event_id?: number | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          details?: Json;
+          event_type?: string;
+          id?: never;
+          mock_interview_id?: string;
+          phase?: string | null;
+          question_cycle?: string;
+          reason_code?: string | null;
+          transcript_event_id?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_conversation_events_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: false;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mock_interview_conversation_events_transcript_event_id_fkey";
+            columns: ["transcript_event_id"];
+            isOneToOne: false;
+            referencedRelation: "realtime_interview_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mock_interview_conversation_state: {
+        Row: {
+          conclusion_reason: string | null;
+          connection_count: number;
+          created_at: string;
+          current_phase: string | null;
+          follow_up_content_version: number | null;
+          follow_up_prompt: string | null;
+          follow_up_started_at: string | null;
+          last_confirmed_connection_attempt_id: string | null;
+          last_confirmed_connection_mode: string | null;
+          lifecycle: string;
+          mock_interview_id: string;
+          pending_connection_attempt_id: string | null;
+          pending_connection_expires_at: string | null;
+          pending_connection_mode: string | null;
+          phase_source: string | null;
+          phase_transcript_event_id: number | null;
+          primary_readiness: string;
+          question_cycle: string;
+          readiness_algorithm: boolean;
+          readiness_complexity: boolean;
+          readiness_correctness: boolean;
+          readiness_data_structures: boolean;
+          readiness_edge_cases: boolean;
+          readiness_operation_order: boolean;
+          updated_at: string;
+          user_id: string;
+          version: number;
+        };
+        Insert: {
+          conclusion_reason?: string | null;
+          connection_count?: number;
+          created_at?: string;
+          current_phase?: string | null;
+          follow_up_content_version?: number | null;
+          follow_up_prompt?: string | null;
+          follow_up_started_at?: string | null;
+          last_confirmed_connection_attempt_id?: string | null;
+          last_confirmed_connection_mode?: string | null;
+          lifecycle?: string;
+          mock_interview_id: string;
+          pending_connection_attempt_id?: string | null;
+          pending_connection_expires_at?: string | null;
+          pending_connection_mode?: string | null;
+          phase_source?: string | null;
+          phase_transcript_event_id?: number | null;
+          primary_readiness?: string;
+          question_cycle?: string;
+          readiness_algorithm?: boolean;
+          readiness_complexity?: boolean;
+          readiness_correctness?: boolean;
+          readiness_data_structures?: boolean;
+          readiness_edge_cases?: boolean;
+          readiness_operation_order?: boolean;
+          updated_at?: string;
+          user_id: string;
+          version?: number;
+        };
+        Update: {
+          conclusion_reason?: string | null;
+          connection_count?: number;
+          created_at?: string;
+          current_phase?: string | null;
+          follow_up_content_version?: number | null;
+          follow_up_prompt?: string | null;
+          follow_up_started_at?: string | null;
+          last_confirmed_connection_attempt_id?: string | null;
+          last_confirmed_connection_mode?: string | null;
+          lifecycle?: string;
+          mock_interview_id?: string;
+          pending_connection_attempt_id?: string | null;
+          pending_connection_expires_at?: string | null;
+          pending_connection_mode?: string | null;
+          phase_source?: string | null;
+          phase_transcript_event_id?: number | null;
+          primary_readiness?: string;
+          question_cycle?: string;
+          readiness_algorithm?: boolean;
+          readiness_complexity?: boolean;
+          readiness_correctness?: boolean;
+          readiness_data_structures?: boolean;
+          readiness_edge_cases?: boolean;
+          readiness_operation_order?: boolean;
+          updated_at?: string;
+          user_id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_conversation_stat_phase_transcript_event_id_fkey";
+            columns: ["phase_transcript_event_id"];
+            isOneToOne: false;
+            referencedRelation: "realtime_interview_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mock_interview_conversation_state_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: true;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       mock_interview_evaluations: {
         Row: {
           completed_at: string | null;
@@ -833,6 +1065,57 @@ export type Database = {
             columns: ["mock_interview_id"];
             isOneToOne: false;
             referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mock_interview_phase_observations: {
+        Row: {
+          accepted: boolean;
+          confidence: number;
+          created_at: string;
+          id: number;
+          mock_interview_id: string;
+          observed_phase: string;
+          signal: string;
+          transcript_event_id: number;
+          user_id: string;
+        };
+        Insert: {
+          accepted: boolean;
+          confidence: number;
+          created_at?: string;
+          id?: never;
+          mock_interview_id: string;
+          observed_phase: string;
+          signal: string;
+          transcript_event_id: number;
+          user_id: string;
+        };
+        Update: {
+          accepted?: boolean;
+          confidence?: number;
+          created_at?: string;
+          id?: never;
+          mock_interview_id?: string;
+          observed_phase?: string;
+          signal?: string;
+          transcript_event_id?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "mock_interview_phase_observations_mock_interview_id_fkey";
+            columns: ["mock_interview_id"];
+            isOneToOne: false;
+            referencedRelation: "mock_interviews";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mock_interview_phase_observations_transcript_event_id_fkey";
+            columns: ["transcript_event_id"];
+            isOneToOne: false;
+            referencedRelation: "realtime_interview_events";
             referencedColumns: ["id"];
           },
         ];
@@ -1399,6 +1682,7 @@ export type Database = {
           event_type: string;
           id: number;
           phase: string | null;
+          question_cycle: string;
           session_id: string;
           user_id: string;
         };
@@ -1408,6 +1692,7 @@ export type Database = {
           event_type: string;
           id?: never;
           phase?: string | null;
+          question_cycle?: string;
           session_id: string;
           user_id: string;
         };
@@ -1417,6 +1702,7 @@ export type Database = {
           event_type?: string;
           id?: never;
           phase?: string | null;
+          question_cycle?: string;
           session_id?: string;
           user_id?: string;
         };
@@ -1706,13 +1992,17 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      activate_voice_mock_interview: {
-        Args: { p_mock_interview_id: string };
-        Returns: Json;
-      };
       abandon_mock_interview: {
         Args: { p_mock_interview_id: string };
         Returns: undefined;
+      };
+      abandon_practice_attempt: {
+        Args: { p_attempt_id: string };
+        Returns: Json;
+      };
+      activate_voice_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: Json;
       };
       advance_mock_interview: {
         Args: {
@@ -1742,13 +2032,31 @@ export type Database = {
         };
         Returns: string;
       };
+      cancel_pending_voice_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: undefined;
+      };
+      cancel_realtime_interview_connection: {
+        Args: {
+          p_connection_attempt_id: string;
+          p_mock_interview_id: string;
+          p_reason_code: string;
+        };
+        Returns: boolean;
+      };
+      claim_guest_interview: { Args: { p_token: string }; Returns: string };
+      cleanup_expired_guest_interviews: { Args: never; Returns: number };
       complete_diagnostic: {
         Args: { p_answers: Json; p_attempt_id: string };
         Returns: undefined;
       };
-      cancel_pending_voice_interview: {
-        Args: { p_mock_interview_id: string };
-        Returns: undefined;
+      complete_follow_up_interview_question: {
+        Args: {
+          p_mock_interview_id: string;
+          p_reason_code: string;
+          p_transcript_event_id: number;
+        };
+        Returns: Json;
       };
       complete_mock_interview: {
         Args: {
@@ -1763,6 +2071,28 @@ export type Database = {
         };
         Returns: undefined;
       };
+      complete_primary_interview_question: {
+        Args: {
+          p_mock_interview_id: string;
+          p_reason_code: string;
+          p_transcript_event_id: number;
+        };
+        Returns: Json;
+      };
+      conclude_realtime_mock_interview: {
+        Args: { p_mock_interview_id: string; p_reason_code: string };
+        Returns: Json;
+      };
+      confirm_realtime_interview_connection: {
+        Args: {
+          p_connection_attempt_id: string;
+          p_mock_interview_id: string;
+          p_model: string;
+          p_provider: string;
+          p_provider_call_id?: string;
+        };
+        Returns: Json;
+      };
       delete_owned_mock_interview: {
         Args: { p_mock_interview_id: string };
         Returns: string;
@@ -1775,6 +2105,16 @@ export type Database = {
         };
         Returns: undefined;
       };
+      execute_realtime_interview_control: {
+        Args: {
+          p_idempotency_key: string;
+          p_mock_interview_id: string;
+          p_payload: Json;
+          p_tool_name: string;
+        };
+        Returns: Json;
+      };
+      expire_pending_guest_interview: { Args: never; Returns: undefined };
       finalize_mock_interview_evaluation: {
         Args: {
           p_confidence: number;
@@ -1807,7 +2147,17 @@ export type Database = {
         };
         Returns: undefined;
       };
+      finish_concluded_mock_interview: {
+        Args: { p_mock_interview_id: string };
+        Returns: undefined;
+      };
       get_active_mock_interview_id: { Args: never; Returns: string };
+      get_guest_interview_trial: { Args: never; Returns: Json };
+      get_interview_phase_classification_context: {
+        Args: { p_mock_interview_id: string; p_transcript_event_id: number };
+        Returns: Json;
+      };
+      get_interview_preferences: { Args: never; Returns: Json };
       get_owned_active_mock_interview: {
         Args: { p_mock_interview_id: string };
         Returns: Json;
@@ -1820,6 +2170,7 @@ export type Database = {
         Args: { p_mock_interview_id: string };
         Returns: string;
       };
+      is_registered_interview_user: { Args: never; Returns: boolean };
       mock_interview_evidence_score: {
         Args: {
           p_developing_lines: number;
@@ -1835,9 +2186,49 @@ export type Database = {
         };
         Returns: string;
       };
+      prepare_guest_interview_claim: { Args: never; Returns: string };
+      prepare_realtime_interview_connection: {
+        Args: { p_connection_attempt_id: string; p_mock_interview_id: string };
+        Returns: Json;
+      };
       recompute_topic_mastery_from_evidence: {
         Args: { p_topic_id: string; p_user_id: string };
         Returns: undefined;
+      };
+      record_interview_solution_readiness: {
+        Args: {
+          p_algorithm: boolean;
+          p_complexity: boolean;
+          p_correctness: boolean;
+          p_data_structures: boolean;
+          p_edge_cases: boolean;
+          p_mock_interview_id: string;
+          p_operation_order: boolean;
+          p_reason_code: string;
+          p_transcript_event_id: number;
+        };
+        Returns: Json;
+      };
+      record_live_interview_stage: {
+        Args: {
+          p_mock_interview_id: string;
+          p_observed_phase: string;
+          p_question_cycle: string;
+          p_reason_code: string;
+          p_signal: string;
+          p_transcript_event_id: number;
+        };
+        Returns: Json;
+      };
+      record_mock_interview_phase_observation: {
+        Args: {
+          p_confidence: number;
+          p_mock_interview_id: string;
+          p_observed_phase: string;
+          p_signal: string;
+          p_transcript_event_id: number;
+        };
+        Returns: Json;
       };
       replace_daily_plan: {
         Args: {
@@ -1846,6 +2237,10 @@ export type Database = {
           p_local_date: string;
         };
         Returns: string;
+      };
+      request_interview_follow_up: {
+        Args: { p_mock_interview_id: string; p_reason_code: string };
+        Returns: Json;
       };
       reserve_ai_coach_interaction: {
         Args: {
@@ -1856,6 +2251,14 @@ export type Database = {
         };
         Returns: string;
       };
+      reserve_interview_evaluation_request: {
+        Args: { p_evaluation_id: string };
+        Returns: boolean;
+      };
+      reserve_interview_voice_request: {
+        Args: { p_connection_attempt_id: string; p_mock_interview_id: string };
+        Returns: boolean;
+      };
       reserve_mock_interview_evaluation: {
         Args: {
           p_evaluation_version: number;
@@ -1865,6 +2268,10 @@ export type Database = {
           p_provider: string;
         };
         Returns: Json;
+      };
+      save_interview_preferences: {
+        Args: { p_preferences: Json };
+        Returns: undefined;
       };
       save_mock_interview_workspace: {
         Args: {

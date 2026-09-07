@@ -283,6 +283,7 @@ function event(
     event_type: eventType,
     id,
     phase,
+    question_cycle: "primary",
     session_id: sessionId,
     user_id: learnerId,
   };

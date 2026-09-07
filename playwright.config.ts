@@ -10,6 +10,13 @@ export default defineConfig({
   reporter: "html",
   use: {
     baseURL: "http://localhost:3000",
+    launchOptions: {
+      args: [
+        "--use-fake-device-for-media-stream",
+        "--use-fake-ui-for-media-stream",
+      ],
+    },
+    permissions: ["microphone"],
     trace: "on-first-retry",
   },
   projects: [

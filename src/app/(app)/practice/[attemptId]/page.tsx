@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PracticeWorkspace } from "@/components/practice/practice-workspace";
 import { requireAuthenticatedUser } from "@/features/auth/session";
@@ -16,6 +16,7 @@ export default async function AttemptPage({ params }: AttemptPageProps) {
 
   const attempt = await getPracticeAttempt(user.id, attemptId);
   if (!attempt) notFound();
+  if (attempt.status === "abandoned") redirect("/practice");
 
   return (
     <PracticeWorkspace aiCoachEnabled={isAiCoachEnabled()} attempt={attempt} />

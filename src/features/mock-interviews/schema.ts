@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+export const quickInterviewSetupSchema = z.object({
+  codingLanguage: z.enum(["python", "java"]),
+  difficultyRange: z.enum([
+    "easy",
+    "medium",
+    "hard",
+    "easy_medium",
+    "medium_hard",
+    "easy_hard",
+  ]),
+  durationMinutes: z.coerce
+    .number()
+    .pipe(z.union([z.literal(30), z.literal(45), z.literal(60)])),
+  interviewLanguage: z.enum(["english", "hebrew"]),
+  interviewerLevel: z.enum(["beginner", "faang_tough"]),
+});
+
 import {
   canTransitionMockInterview,
   INTERVIEWER_LEVELS,

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
@@ -16,11 +16,16 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "FAANG Interview Academy",
-    template: "%s | FAANG Interview Academy",
+    default: "AI Mock Interview",
+    template: "%s | AI Mock Interview",
   },
   description:
-    "A personalized path from interview fundamentals to independent technical interview performance.",
+    "Start a real AI coding interview without signup. English or Hebrew, live conversation, and evidence-based feedback.",
+};
+
+export const viewport: Viewport = {
+  initialScale: 1,
+  width: "device-width",
 };
 
 const themeBootstrap = `

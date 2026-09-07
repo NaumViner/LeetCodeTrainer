@@ -1,36 +1,12 @@
 "use client";
 
-import {
-  BookOpen,
-  BriefcaseBusiness,
-  CalendarCheck2,
-  ChartNoAxesCombined,
-  Dumbbell,
-  Gauge,
-  History,
-  LibraryBig,
-  RefreshCw,
-  Settings,
-  UserRoundSearch,
-} from "lucide-react";
+import { BriefcaseBusiness, History, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/dashboard", icon: Gauge, label: "Dashboard" },
-  { href: "/plan", icon: CalendarCheck2, label: "Today" },
-  { href: "/learn", icon: BookOpen, label: "Learn" },
-  { href: "/practice", icon: Dumbbell, label: "Practice" },
-  { href: "/review", icon: RefreshCw, label: "Review" },
-  { href: "/interviews", icon: BriefcaseBusiness, label: "Interview" },
-  {
-    href: "/interview-profile",
-    icon: UserRoundSearch,
-    label: "Interview profile",
-  },
-  { href: "/problems", icon: LibraryBig, label: "Problems" },
-  { href: "/progress", icon: ChartNoAxesCombined, label: "Progress" },
-  { href: "/history", icon: History, label: "History" },
+  { href: "/interviews", icon: BriefcaseBusiness, label: "Start interview" },
+  { href: "/interviews/history", icon: History, label: "My interviews" },
   { href: "/settings/profile", icon: Settings, label: "Settings" },
 ] as const;
 
@@ -40,7 +16,9 @@ export function AppNavigation() {
   return (
     <ul className="flex gap-1 lg:block lg:space-y-1">
       {items.map(({ href, icon: Icon, label }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+        const active =
+          pathname === href ||
+          (href !== "/interviews" && pathname.startsWith(`${href}/`));
         return (
           <li key={label}>
             <Link

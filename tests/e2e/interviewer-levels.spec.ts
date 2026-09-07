@@ -1,224 +1,121 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
-test("a newly diagnosed learner can start a hard tough-FAANG interview", async ({
+const sql = (query: string) =>
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      "supabase_db_faang-interview-academy",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      query,
+    ],
+    { encoding: "utf8" },
+  ).trim();
+
+test("a guest starts a Hebrew tough interview, resumes, then saves the same identity", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
-  const email = `interviewer-level-${randomUUID()}@example.com`;
-  const password = "InterviewerLevel123";
-
+  test.setTimeout(90000);
+  let userId = "";
+  // The test uses a synthetic microphone and no paid AI provider requests.
+  await page.route("**/api/realtime/**", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Test voice transport unavailable" }),
+    }),
+  );
   try {
-    await page.goto("/signup");
-    await page.getByLabel("Display name").fill("Interviewer Level Learner");
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: "Create account" }).click();
-
-    await page.getByRole("checkbox", { name: "Google" }).check();
-    await page.getByLabel("Weekly study hours").fill("8");
-    await page.getByLabel("Timezone").fill("Asia/Jerusalem");
-    await page.getByRole("button", { name: "Create my plan" }).click();
-
-    await page.getByLabel("O(n²)").check();
-    await page.getByLabel("A hash map").check();
-    await page.getByLabel("A base case that stops recursion").check();
-    await page.getByLabel("Inorder").check();
-    await page.getByLabel("A visited set").check();
-    await page.getByLabel("Hash set").check();
-    await page.getByLabel("Sliding window").check();
-    await page.getByLabel("BFS").check();
-    await page.getByRole("button", { name: "Continue to coding" }).click();
-    await page
-      .getByLabel(
-        "Compare the midpoint, then discard only the half that cannot contain the target.",
-      )
-      .check();
-    await page
-      .getByLabel(
-        "Return 0 for null; otherwise return 1 + max(depth(left), depth(right)).",
-      )
-      .check();
-    await page.getByRole("button", { name: "Finish diagnostic" }).click();
-
-    await page.goto("/interviews");
-    await page.getByLabel("Duration").selectOption("30");
-    await page.getByRole("radio", { name: /Choose topic/ }).check();
-    await page
-      .getByRole("combobox", { name: /NeetCode topic/ })
-      .selectOption({ label: "Trees" });
-    await page
-      .getByRole("combobox", { name: /Exact difficulty/ })
-      .selectOption("hard");
-    await page
-      .getByRole("combobox", { name: /Coding language/ })
-      .selectOption("python");
+    await page.goto("/");
+    await page.getByLabel("Difficulty range").selectOption("hard");
+    await page.getByLabel("Coding language").selectOption("java");
     await page.getByLabel("Interview language").selectOption("hebrew");
-    await page.getByRole("radio", { name: /Tough FAANG interviewer/ }).check();
-    await page.getByRole("button", { name: "Start mock interview" }).click();
-
+    await page.getByRole("radio", { name: "קשוח" }).check();
+    await page.getByRole("button", { name: "התחלת ראיון" }).click();
     await expect(page).toHaveURL(/\/interviews\/[0-9a-f-]{36}$/);
-    await expect(
-      page.getByText("Tough FAANG interviewer", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("Interview prompt", { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText(/Design a Codec with serialize/)).toBeVisible();
-    await expect(page.getByText(/First-party interview prompt/)).toBeVisible();
-    await expect(
-      page.getByText(/encoding records enough boundary/i),
-    ).toHaveCount(0);
-    await page.getByText("Interview prompt", { exact: true }).click();
-    await expect(page.getByText(/Design a Codec with serialize/)).toBeHidden();
-    await page.getByText("Interview prompt", { exact: true }).click();
-    await expect(page.getByText(/Design a Codec with serialize/)).toBeVisible();
-    await expect(page.getByLabel("Interview scratchpad")).toBeVisible();
-    await expect(page.getByLabel("Python code editor")).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Interview process guide" }),
-    ).toBeVisible();
-    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
-      "1. Intro",
+    const id = page.url().split("/").at(-1)!;
+    userId = sql(
+      `select user_id from public.mock_interviews where id = '${id}'`,
     );
-    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
-      "You are here",
+    expect(
+      sql(`select is_anonymous from auth.users where id = '${userId}'`),
+    ).toBe("t");
+    expect(
+      sql(
+        `select selection_mode || ':' || interview_language || ':' || interviewer_level || ':' || coding_language from public.mock_interviews where id = '${id}'`,
+      ),
+    ).toBe("coverage:hebrew:faang_tough:java");
+    await expect(
+      page.getByRole("heading", { name: "Live interviewer" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Java code editor")).toBeVisible();
+    // Represent a successfully activated provider transport at the DB boundary.
+    sql(
+      `update public.mock_interviews set voice_activated_at = now(), voice_last_heartbeat_at = now(), timer_running = true where id = '${id}'`,
     );
+    await page.reload();
     await page
       .getByLabel("Interview scratchpad")
-      .fill("Round-trip empty, one-node, and sparse trees.");
+      .fill("Check empty input and complexity.");
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(page.viewportSize()!.width);
     await page.getByRole("button", { name: "Save now" }).click();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
     await page.reload();
-    await expect(
-      page.getByText("Tough FAANG interviewer", { exact: true }),
-    ).toBeVisible();
-
-    await page.getByRole("button", { name: "Begin clarification" }).click();
-    await expect(
-      page.locator('li[data-phase-state="completed"]'),
-    ).toContainText("1. Intro");
-    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
-      "2. Clarify",
-    );
-    await page
-      .getByLabel("Clarifying questions and assumptions")
-      .fill("What input bounds and edge cases should I consider?");
-    await page.getByRole("button", { name: "Continue to examples" }).click();
-    await page
-      .getByLabel("Examples and expected behavior")
-      .fill("Normal input\nMinimal input\nBoundary input");
-    await page.getByRole("button", { name: "Continue to brute force" }).click();
-    await page
-      .getByLabel("Brute-force reasoning")
-      .fill(
-        "Enumerate candidates.\nValidate each candidate.\nFind repeated work.",
-      );
-    await page
-      .getByRole("button", { name: "Continue to optimization" })
-      .click();
-    await page
-      .getByLabel("Optimized approach and invariant")
-      .fill("Maintain state once per input and preserve the stated invariant.");
-    await page.getByRole("button", { name: "Begin implementation" }).click();
-    const code = `class Codec:
-    def serialize(self, root):
-        return "" if root is None else str(root.val)
-
-    def deserialize(self, data):
-        return None if data == "" else TreeNode(int(data))`;
-    await page.getByLabel("Python code editor").fill(code);
-    await page
-      .getByRole("button", { name: /Send current code to interviewer/ })
-      .click();
-    await expect(page.getByText(/AI review is unavailable/)).toBeVisible();
-    await page.reload();
     await expect(page.getByLabel("Interview scratchpad")).toHaveValue(
-      "Round-trip empty, one-node, and sparse trees.",
+      "Check empty input and complexity.",
     );
-    await expect(page.getByLabel("Python code editor")).toContainText(
-      "class Codec",
-    );
-    await page.getByRole("button", { name: /I’m done coding/ }).click();
-    await expect(page.getByText(/You are now in Testing/)).toBeVisible();
-    await expect(page.locator('li[data-phase-state="current"]')).toContainText(
-      "7. Testing",
-    );
-    await page
-      .getByLabel("Tests and traces")
-      .fill("Minimal input\nBoundary input\nOrdinary input");
-    await page.getByRole("button", { name: "Continue to complexity" }).click();
-    await page.getByLabel("Time complexity").fill("O(n)");
-    await page.getByLabel("Space complexity").fill("O(1)");
-    await page.getByRole("button", { name: "Stop timer and reflect" }).click();
-    await page.getByLabel("Outcome").selectOption("partial");
-    await page
-      .getByLabel("What went well, what broke down, and what will you change?")
-      .fill("I will validate the invariant against boundary cases earlier.");
-    await page.getByRole("button", { name: "Generate scorecard" }).click();
-
-    await expect(page).toHaveURL(/\/interviews\/[0-9a-f-]{36}\/scorecard$/);
-    const completedInterviewId = page.url().split("/").at(-2)!;
-    const apiUrl = process.env.E2E_SUPABASE_API_URL!;
-    const secretKey = process.env.E2E_SUPABASE_SECRET_KEY!;
-    const admin = createClient(apiUrl, secretKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data: evaluation, error: evaluationError } = await admin
-      .from("mock_interview_evaluations")
-      .select(
-        "status, provider, model, raw_score, confidence, dimensions, source_interview_language",
-      )
-      .eq("mock_interview_id", completedInterviewId)
-      .eq("is_current", true)
-      .single();
-    expect(evaluationError).toBeNull();
-    expect(evaluation).toMatchObject({
-      model: "deterministic-v1",
-      provider: "deterministic",
-      status: "provisional",
-      source_interview_language: "hebrew",
-    });
-    expect(evaluation?.raw_score).toBeGreaterThan(0);
-    expect(evaluation?.confidence).toBeGreaterThan(0);
-    expect(evaluation?.dimensions).toBeTruthy();
-
-    await page.goto("/interview-profile");
-    await expect(
-      page.getByRole("heading", { name: "Your interview performance" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Interview dimensions" }),
-    ).toBeVisible();
-    await expect(page.getByText(/Profile confidence/i)).toBeVisible();
-
-    await page.goto("/interviews/history");
-    await page.getByText("Delete", { exact: true }).click();
-    await page.getByRole("checkbox", { name: /cannot be undone/i }).check();
-    await page.getByRole("button", { name: "Delete permanently" }).click();
-    await expect(
-      page.getByRole("heading", { name: "No mock interviews yet" }),
-    ).toBeVisible();
-
-    await page.goto("/interview-profile");
-    await expect(
-      page.getByRole("heading", { name: "No evaluated interviews yet" }),
-    ).toBeVisible();
-
+    await page.getByRole("button", { name: "End interview" }).click();
+    await expect(page).toHaveURL(/\/ended$/);
     await page.goto("/interviews");
-    await expect(page.getByRole("checkbox", { name: /hard/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "התחלת ראיון" })).toHaveCount(
+      0,
+    );
+    await page.goto("/signup");
+    await page
+      .getByLabel("Email", { exact: true })
+      .fill(`guest-browser-${randomUUID()}@example.com`);
+    await page
+      .getByRole("button", { name: "Verify email & save interview" })
+      .click();
+    await expect(page).toHaveURL(/\/signup\/complete$/);
+    await page.getByLabel("Choose a password").fill("GuestBrowser123");
+    await page.getByRole("button", { name: "Save account" }).click();
+    await expect(page).toHaveURL(/\/interviews\?notice=saved$/);
+    await expect(page.getByLabel("שפת קוד")).toHaveValue("java");
+    await expect(page.getByRole("radio", { name: "קשוח" })).toBeChecked();
+    expect(
+      sql(`select is_anonymous from auth.users where id = '${userId}'`),
+    ).toBe("f");
+    expect(
+      sql(`select user_id from public.mock_interviews where id = '${id}'`),
+    ).toBe(userId);
+    await page.goto("/interviews/history");
+    await page.getByRole("link", { name: "View saved work" }).click();
+    await expect(page).toHaveURL(new RegExp(`/interviews/${id}/ended$`));
+    await expect(
+      page.getByText("Check empty input and complexity.", { exact: true }),
+    ).toBeVisible();
   } finally {
-    const apiUrl = process.env.E2E_SUPABASE_API_URL;
-    const secretKey = process.env.E2E_SUPABASE_SECRET_KEY;
-    if (apiUrl && secretKey) {
-      const admin = createClient(apiUrl, secretKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
-      const { data } = await admin.auth.admin.listUsers();
-      const user = data?.users.find((candidate) => candidate.email === email);
-      if (user) await admin.auth.admin.deleteUser(user.id);
+    if (userId) {
+      const admin = createClient(
+        process.env.E2E_SUPABASE_API_URL!,
+        process.env.E2E_SUPABASE_SECRET_KEY!,
+        { auth: { persistSession: false } },
+      );
+      await admin.auth.admin.deleteUser(userId);
     }
   }
 });

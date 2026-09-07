@@ -74,7 +74,11 @@ export default async function MockInterviewHistoryPage() {
                       >
                         {interview.evaluation.status === "provisional"
                           ? "Provisional evaluation"
-                          : "Evaluated"}
+                          : interview.evaluation.status === "completed"
+                            ? "Evaluated"
+                            : interview.evaluation.status === "pending"
+                              ? "Feedback pending"
+                              : "Feedback unavailable"}
                         {interview.evaluation.raw_score === null
                           ? ""
                           : ` · ${Math.round(interview.evaluation.raw_score)}`}
@@ -98,13 +102,20 @@ export default async function MockInterviewHistoryPage() {
                     <Clock3 aria-hidden="true" className="size-4" />{" "}
                     {formatMinutes(interview.elapsed_seconds)}
                   </p>
-                  {interview.scorecard ? (
+                  {interview.status === "completed" ? (
                     <Link
                       className={buttonVariants({ variant: "secondary" })}
                       href={`/interviews/${interview.id}/scorecard`}
                     >
-                      Scorecard ·{" "}
-                      {Math.round(interview.scorecard.overall_score)}
+                      View feedback
+                    </Link>
+                  ) : null}
+                  {interview.status === "abandoned" ? (
+                    <Link
+                      className={buttonVariants({ variant: "secondary" })}
+                      href={`/interviews/${interview.id}/ended`}
+                    >
+                      View saved work
                     </Link>
                   ) : null}
                   {interview.status === "completed" ? (

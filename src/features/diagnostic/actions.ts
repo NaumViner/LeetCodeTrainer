@@ -38,8 +38,7 @@ export async function beginDiagnosticAction(
 
   const user = await requireAuthenticatedUser();
   const profile = await getProfile(user.id);
-  if (!profile?.onboarding_completed) redirect("/onboarding");
-  if (profile.diagnostic_completed) redirect("/diagnostic/results");
+  if (profile?.diagnostic_completed) redirect("/diagnostic/results");
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("begin_diagnostic", {

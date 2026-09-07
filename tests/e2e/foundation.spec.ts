@@ -2,14 +2,24 @@ import { expect, test } from "@playwright/test";
 
 test("the application foundation is responsive and navigable", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Know exactly what to practice next",
+    "Your next interview starts here.",
   );
-  await page.getByRole("link", { name: "Explore the learning loop" }).click();
-  await expect(page.locator("#learning-loop")).toBeInViewport();
+  await expect(page.getByRole("combobox")).toHaveCount(4);
+  await expect(
+    page.getByRole("button", { name: "Start interview" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText("First interview without signup", { exact: false }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: `test-results/interview-entry-${testInfo.project.name}.png`,
+    fullPage: true,
+    caret: "initial",
+  });
 });
 
 test("the mobile landing page exposes account and theme controls", async ({

@@ -42,18 +42,27 @@ describe("parseServerEnv", () => {
   it("keeps interview rollout capabilities independently switchable", () => {
     expect(getInterviewRolloutConfig({})).toEqual({
       codingWorkspaceEnabled: true,
+      followUpEnabled: true,
+      liveStageEnabled: true,
       promptContentEnabled: true,
+      reviewTimelineEnabled: true,
       selectionModesEnabled: true,
     });
     expect(
       getInterviewRolloutConfig({
         INTERVIEW_CODING_WORKSPACE_ENABLED: "false",
+        INTERVIEW_FOLLOW_UP_ENABLED: "false",
+        INTERVIEW_LIVE_STAGE_ENABLED: "false",
         INTERVIEW_PROMPT_CONTENT_ENABLED: "true",
+        INTERVIEW_REVIEW_TIMELINE_ENABLED: "false",
         INTERVIEW_SELECTION_MODES_ENABLED: "false",
       }),
     ).toEqual({
       codingWorkspaceEnabled: false,
+      followUpEnabled: false,
+      liveStageEnabled: false,
       promptContentEnabled: true,
+      reviewTimelineEnabled: false,
       selectionModesEnabled: false,
     });
     expect(() =>

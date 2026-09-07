@@ -11,6 +11,32 @@ import {
 afterEach(cleanup);
 
 describe("interview phase guide", () => {
+  it("shows a neutral unknown state instead of falsely selecting Intro", () => {
+    render(
+      <InterviewPhaseGuide
+        currentPhase="intro"
+        events={[]}
+        observedPhase={null}
+      />,
+    );
+    expect(
+      screen.getByText("Waiting for a clear conversation stage"),
+    ).toBeVisible();
+    expect(screen.queryByRole("listitem", { current: "step" })).toBeNull();
+  });
+
+  it("clears the highlighted stage while tracking reconnects", () => {
+    render(
+      <InterviewPhaseGuide
+        currentPhase="implementation"
+        observedPhase="implementation"
+        trackingStatus="reconnecting"
+      />,
+    );
+    expect(screen.getByText("Reconnecting stage tracking")).toBeVisible();
+    expect(screen.queryByRole("listitem", { current: "step" })).toBeNull();
+  });
+
   const events: InterviewPhaseGuideEvent[] = [
     {
       displaySummary: "Interview setup and prompt review completed.",
@@ -51,7 +77,9 @@ describe("interview phase guide", () => {
 
   it("renders compact phase-name-only tiles with accessible state", () => {
     render(<InterviewPhaseGuide currentPhase="clarify" events={events} />);
-    expect(screen.getByRole("heading", { name: "Guiding star" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: /Guiding star.*Primary question/i }),
+    ).toBeVisible();
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent(
       "Clarify",
     );
@@ -62,6 +90,34 @@ describe("interview phase guide", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/Captured:/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Final scoring/i)).not.toBeInTheDocument();
+  });
+
+  it("lights only the observed conversational stage and permits jumps", () => {
+    const guide = buildInterviewPhaseGuide({
+      currentPhase: "clarify",
+      events,
+      observedPhase: "implementation",
+    });
+    expect(guide.map((item) => item.state)).toEqual([
+      "future",
+      "future",
+      "future",
+      "future",
+      "future",
+      "current",
+      "future",
+      "future",
+      "future",
+    ]);
+
+    const afterBacktrack = buildInterviewPhaseGuide({
+      currentPhase: "implementation",
+      events,
+      observedPhase: "examples",
+    });
+    expect(afterBacktrack.find((item) => item.state === "current")?.phase).toBe(
+      "examples",
+    );
   });
 
   it("creates bounded deterministic summaries from saved evidence", () => {

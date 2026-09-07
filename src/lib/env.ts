@@ -36,7 +36,10 @@ export const serverEnvSchema = z.object({
   INTERVIEW_EVALUATOR_MODEL: optionalString,
   INTERVIEW_EVALUATOR_PROVIDER: optionalString,
   INTERVIEW_CODING_WORKSPACE_ENABLED: optionalBoolean,
+  INTERVIEW_FOLLOW_UP_ENABLED: optionalBoolean,
+  INTERVIEW_LIVE_STAGE_ENABLED: optionalBoolean,
   INTERVIEW_PROMPT_CONTENT_ENABLED: optionalBoolean,
+  INTERVIEW_REVIEW_TIMELINE_ENABLED: optionalBoolean,
   INTERVIEW_SELECTION_MODES_ENABLED: optionalBoolean,
   REALTIME_AI_PROVIDER: optionalString,
   REALTIME_AI_MODEL: optionalString,
@@ -45,6 +48,9 @@ export const serverEnvSchema = z.object({
   REALTIME_AI_TRANSCRIPTION_MODEL: optionalString,
   REALTIME_AI_VOICE: optionalString,
   ANALYTICS_PROVIDER: optionalString,
+  AUTH_GOOGLE_ENABLED: optionalBoolean,
+  AUTH_GITHUB_ENABLED: optionalBoolean,
+  CRON_SECRET: optionalString,
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -1,6 +1,10 @@
-# FAANG Interview Academy
+# AI Mock Interview
 
-An adaptive technical-interview learning platform focused on independent problem solving, pattern recognition, reflection, and long-term retention.
+A voice-based coding interview app: start one full interview without signup, then save it to an account. The underlying learning tools remain available as optional features.
+
+## AI Mock Interview first
+
+The [Hebrew specification](docs/ai-mock-interview-first-spec.md) is implemented locally: a short setup, one guest interview, Coverage question selection, preserved interviewer behavior and follow-up, and account creation after completion or abandonment. See [implementation and verification](docs/interview-first-implementation.md), [the public-launch runbook](docs/public-launch-runbook.md), and [production environment template](deploy/production.env.example). Hosted Supabase requires all migrations plus Anonymous Sign-Ins and Manual Identity Linking to be enabled.
 
 ## Current status
 
@@ -99,7 +103,7 @@ content/        Versioned Markdown curriculum lessons
 data/           Reproducible seed data added from Phase 3 onward
 ```
 
-The complete product specification remains in `faang_interview_academy_end_to_end_master_prompt.md`.
+The original platform specification is in `faang_interview_academy_end_to_end_master_prompt.md`. For the next product release, [the AI Mock Interview specification](docs/ai-mock-interview-first-spec.md) takes precedence over conflicting product-flow requirements in older documents.
 
 ## Environment variables
 
@@ -108,7 +112,9 @@ Copy `.env.example` to `.env.local`. Never commit `.env.local` or provider secre
 - `NEXT_PUBLIC_SUPABASE_URL`: browser-safe project API URL
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: preferred browser-safe project key
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: fallback for legacy Supabase projects
-- `SUPABASE_SERVICE_ROLE_KEY`: server-only administrative key; the application does not require it
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only administrative key used exclusively by scheduled guest cleanup
+- `CRON_SECRET`: random server-only secret of at least 32 characters for the cleanup endpoint
+- `AUTH_GOOGLE_ENABLED`, `AUTH_GITHUB_ENABLED`: show an OAuth provider only after configuring and testing it; default false
 - `AI_COACH_ENABLED`: server-only feature flag; defaults to disabled
 - `AI_PROVIDER`, `AI_MODEL`, and `AI_API_KEY`: optional server-only learning-coach configuration
 - `GEMINI_API_KEY`: preferred single server-only key for the Gemini coach, post-interview evaluator, and live interviewer
@@ -118,6 +124,6 @@ Copy `.env.example` to `.env.local`. Never commit `.env.local` or provider secre
 - `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, and `REALTIME_AI_API_KEY`: server-only realtime provider configuration
 - `REALTIME_AI_TRANSCRIPTION_MODEL` and `REALTIME_AI_VOICE`: optional input-transcription and voice overrides
 
-Gemini is the zero-cost local-development default when its API free tier is available. Set only `GEMINI_API_KEY` after copying `.env.example`; the example already enables the Gemini coach, post-interview evaluator, and live interviewer. OpenAI remains supported for the learning coach and live interviewer by setting their provider variables to `openai` and supplying the corresponding integration keys; the post-interview evaluator currently uses Gemini or its deterministic provisional fallback.
+Gemini is the local-development default. Verify model access, quotas and billing before use. Set `GEMINI_API_KEY` after copying `.env.example`; the example enables the Gemini coach, post-interview evaluator, and live interviewer. OpenAI remains supported for the learning coach and live interviewer by setting their provider variables to `openai` and supplying the corresponding integration keys; the post-interview evaluator currently uses Gemini or its deterministic provisional fallback.
 
 Google and GitHub sign-in buttons are implemented, but each provider remains disabled until its credentials and callback URLs are configured in the target Supabase project. Email/password authentication works locally without external credentials.

@@ -35,7 +35,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       ) : null}
 
       <div className="mt-7">
-        <OAuthButtons configured={configured} />
+        <OAuthButtons configured={configured} intent="login" />
       </div>
       <div className="text-muted my-6 flex items-center gap-3 text-xs">
         <span className="bg-border h-px flex-1" />

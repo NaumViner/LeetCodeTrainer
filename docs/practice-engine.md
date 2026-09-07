@@ -8,7 +8,7 @@ The selected problem exists before an attempt begins. Starting creates one priva
 PRE_ATTEMPT → PLANNING → CODING → TESTING → REFLECTION → COMPLETED
 ```
 
-The practice route always resumes an active attempt before offering another recommendation. Every transition saves its durable fields, so refreshing or changing devices does not discard the session.
+The practice route always resumes an active attempt before offering another recommendation. Every transition saves its durable fields, so refreshing or changing devices does not discard the session. An explicit confirmed **Abandon practice** control stops the timer and releases the active-attempt lock before taking the learner to mock-interview setup.
 
 ## Adaptive recommendation
 
@@ -37,6 +37,6 @@ pseudocode 0.45 · full solution 0.20 · copied 0.05
 
 Server Actions treat typed arguments as untrusted, validate them with Zod, re-authenticate the learner, and scope every write to the verified user ID. Forced RLS is the final ownership boundary. Database checks prevent an active attempt from carrying a result or completion timestamp, require completed attempts to contain a valid result, and keep timer fields consistent.
 
-Completion finalizes the attempt record in one database update. In that same transaction, Phase 6 creates the immutable performance snapshot and updates topic mastery, then Phase 7 adapts the problem's review schedule and appends its immutable schedule event. Mistake aggregation and full attempt history remain derived from completed records without duplicating learner input.
+Completion finalizes the attempt record in one database update. In that same transaction, Phase 6 creates the immutable performance snapshot and updates topic mastery, then Phase 7 adapts the problem's review schedule and appends its immutable schedule event. Mistake aggregation and full attempt history remain derived from completed records without duplicating learner input. Abandonment is a separate authenticated atomic transition: it preserves elapsed time and marks the attempt `abandoned`, but creates no performance, mastery, review-schedule, recommendation, or completed-history evidence.
 
 Review mode uses the same persisted state machine. It withholds hints and previous-attempt notes until the learner saves a fresh pattern prediction, then exposes the earlier result, assistance, time, pattern, takeaway, and mistakes for comparison.

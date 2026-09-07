@@ -13,19 +13,43 @@ import type { MockInterviewPhase } from "@/domain/mock-interview";
 export function InterviewPhaseGuide({
   currentPhase,
   events = [],
+  observedPhase,
+  questionCycle = "primary",
+  trackingStatus = "available",
 }: {
   currentPhase: MockInterviewPhase;
   events?: InterviewPhaseGuideEvent[];
+  observedPhase?: Exclude<MockInterviewPhase, "completed"> | null;
+  questionCycle?: "primary" | "follow_up";
+  trackingStatus?: "available" | "reconnecting" | "unavailable";
 }) {
-  const items = buildInterviewPhaseGuide({ currentPhase, events });
+  const visibleObservedPhase =
+    trackingStatus === "available" ? observedPhase : null;
+  const items = buildInterviewPhaseGuide({
+    currentPhase,
+    events,
+    observedPhase: visibleObservedPhase,
+  });
   return (
     <section aria-labelledby="interview-process-guide-title">
-      <h2
-        className="text-primary text-xs font-semibold tracking-wide uppercase"
-        id="interview-process-guide-title"
-      >
-        Guiding star
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2
+          className="text-primary text-xs font-semibold tracking-wide uppercase"
+          id="interview-process-guide-title"
+        >
+          Guiding star ·{" "}
+          {questionCycle === "primary" ? "Primary question" : "Follow-up"}
+        </h2>
+        <p aria-live="polite" className="text-muted text-xs">
+          {trackingStatus === "reconnecting"
+            ? "Reconnecting stage tracking"
+            : trackingStatus === "unavailable"
+              ? "Stage tracking unavailable"
+              : visibleObservedPhase
+                ? `Current: ${mockInterviewPhaseLabels[visibleObservedPhase]}`
+                : "Waiting for a clear conversation stage"}
+        </p>
+      </div>
       <ol
         aria-label="Live interview process"
         className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-5 lg:grid-cols-9"
@@ -33,7 +57,7 @@ export function InterviewPhaseGuide({
         {items.map((item) => (
           <li
             aria-current={item.state === "current" ? "step" : undefined}
-            className={`flex min-h-12 min-w-28 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center text-xs font-semibold sm:min-w-0 ${stateClassName(item.state)}`}
+            className={`relative flex min-h-12 min-w-28 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center text-xs font-semibold sm:min-w-0 ${stateClassName(item.state)}`}
             data-phase-state={item.state}
             key={item.phase}
           >

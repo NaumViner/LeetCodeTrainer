@@ -1,26 +1,40 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-
-import HomePage from "@/app/(marketing)/page";
-
-describe("HomePage", () => {
-  it("introduces the adaptive learning proposition", () => {
-    render(<HomePage />);
-
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { InterviewEntry } from "@/components/mock-interviews/interview-entry";
+vi.mock("@/features/mock-interviews/queries", () => ({
+  getActiveMockInterview: vi.fn(),
+}));
+vi.mock("@/features/mock-interviews/guest", () => ({
+  getGuestInterviewTrial: vi.fn(),
+  getInterviewPreferences: vi.fn(),
+}));
+vi.mock("@/features/practice/queries", () => ({ getActiveAttempt: vi.fn() }));
+vi.mock("@/features/auth/session", () => ({
+  getAuthenticatedUser: vi.fn(async () => null),
+}));
+vi.mock("@/features/mock-interviews/actions", () => ({
+  startMockInterviewAction: vi.fn(),
+  resumeMockInterviewAction: vi.fn(),
+}));
+vi.mock("@/features/realtime-interviews/config", () => ({
+  getRealtimeInterviewProviderName: () => "gemini",
+}));
+vi.mock("@/features/mock-interviews/rollout", () => ({
+  getInterviewRolloutConfig: () => ({ promptContentEnabled: true }),
+}));
+afterEach(cleanup);
+describe("interview-first landing", () => {
+  it("lets a new visitor start immediately without learning or signup choices", async () => {
+    render(await InterviewEntry({ standalone: true }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Your next interview starts here.",
+    );
     expect(
-      screen.getByRole("heading", {
-        level: 1,
-        name: /know exactly what to practice next/i,
-      }),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Start interview" }),
+    ).toBeEnabled();
+    expect(screen.getAllByRole("combobox")).toHaveLength(4);
     expect(
-      screen.getByRole("heading", { level: 3, name: "Recognize" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 3, name: "Attempt" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 3, name: "Retain" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("link", { name: "Start preparing" }),
+    ).not.toBeInTheDocument();
   });
 });

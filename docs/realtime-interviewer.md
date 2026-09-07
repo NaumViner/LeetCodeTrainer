@@ -9,7 +9,7 @@ The active workspace exposes only:
 - compact Guiding Star tiles containing phase names and state at the top of the page;
 - the approved question wording, without its title, difficulty, topic, examples, constraints, or external reference;
 - the Live interviewer directly below the question;
-- the six most recent completed learner/interviewer transcript turns;
+- the six most recent completed learner/interviewer transcript turns, newest first;
 - the Python or Java coding workspace;
 
 There is no typed-message fallback, live transcript, learner-controlled “End voice” action, or non-voice interview mode. The learner may mute and reconnect. If voice cannot be restored, the learner can abandon the interview; an interview that never activated is cancelled without creating history.
@@ -32,13 +32,17 @@ An OpenAI WebRTC adapter remains available. It sends a local SDP offer and the o
 
 Both providers receive the same bounded contract: approved question wording, current phase, selected interview language, interviewer level, and explicitly submitted code context. They do not receive the question title, difficulty, topic, pattern, public examples, constraints, canonical URL, evaluator invariants, or private tests. Transcript and code are treated as untrusted learner evidence. Code is never represented as executed, and the interviewer may not claim that tests passed.
 
-Both adapters expose one structured phase-suggestion tool. The provider can suggest only the immediate successor of the expected current phase with a bounded reason code. The application injects trusted identifiers and revalidates authentication, ownership, lease, phase order, evidence ownership, and staleness. A valid suggestion creates a “Needs confirmation” event only; it cannot advance the interview.
+Both adapters expose the same structured control tools for stage reporting, solution readiness, primary/follow-up completion, optional follow-up selection, and conclusion. The already-running Live model reports a Guiding Star stage only when the current activity changes, so stage tracking creates no second AI request per utterance. The application injects trusted interview, transcript, and idempotency identifiers; PostgreSQL validates ownership, the current voice lease, question cycle, lifecycle, evidence ordering, and allowed transitions.
+
+Provider tool calls are replay-safe. A private receipt stores the bounded result for each provider call ID, so a duplicate delivery returns the original result without duplicating a stage event, follow-up, or conclusion. Completed transcript turns are persisted before a stage/readiness report is submitted. Stale stage evidence cannot overwrite a newer accepted report. Tracking failure leaves the guide neutral while voice continues; it never fabricates Intro.
+
+Fresh provider creation uses a two-step connection reservation. Preparing credentials reserves one atomic `start` or `resume` decision without incrementing the successful connection count. Only an opened Live/WebRTC transport confirms the reservation, creates the realtime session, records the connection event, and permits the opening/resume directive. Failed or expired reservations are released, so a failed first token or transport attempt cannot consume the one valid `SYSTEM START`. A concurrent tab cannot reserve a second start.
 
 ## Active-data boundary
 
 Browser roles cannot read the raw active `mock_interviews` row or active interview evidence. Active pages use ownership-checking RPCs that return a sanitized snapshot and an opaque question-content key. Only server code resolves that key to approved question wording. The active provider routes use the same boundary.
 
-Transcript turns, phase events, notes, and submission snapshots are persisted privately. During an active interview, one ownership-checking RPC returns only the six most recent completed learner/interviewer transcript turns so they remain visible above the coding workspace after refresh or reconnect. All older transcript and other evidence become learner-visible only after completion on `/interviews/[interviewId]/review`. The scorecard remains a separate result surface.
+Transcript turns, phase events, notes, stage observations, readiness receipts, and submission snapshots are persisted privately. During an active interview, direct reads of transcript and conversation-control tables are blocked. Ownership-checking RPCs return only the sanitized active snapshot and six most recent completed learner/interviewer transcript turns. The recent turns remain visible above the coding workspace after refresh or reconnect. Detailed control history and older evidence become learner-visible only after completion on `/interviews/[interviewId]/review`. The scorecard remains a separate result surface.
 
 ## Configuration
 
@@ -50,7 +54,12 @@ REALTIME_AI_ENABLED=true
 REALTIME_AI_PROVIDER=gemini
 REALTIME_AI_MODEL=gemini-3.1-flash-live-preview
 REALTIME_AI_VOICE=Kore
+INTERVIEW_LIVE_STAGE_ENABLED=true
+INTERVIEW_FOLLOW_UP_ENABLED=true
+INTERVIEW_REVIEW_TIMELINE_ENABLED=true
 ```
+
+Guiding Star stage reporting is part of the existing live provider session. There is no standalone phase-classifier model or per-utterance `generateContent` request.
 
 OpenAI can be selected with `REALTIME_AI_PROVIDER=openai`, `REALTIME_AI_API_KEY`, a realtime model, transcription model, and voice. Secret variables must not use a `NEXT_PUBLIC_` prefix. HTTPS is required for microphone access outside localhost. The selected provider project must have model access and sufficient quota or billing.
 
@@ -60,4 +69,4 @@ Production configuration validation fails when mock interviews are enabled witho
 
 Completed transcript turns and context events are written only through authenticated database functions. Code-review submission first persists an immutable, bounded snapshot; provider delivery can then reference that snapshot. Forced Row Level Security prevents browser roles from writing the underlying tables directly.
 
-Reconnect creates a fresh provider connection or resumes the provider session when supported. Refreshing the page never exposes the stored transcript. Completing or abandoning the parent interview closes any active realtime record, and deleting an interview cascades its transcript, phase evidence, submissions, scorecard, evaluation, and profile impact.
+Gemini first attempts native handle resumption. A fresh Gemini or OpenAI connection receives a bounded durable Resume Snapshot and `SYSTEM RESUME`; it may never replay the opening after a confirmed connection or persisted transcript. The snapshot restores the lifecycle, question cycle, observed stage, approved follow-up wording, six recent turns, code snapshot, and server time. Refreshing the page exposes only the six permitted recent turns, never the older stored transcript. Completing or abandoning the parent interview closes any active realtime record, and deleting an interview cascades its transcript, control receipts, conversation state/events, phase observations, submissions, scorecard, evaluation, and profile impact.

@@ -7,8 +7,7 @@ import type {
 } from "@/features/realtime-interviews/provider";
 import {
   buildCodeReviewMessage,
-  parsePhaseSuggestionToolArguments,
-  PHASE_SUGGESTION_TOOL,
+  parseInterviewControlToolCall,
 } from "@/features/realtime-interviews/provider";
 
 type RealtimeServerEvent = {
@@ -106,10 +105,14 @@ export function parseRealtimeServerEvent(
 
 export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider {
   private channel: RTCDataChannel | null = null;
+  private connectionDirective = "";
+  private connectionAttemptId: string | null = null;
+  private connectionMode: "start" | "resume" = "start";
   private input: CreateRealtimeSessionInput | null = null;
   private intentionalClose = false;
   private localStream: MediaStream | null = null;
   private peer: RTCPeerConnection | null = null;
+  private providerCallId: string | undefined;
   private remoteAudio: HTMLAudioElement | null = null;
   private transcriptBuffer = "";
 
@@ -148,8 +151,7 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
       this.handleServerEvent(String(event.data));
     });
     channel.addEventListener("open", () => {
-      input.onStateChange("connected");
-      this.send({ type: "response.create" });
+      void this.confirmOpenTransport();
     });
     channel.addEventListener("close", () => {
       input.onSpeakingChange(false);
@@ -163,8 +165,6 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
         );
       } else if (peer.connectionState === "disconnected") {
         input.onStateChange("reconnecting");
-      } else if (peer.connectionState === "connected") {
-        input.onStateChange("connected");
       }
     });
 
@@ -183,8 +183,37 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
         detail?.message ?? "The realtime interview could not be connected.",
       );
     }
-    const answer = (await response.json()) as { sdp: string };
-    await peer.setRemoteDescription({ sdp: answer.sdp, type: "answer" });
+    const answer = (await response.json()) as {
+      connectionAttemptId: string;
+      connectionDirective: string;
+      connectionMode: "start" | "resume";
+      providerCallId?: string;
+      sdp: string;
+    };
+    if (
+      !answer.sdp ||
+      !answer.connectionDirective ||
+      !answer.connectionAttemptId
+    ) {
+      throw new Error("The realtime session response is incomplete.");
+    }
+    this.connectionAttemptId = answer.connectionAttemptId;
+    this.connectionDirective = answer.connectionDirective;
+    this.connectionMode = answer.connectionMode;
+    this.providerCallId = answer.providerCallId;
+    if (answer.connectionMode === "resume") {
+      input.onStateChange("reconnecting", "Restoring interview context…");
+    }
+    try {
+      await peer.setRemoteDescription({ sdp: answer.sdp, type: "answer" });
+    } catch (error) {
+      await input.onTransportFailed(
+        answer.connectionAttemptId,
+        answer.providerCallId,
+      );
+      this.connectionAttemptId = null;
+      throw error;
+    }
     return { localStream };
   }
 
@@ -217,6 +246,14 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
   }
 
   async closeSession() {
+    const pendingConnectionAttemptId = this.connectionAttemptId;
+    this.connectionAttemptId = null;
+    if (pendingConnectionAttemptId && this.input) {
+      await this.input.onTransportFailed(
+        pendingConnectionAttemptId,
+        this.providerCallId,
+      );
+    }
     this.intentionalClose = true;
     this.input?.onSpeakingChange(false);
     this.channel?.close();
@@ -228,6 +265,10 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
     this.peer = null;
     this.remoteAudio = null;
     this.transcriptBuffer = "";
+    this.connectionDirective = "";
+    this.connectionMode = "start";
+    this.providerCallId = undefined;
+    this.input = null;
   }
 
   private sendContext(text: string, requestResponse: boolean) {
@@ -260,30 +301,65 @@ export class OpenAiWebRtcInterviewProvider implements RealtimeInterviewProvider 
       this.input?.onStateChange("error", parsed.error);
     }
     if (parsed.functionCall && this.input) {
-      const suggestion =
-        parsed.functionCall.name === PHASE_SUGGESTION_TOOL.name
-          ? parsePhaseSuggestionToolArguments(
-              parsed.functionCall.args,
-              this.input.interviewId,
-            )
-          : null;
-      if (suggestion) this.input.onPhaseSuggestion(suggestion);
-      this.send({
-        item: {
-          call_id: parsed.functionCall.callId,
-          output: JSON.stringify(
-            suggestion
-              ? {
-                  status: "pending_learner_confirmation",
-                  transitioned: false,
-                }
-              : { error: "invalid_or_out_of_order_suggestion" },
-          ),
-          type: "function_call_output",
-        },
-        type: "conversation.item.create",
+      void this.handleControlToolCall(parsed.functionCall);
+    }
+  }
+
+  private async handleControlToolCall(call: {
+    args: unknown;
+    callId: string;
+    name: string;
+  }) {
+    const parsed = parseInterviewControlToolCall(call.name, call.args);
+    const result =
+      parsed && this.input
+        ? await this.input.onControlToolCall({
+            ...parsed,
+            idempotencyKey: call.callId,
+          })
+        : {
+            code: "invalid_control_tool",
+            message: "Invalid or unavailable interview control action.",
+            status: "error" as const,
+          };
+    this.send({
+      item: {
+        call_id: call.callId,
+        output: JSON.stringify(result),
+        type: "function_call_output",
+      },
+      type: "conversation.item.create",
+    });
+    this.send({ type: "response.create" });
+  }
+
+  private async confirmOpenTransport() {
+    const attemptId = this.connectionAttemptId;
+    const input = this.input;
+    if (!attemptId || !input) return;
+    try {
+      await input.onTransportReady({
+        connectionAttemptId: attemptId,
+        providerCallId: this.providerCallId,
       });
-      this.send({ type: "response.create" });
+      this.connectionAttemptId = null;
+      input.onStateChange(
+        "connected",
+        this.connectionMode === "resume"
+          ? "Interview context restored."
+          : undefined,
+      );
+      this.sendContext(this.connectionDirective, true);
+    } catch (error) {
+      this.connectionAttemptId = null;
+      await input.onTransportFailed(attemptId, this.providerCallId);
+      input.onStateChange(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "The voice connection could not be confirmed.",
+      );
+      await this.closeSession();
     }
   }
 

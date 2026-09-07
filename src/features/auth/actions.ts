@@ -1,5 +1,12 @@
 "use server";
 
+import { getAuthenticatedUser } from "@/features/auth/session";
+import { getActiveMockInterview } from "@/features/mock-interviews/queries";
+import {
+  prepareGuestAccountClaim,
+  finishGuestAccountClaim,
+} from "@/features/auth/guest-claim";
+import { configuredOAuthProviders } from "@/features/auth/providers";
 import type { Provider } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
@@ -37,23 +44,34 @@ export async function loginAction(
   }
 
   const supabase = await createClient();
+  const guest = await getAuthenticatedUser();
+  if (guest?.isAnonymous) {
+    if (await getActiveMockInterview())
+      return {
+        status: "error",
+        message:
+          "Finish or end your current interview before signing in, so your work can be saved.",
+      };
+    if (!(await prepareGuestAccountClaim()))
+      return {
+        status: "error",
+        message:
+          "Your interview could not be prepared for saving. Please try again.",
+      };
+  }
   const { error } = await supabase.auth.signInWithPassword(result.data);
 
   if (error) {
     return { message: "Email or password is incorrect.", status: "error" };
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("diagnostic_completed, onboarding_completed")
-    .single();
-
+  const claim = await finishGuestAccountClaim();
   redirect(
-    !profile?.onboarding_completed
-      ? "/onboarding"
-      : profile.diagnostic_completed
-        ? "/dashboard"
-        : "/diagnostic",
+    claim.pending
+      ? "/signup/transfer"
+      : claim.interviewId
+        ? "/interviews/" + claim.interviewId
+        : "/interviews",
   );
 }
 
@@ -61,8 +79,15 @@ export async function signupAction(
   _previousState: AuthActionState,
   formData: FormData,
 ): Promise<AuthActionState> {
+  const current = await getAuthenticatedUser();
+  if (current?.isAnonymous)
+    return {
+      status: "error",
+      message:
+        "Verify your email using the save-interview form to keep your first interview.",
+    };
   const result = signupSchema.safeParse({
-    displayName: formData.get("displayName"),
+    displayName: formData.get("displayName") ?? "",
     email: formData.get("email"),
     password: formData.get("password"),
   });
@@ -84,7 +109,7 @@ export async function signupAction(
     email: result.data.email,
     options: {
       data: { display_name: result.data.displayName },
-      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/interviews`,
     },
     password: result.data.password,
   });
@@ -94,7 +119,7 @@ export async function signupAction(
   }
 
   if (data.session) {
-    redirect("/onboarding");
+    redirect("/interviews");
   }
 
   return {
@@ -105,23 +130,27 @@ export async function signupAction(
 
 export async function signInWithOAuthAction(
   provider: Provider,
-  _formData: FormData,
+  formData: FormData,
 ) {
-  void _formData;
-  if (!getSupabasePublicConfig()) {
-    redirect("/login?notice=configuration");
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    options: { redirectTo: `${getSiteUrl()}/auth/callback?next=/onboarding` },
-    provider,
-  });
-
-  if (error || !data.url) {
+  if (
+    !getSupabasePublicConfig() ||
+    !configuredOAuthProviders().includes(provider as "google" | "github")
+  )
     redirect("/login?notice=oauth");
-  }
-
+  const user = await getAuthenticatedUser();
+  const supabase = await createClient();
+  if (user?.isAnonymous && (await getActiveMockInterview()))
+    redirect("/interviews");
+  const linkGuest = user?.isAnonymous && formData.get("intent") !== "login";
+  if (user?.isAnonymous && !linkGuest && !(await prepareGuestAccountClaim()))
+    redirect("/login?notice=save");
+  const options = {
+    redirectTo: getSiteUrl() + "/auth/callback?next=/interviews",
+  };
+  const { data, error } = linkGuest
+    ? await supabase.auth.linkIdentity({ provider, options })
+    : await supabase.auth.signInWithOAuth({ provider, options });
+  if (error || !data.url) redirect("/login?notice=oauth");
   redirect(data.url);
 }
 
@@ -131,5 +160,5 @@ export async function logoutAction() {
     await supabase.auth.signOut({ scope: "local" });
   }
 
-  redirect("/login");
+  redirect("/");
 }

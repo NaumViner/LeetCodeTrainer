@@ -19,8 +19,7 @@ export default async function DiagnosticPage() {
     getProfile(user.id),
     getDiagnosticAttempt(user.id),
   ]);
-  if (!profile?.onboarding_completed) redirect("/onboarding");
-  if (profile.diagnostic_completed || attempt?.status === "completed") {
+  if (profile?.diagnostic_completed || attempt?.status === "completed") {
     redirect("/diagnostic/results");
   }
 

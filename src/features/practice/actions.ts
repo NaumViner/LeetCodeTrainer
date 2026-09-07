@@ -32,11 +32,13 @@ import {
   type AttemptHintRow,
 } from "@/features/practice/queries";
 import {
+  abandonPracticeAttemptSchema,
   attemptIdSchema,
   preAttemptInputSchema,
   progressInputSchema,
   reflectionInputSchema,
   timerInputSchema,
+  type AbandonPracticeAttemptActionState,
   type PracticeActionResult,
 } from "@/features/practice/schema";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +49,38 @@ const complexityCoachInputSchema = z.object({
   spaceComplexity: z.string().trim().min(1).max(120),
   timeComplexity: z.string().trim().min(1).max(120),
 });
+
+export async function abandonPracticeAttemptAction(
+  _previousState: AbandonPracticeAttemptActionState,
+  formData: FormData,
+): Promise<AbandonPracticeAttemptActionState> {
+  const input = abandonPracticeAttemptSchema.safeParse({
+    attemptId: formData.get("attemptId"),
+    confirmation: formData.get("confirmation"),
+  });
+  if (!input.success) {
+    return {
+      message: "Confirm that you want to abandon this practice attempt.",
+      status: "error",
+    };
+  }
+  await requireAuthenticatedUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("abandon_practice_attempt", {
+    p_attempt_id: input.data.attemptId,
+  });
+  if (error) {
+    return {
+      message: "This active practice attempt could not be abandoned.",
+      status: "error",
+    };
+  }
+  revalidateAttempt(input.data.attemptId);
+  revalidatePath("/practice");
+  revalidatePath("/interviews");
+  revalidatePath("/dashboard");
+  redirect("/interviews");
+}
 
 export async function startPracticeAttemptAction(formData: FormData) {
   const problemId = problemIdSchema.safeParse(formData.get("problemId"));

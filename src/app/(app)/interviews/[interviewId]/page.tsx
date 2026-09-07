@@ -5,7 +5,7 @@ import {
   normalizeInterviewLanguage,
   type MockInterviewPhase,
 } from "@/domain/mock-interview";
-import { requireAuthenticatedUser } from "@/features/auth/session";
+import { requireInterviewUser } from "@/features/auth/session";
 import { getActiveInterviewQuestionPrompt } from "@/features/interview-evaluation/question-content";
 import {
   getMockInterview,
@@ -20,7 +20,7 @@ export default async function MockInterviewPage({
 }: {
   params: Promise<{ interviewId: string }>;
 }) {
-  const user = await requireAuthenticatedUser();
+  const user = await requireInterviewUser();
   const rollout = getInterviewRolloutConfig();
   const { interviewId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(interviewId)) notFound();
@@ -34,7 +34,7 @@ export default async function MockInterviewPage({
     if (finishedInterview.status === "completed") {
       redirect(`/interviews/${finishedInterview.id}/scorecard`);
     }
-    redirect("/interviews/history");
+    redirect(`/interviews/${finishedInterview.id}/ended`);
   }
   const realtimeProvider = getRealtimeInterviewProviderName();
   const questionPrompt = rollout.promptContentEnabled
@@ -50,6 +50,8 @@ export default async function MockInterviewPage({
         codeSnapshot: interview.codeSnapshot ?? "",
         codingLanguage: interview.codingLanguage,
         codingWorkspaceEnabled: rollout.codingWorkspaceEnabled,
+        connectionCount: interview.connectionCount,
+        conversationLifecycle: interview.conversationLifecycle,
         durationMinutes: interview.durationMinutes,
         effectiveElapsedSeconds: interview.effectiveElapsedSeconds,
         id: interview.id,
@@ -57,8 +59,12 @@ export default async function MockInterviewPage({
         interviewLanguage: normalizeInterviewLanguage(
           interview.interviewLanguage,
         ),
+        followUpPrompt: interview.followUpPrompt,
+        observedPhase: interview.observedPhase,
+        observedPhaseEventId: interview.observedPhaseEventId,
         phase: interview.phase as MockInterviewPhase,
         questionPrompt,
+        questionCycle: interview.questionCycle,
         realtimeEnabled: realtimeProvider !== null,
         realtimeProvider,
         scratchpad: interview.scratchpad ?? "",

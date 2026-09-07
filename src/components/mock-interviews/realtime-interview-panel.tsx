@@ -16,10 +16,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { MockInterviewPhase } from "@/domain/mock-interview";
 import {
   activateVoiceMockInterviewAction,
+  cancelRealtimeInterviewConnectionAction,
+  completeFollowUpInterviewQuestionAction,
+  completePrimaryInterviewQuestionAction,
+  confirmRealtimeInterviewConnectionAction,
+  concludeRealtimeMockInterviewAction,
   endRealtimeInterviewSessionAction,
   heartbeatVoiceMockInterviewAction,
-  recordMockInterviewPhaseSuggestionAction,
+  recordInterviewSolutionReadinessAction,
+  recordLiveInterviewStageAction,
+  requestInterviewFollowUpAction,
   saveRealtimeInterviewEventAction,
+  type InterviewControlActionResult,
 } from "@/features/realtime-interviews/actions";
 import type {
   RealtimeConnectionState,
@@ -28,7 +36,8 @@ import type {
 import { GeminiLiveInterviewProvider } from "@/features/realtime-interviews/gemini-live-provider";
 import { OpenAiWebRtcInterviewProvider } from "@/features/realtime-interviews/openai-webrtc-provider";
 import type {
-  InterviewPhaseSuggestion,
+  InterviewControlToolCall,
+  InterviewControlToolResult,
   RealtimeInterviewProvider,
   RealtimeInterviewProviderName,
 } from "@/features/realtime-interviews/provider";
@@ -47,22 +56,34 @@ export type RealtimeContextUpdate = {
 
 export function RealtimeInterviewPanel({
   contextUpdate,
+  concluding = false,
   interviewId,
   onConnectionStateChange,
-  onPhaseSuggestionRecorded,
+  onConversationStateChange,
+  onObservedPhaseChange,
+  onTrackingStatusChange,
   onTranscript,
   onVoiceActivated,
   phase,
   providerName,
 }: {
   contextUpdate: RealtimeContextUpdate | null;
+  concluding?: boolean;
   interviewId: string;
   onConnectionStateChange(state: RealtimeConnectionState): void;
-  onPhaseSuggestionRecorded(input: {
-    eventId: string;
-    expectedCurrentPhase: MockInterviewPhase;
-    suggestedNextPhase: MockInterviewPhase;
+  onConversationStateChange(input: {
+    followUpPrompt?: string;
+    lifecycle: string;
+    questionCycle?: "primary" | "follow_up";
+    remainingSeconds?: number;
   }): void;
+  onObservedPhaseChange(input: {
+    observedPhase: Exclude<MockInterviewPhase, "completed">;
+    observedPhaseEventId: string | null;
+  }): void;
+  onTrackingStatusChange(
+    status: "available" | "reconnecting" | "unavailable",
+  ): void;
   onTranscript(entry: RealtimeTranscriptEntry): void;
   onVoiceActivated(input: {
     elapsedSeconds: number;
@@ -77,8 +98,10 @@ export function RealtimeInterviewPanel({
   const phaseRef = useRef(phase);
   const animationRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const conclusionTimerRef = useRef<number | null>(null);
   const evidenceEventIdsRef = useRef<string[]>([]);
-  const pendingSuggestionRef = useRef<InterviewPhaseSuggestion | null>(null);
+  const latestTranscriptEventIdRef = useRef<string | null>(null);
+  const transcriptPersistenceRef = useRef<Promise<string | null> | null>(null);
   const autoConnectAttemptedRef = useRef(false);
   const activationInFlightRef = useRef(false);
   const voiceVerifiedRef = useRef(false);
@@ -90,35 +113,8 @@ export function RealtimeInterviewPanel({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [inputLevel, setInputLevel] = useState(0);
   const [message, setMessage] = useState("");
-
-  const flushPhaseSuggestion = useCallback(async () => {
-    const suggestion = pendingSuggestionRef.current;
-    const evidenceEventIds = evidenceEventIdsRef.current.slice(-12);
-    if (
-      !suggestion ||
-      suggestion.interviewId !== interviewId ||
-      suggestion.expectedCurrentPhase !== phaseRef.current ||
-      evidenceEventIds.length === 0
-    ) {
-      return;
-    }
-    pendingSuggestionRef.current = null;
-    const result = await recordMockInterviewPhaseSuggestionAction(interviewId, {
-      evidenceEventIds,
-      expectedCurrentPhase: suggestion.expectedCurrentPhase,
-      reasonCode: suggestion.reasonCode,
-      suggestedNextPhase: suggestion.suggestedNextPhase,
-    });
-    if (result.status === "success") {
-      onPhaseSuggestionRecorded({
-        eventId: result.eventId,
-        expectedCurrentPhase: suggestion.expectedCurrentPhase,
-        suggestedNextPhase: result.suggestedNextPhase,
-      });
-    } else if (result.status === "error") {
-      setMessage("The interviewer suggestion could not be recorded.");
-    }
-  }, [interviewId, onPhaseSuggestionRecorded]);
+  const [messageTone, setMessageTone] = useState<"error" | "status">("status");
+  const [interviewConcluded, setInterviewConcluded] = useState(concluding);
 
   const persistEvent = useCallback(
     async (input: {
@@ -149,11 +145,155 @@ export function RealtimeInterviewPanel({
           ...evidenceEventIdsRef.current,
           result.eventId,
         ].slice(-12);
-        void flushPhaseSuggestion();
       }
       return result.eventId;
     },
-    [flushPhaseSuggestion, interviewId],
+    [interviewId],
+  );
+
+  const handleControlToolCall = useCallback(
+    async (
+      call: InterviewControlToolCall,
+    ): Promise<InterviewControlToolResult> => {
+      await transcriptPersistenceRef.current;
+      const evidenceEventId = latestTranscriptEventIdRef.current;
+      let result: InterviewControlActionResult;
+      if (call.name === "report_current_stage") {
+        if (!evidenceEventId) {
+          onTrackingStatusChange("unavailable");
+          setMessage(
+            "Stage tracking is waiting for persisted conversation evidence.",
+          );
+          setMessageTone("status");
+          return missingEvidenceResult();
+        }
+        result = await recordLiveInterviewStageAction(
+          interviewId,
+          evidenceEventId,
+          call.idempotencyKey,
+          call.input,
+        );
+        if (result.status === "success" && result.observedPhase) {
+          onTrackingStatusChange("available");
+          onObservedPhaseChange({
+            observedPhase: result.observedPhase,
+            observedPhaseEventId: result.observedPhaseEventId ?? null,
+          });
+        }
+      } else if (call.name === "report_solution_readiness") {
+        if (!evidenceEventId) return missingEvidenceResult();
+        result = await recordInterviewSolutionReadinessAction(
+          interviewId,
+          evidenceEventId,
+          call.idempotencyKey,
+          call.input,
+        );
+      } else if (call.name === "complete_primary_question") {
+        if (!evidenceEventId) return missingEvidenceResult();
+        result = await completePrimaryInterviewQuestionAction(
+          interviewId,
+          evidenceEventId,
+          call.idempotencyKey,
+          call.input,
+        );
+      } else if (call.name === "request_follow_up") {
+        result = await requestInterviewFollowUpAction(
+          interviewId,
+          call.idempotencyKey,
+          call.input,
+        );
+      } else if (call.name === "complete_follow_up_question") {
+        if (!evidenceEventId) return missingEvidenceResult();
+        result = await completeFollowUpInterviewQuestionAction(
+          interviewId,
+          evidenceEventId,
+          call.idempotencyKey,
+          call.input,
+        );
+      } else {
+        result = await concludeRealtimeMockInterviewAction(
+          interviewId,
+          call.idempotencyKey,
+          call.input,
+        );
+      }
+
+      if (result.status === "error") {
+        if (call.name === "report_current_stage") {
+          onTrackingStatusChange("unavailable");
+          setMessage(
+            "Stage tracking is temporarily unavailable. Voice can continue.",
+          );
+          setMessageTone("status");
+        }
+        return {
+          code: result.code,
+          message: result.message,
+          status: "error",
+        };
+      }
+      if (result.lifecycle) {
+        onConversationStateChange({
+          followUpPrompt: result.followUpPrompt,
+          lifecycle: result.lifecycle,
+          questionCycle: result.questionCycle,
+          remainingSeconds: result.remainingSeconds,
+        });
+      }
+      if (call.name === "report_solution_readiness") {
+        return {
+          message: result.ready
+            ? "The readiness gate is complete. Implementation may begin."
+            : "The algorithm is not complete. Ask the learner to walk through it from input to output without giving a hint.",
+          ready: result.ready,
+          status: "success",
+        };
+      }
+      if (call.name === "request_follow_up") {
+        return {
+          followUpPrompt: result.followUpPrompt,
+          lifecycle: result.lifecycle,
+          message:
+            "One follow-up is authorized. Speak the returned followUpPrompt exactly; do not add constraints or another follow-up.",
+          questionCycle: result.questionCycle,
+          remainingSeconds: result.remainingSeconds,
+          status: "success",
+        };
+      }
+      if (call.name === "conclude_interview") {
+        setInterviewConcluded(true);
+        conclusionTimerRef.current = window.setTimeout(() => {
+          void providerRef.current?.closeSession();
+          if (animationRef.current !== null) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+          }
+          void audioContextRef.current?.close();
+          audioContextRef.current = null;
+          setInputLevel(0);
+          setConnectionState("disconnected");
+        }, 7_000);
+        return {
+          lifecycle: "concluding",
+          message:
+            "Conclusion is persisted. Give at most one brief closing sentence and do not ask another question.",
+          questionCycle: result.questionCycle,
+          remainingSeconds: result.remainingSeconds,
+          status: "success",
+        };
+      }
+      return {
+        lifecycle: result.lifecycle,
+        message: "Interview control state was persisted.",
+        status: "success",
+      };
+    },
+    [
+      interviewId,
+      onConversationStateChange,
+      onObservedPhaseChange,
+      onTrackingStatusChange,
+    ],
   );
 
   const stopInputMeter = useCallback(() => {
@@ -195,6 +335,7 @@ export function RealtimeInterviewPanel({
 
   const connect = useCallback(async () => {
     setMessage("");
+    setMessageTone("status");
     endedStateRef.current = null;
     activationInFlightRef.current = false;
     voiceVerifiedRef.current = false;
@@ -205,13 +346,37 @@ export function RealtimeInterviewPanel({
     try {
       const session = await provider.createSession({
         interviewId,
-        onPhaseSuggestion: (suggestion) => {
-          pendingSuggestionRef.current = suggestion;
-          void flushPhaseSuggestion();
+        onControlToolCall: handleControlToolCall,
+        onTransportFailed: async (connectionAttemptId, providerCallId) => {
+          await cancelRealtimeInterviewConnectionAction(
+            interviewId,
+            connectionAttemptId,
+            providerCallId,
+          );
+        },
+        onTransportReady: async ({ connectionAttemptId, providerCallId }) => {
+          const result = await confirmRealtimeInterviewConnectionAction(
+            interviewId,
+            connectionAttemptId,
+            providerCallId,
+          );
+          if (result.status === "error") throw new Error(result.message);
         },
         onSpeakingChange: setIsSpeaking,
         onStateChange: (state, detail) => {
-          if (detail) setMessage(detail);
+          if (detail) {
+            setMessage(detail);
+            setMessageTone(
+              state === "error" || state === "disconnected"
+                ? "error"
+                : "status",
+            );
+          }
+          if (state === "reconnecting") onTrackingStatusChange("reconnecting");
+          if (state === "disconnected" || state === "error") {
+            onTrackingStatusChange("unavailable");
+          }
+          if (state === "connected") onTrackingStatusChange("available");
           if (state === "connected") {
             if (voiceVerifiedRef.current) {
               setConnectionState("connected");
@@ -226,7 +391,9 @@ export function RealtimeInterviewPanel({
                 if (result.status === "error") {
                   await provider.closeSession();
                   setConnectionState("error");
+                  onTrackingStatusChange("unavailable");
                   setMessage(result.message);
+                  setMessageTone("error");
                   return;
                 }
                 voiceVerifiedRef.current = true;
@@ -246,14 +413,18 @@ export function RealtimeInterviewPanel({
         onTranscript: (entry) => {
           turnCountsRef.current[entry.role] += 1;
           onTranscript(entry);
-          void persistEvent({
+          const persistence = persistEvent({
             content: entry.text,
             eventType:
               entry.role === "learner"
                 ? "user_transcript"
                 : "assistant_transcript",
             phase: phaseRef.current,
+          }).then((eventId) => {
+            if (eventId) latestTranscriptEventIdRef.current = eventId;
+            return eventId;
           });
+          transcriptPersistenceRef.current = persistence;
         },
       });
       startInputMeter(session.localStream);
@@ -261,6 +432,7 @@ export function RealtimeInterviewPanel({
     } catch (error) {
       await provider.closeSession();
       setConnectionState("error");
+      setMessageTone("error");
       setMessage(
         error instanceof DOMException && error.name === "NotAllowedError"
           ? "Microphone access was denied. Allow microphone access and reconnect."
@@ -270,10 +442,11 @@ export function RealtimeInterviewPanel({
       );
     }
   }, [
-    flushPhaseSuggestion,
+    handleControlToolCall,
     interviewId,
     onVoiceActivated,
     onTranscript,
+    onTrackingStatusChange,
     persistEvent,
     providerName,
     startInputMeter,
@@ -285,10 +458,10 @@ export function RealtimeInterviewPanel({
   }, [connectionState, onConnectionStateChange]);
 
   useEffect(() => {
-    if (autoConnectAttemptedRef.current) return;
+    if (autoConnectAttemptedRef.current || interviewConcluded) return;
     autoConnectAttemptedRef.current = true;
     void connect();
-  }, [connect]);
+  }, [connect, interviewConcluded]);
 
   useEffect(() => {
     if (
@@ -307,7 +480,7 @@ export function RealtimeInterviewPanel({
   }, [connectionState, interviewId, stopInputMeter]);
 
   useEffect(() => {
-    if (connectionState !== "connected") return;
+    if (connectionState !== "connected" || interviewConcluded) return;
     const heartbeat = () => {
       void heartbeatVoiceMockInterviewAction(interviewId).then((result) => {
         if (result.status === "error") {
@@ -318,12 +491,11 @@ export function RealtimeInterviewPanel({
     };
     const interval = window.setInterval(heartbeat, 30_000);
     return () => window.clearInterval(interval);
-  }, [connectionState, interviewId]);
+  }, [connectionState, interviewConcluded, interviewId]);
 
   useEffect(() => {
     if (phaseRef.current !== phase) {
       evidenceEventIdsRef.current = [];
-      pendingSuggestionRef.current = null;
     }
     phaseRef.current = phase;
   }, [phase]);
@@ -332,6 +504,9 @@ export function RealtimeInterviewPanel({
     return () => {
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
+      }
+      if (conclusionTimerRef.current !== null) {
+        window.clearTimeout(conclusionTimerRef.current);
       }
       void audioContextRef.current?.close();
       void providerRef.current?.closeSession();
@@ -409,7 +584,9 @@ export function RealtimeInterviewPanel({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {!connected ? (
+            {interviewConcluded ? (
+              <Badge variant="success">Interview concluded</Badge>
+            ) : !connected ? (
               <Button disabled={connecting} onClick={connect}>
                 <RefreshCcw aria-hidden="true" className="size-4" />
                 {connecting ? "Connecting…" : "Reconnect voice"}
@@ -448,7 +625,11 @@ export function RealtimeInterviewPanel({
         {message ? (
           <p
             aria-live="polite"
-            className="bg-danger-soft text-danger mt-5 rounded-lg px-4 py-3 text-sm"
+            className={
+              messageTone === "error"
+                ? "bg-danger-soft text-danger mt-5 rounded-lg px-4 py-3 text-sm"
+                : "bg-primary-soft text-primary mt-5 rounded-lg px-4 py-3 text-sm"
+            }
           >
             {message}
           </p>
@@ -487,4 +668,13 @@ function ConnectionBadge({ state }: { state: RealtimeConnectionState }) {
       {label[state]}
     </Badge>
   );
+}
+
+function missingEvidenceResult(): InterviewControlToolResult {
+  return {
+    code: "transcript_evidence_pending",
+    message:
+      "Wait for the current transcript turn to persist, then report the control state again.",
+    status: "error",
+  };
 }

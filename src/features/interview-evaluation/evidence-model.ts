@@ -112,7 +112,7 @@ export const interviewEvidencePackageSchema = z
       .strict(),
     learnerOutcome: z
       .object({
-        result: z.enum(["solved", "partial", "failed"]),
+        result: z.enum(["solved", "partial", "failed"]).nullable(),
         retrospective: boundedText(4_000),
       })
       .strict(),
@@ -209,11 +209,7 @@ export function buildInterviewEvidencePackage(input: {
   realtimeSession: RealtimeSessionRow | null;
   trustedTests?: TrustedTestResults | null;
 }): InterviewEvidencePackage | null {
-  if (
-    input.interview.status !== "completed" ||
-    !input.interview.completed_at ||
-    !input.interview.result
-  ) {
+  if (input.interview.status !== "completed" || !input.interview.completed_at) {
     return null;
   }
 

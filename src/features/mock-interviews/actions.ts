@@ -1,28 +1,20 @@
 "use server";
 
 import { randomInt } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
+import { selectCoverageInterview } from "@/domain/interview-selection";
+import { INTERVIEW_DIFFICULTY_RANGES } from "@/domain/interview-setup";
 import {
-  selectCoverageInterview,
-  selectCustomInterview,
-  selectImprovementInterview,
-  selectLearningInterview,
-  type InterviewDifficulty,
-  type InterviewSelectionResult,
-} from "@/domain/interview-selection";
-import { requireAuthenticatedUser } from "@/features/auth/session";
+  ensureInterviewUser,
+  requireInterviewUser,
+} from "@/features/auth/session";
 import { evaluateAndPersistCompletedInterview } from "@/features/interview-evaluation/service";
 import {
   getActiveMockInterview,
   getOwnedActiveMockInterview,
 } from "@/features/mock-interviews/queries";
-import {
-  canUseInterviewSelectionMode,
-  getInterviewRolloutConfig,
-} from "@/features/mock-interviews/rollout";
+import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import {
   mockInterviewAdvanceSchema,
   mockInterviewCodeSubmissionResultSchema,
@@ -30,156 +22,71 @@ import {
   mockInterviewCompletionSchema,
   mockInterviewDeleteSchema,
   mockInterviewIdSchema,
-  mockInterviewSetupSchema,
+  quickInterviewSetupSchema,
   mockInterviewWorkspaceSaveSchema,
   type MockInterviewActionResult,
   type MockInterviewCodeSubmissionActionResult,
   type MockInterviewDeleteActionState,
-  type MockInterviewSetup,
   type MockInterviewStartActionState,
   type MockInterviewWorkspaceActionResult,
 } from "@/features/mock-interviews/schema";
-import { getInterviewSelectionContext } from "@/features/mock-interviews/selection";
-import { getActiveAttempt } from "@/features/practice/queries";
-import { getProfile } from "@/features/profile/queries";
+import { getCoverageSelectionContext } from "@/features/mock-interviews/selection";
+import { getGuestInterviewTrial } from "@/features/mock-interviews/guest";
 import { createClient } from "@/lib/supabase/server";
-import type { Json } from "@/types/database";
 import { recordOperationalEvent } from "@/lib/operational-events";
 import { isRealtimeInterviewEnabled } from "@/features/realtime-interviews/config";
+import type { Json } from "@/types/database";
 
 export async function startMockInterviewAction(
   _previousState: MockInterviewStartActionState,
   formData: FormData,
 ): Promise<MockInterviewStartActionState> {
-  const startedAt = Date.now();
-  const setup = mockInterviewSetupSchema.safeParse({
-    codingLanguage: formData.get("codingLanguage"),
-    customDifficulty: formData.get("customDifficulty") || null,
-    difficulties: formData.getAll("difficulties"),
-    durationMinutes: formData.get("durationMinutes"),
-    interviewerLevel: formData.get("interviewerLevel"),
-    interviewLanguage: formData.get("interviewLanguage"),
-    requestedTopicId: formData.get("requestedTopicId") || null,
-    selectionMode: formData.get("selectionMode"),
-  });
-  if (!setup.success) {
-    recordOperationalEvent("mock_interview_start_rejected", {
-      latencyMs: Date.now() - startedAt,
-      reason: "invalid_setup",
-    });
+  const setup = quickInterviewSetupSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!setup.success)
     return {
-      message:
-        "Review the selection mode, difficulty, language, duration, and interviewer settings.",
       status: "error",
+      message: "Check the language, difficulty range and interview duration.",
     };
-  }
-
   const rollout = getInterviewRolloutConfig();
   if (!rollout.promptContentEnabled || !isRealtimeInterviewEnabled()) {
-    recordOperationalEvent("mock_interview_start_rejected", {
-      latencyMs: Date.now() - startedAt,
-      reason: "full_voice_unavailable",
-    });
     return {
-      message:
-        "Mock interviews require an approved prompt and a configured live voice provider.",
       status: "error",
+      message:
+        "The live interviewer is temporarily unavailable. Please try again shortly.",
     };
   }
-  if (!canUseInterviewSelectionMode(rollout, setup.data.selectionMode)) {
-    recordOperationalEvent("mock_interview_start_rejected", {
-      latencyMs: Date.now() - startedAt,
-      reason: "selection_mode_rollout_disabled",
-    });
+  const user = await ensureInterviewUser();
+  if (!user)
     return {
-      message:
-        "Advanced selection modes are temporarily unavailable. Use Learning mode and try again.",
       status: "error",
-    };
-  }
-
-  const user = await requireAuthenticatedUser();
-  const profile = await getProfile(user.id);
-  if (!profile?.onboarding_completed) redirect("/onboarding");
-  if (!profile.diagnostic_completed) redirect("/diagnostic");
-  const [activeInterview, activeAttempt] = await Promise.all([
-    getActiveMockInterview(),
-    getActiveAttempt(user.id),
-  ]);
-  if (activeInterview) redirect(`/interviews/${activeInterview.id}`);
-  if (activeAttempt) redirect(`/practice/${activeAttempt.id}`);
-
-  const selectionContext = await getInterviewSelectionContext(
-    user.id,
-    new Date(),
-  );
-  const selectedDifficulties = requestedDifficulties(setup.data);
-  const randomSelectionInput = {
-    catalog: selectionContext.selectionProblems,
-    collectionProblemIds: selectionContext.collectionProblemIds,
-    completedProblemIds: selectionContext.completedProblemIds,
-    randomIndex: randomInt,
-  };
-  let selected: InterviewSelectionResult<
-    (typeof selectionContext.selectionProblems)[number]
-  >;
-  switch (setup.data.selectionMode) {
-    case "coverage":
-      selected = selectCoverageInterview({
-        ...randomSelectionInput,
-        coverage: selectionContext.coverage,
-        selectedDifficulties,
-      });
-      break;
-    case "improvement":
-      selected = selectImprovementInterview({
-        ...randomSelectionInput,
-        coverage: selectionContext.coverage,
-        selectedDifficulties,
-        topicPerformance: selectionContext.topicPerformance,
-      });
-      break;
-    case "learning":
-      selected = selectLearningInterview({
-        catalog: selectionContext.selectionProblems,
-        collectionProblemIds: selectionContext.collectionProblemIds,
-        rankedRecommendations: selectionContext.scoredRecommendations,
-        recentProblemIds: selectionContext.recentProblemIds,
-      });
-      break;
-    case "custom":
-      selected = selectCustomInterview({
-        ...randomSelectionInput,
-        requestedDifficulty: setup.data.customDifficulty!,
-        requestedTopicId: setup.data.requestedTopicId!,
-        validTopicIds: new Set(
-          selectionContext.coverage.topics.map((topic) => topic.id),
-        ),
-      });
-      break;
-  }
-  if (!selected.ok) {
-    recordOperationalEvent("mock_interview_start_rejected", {
-      latencyMs: Date.now() - startedAt,
-      reason: selected.code,
-      selectionMode: setup.data.selectionMode,
-    });
-    const topicNames = selected.details.topicIds?.flatMap((topicId) => {
-      const topic = selectionContext.coverage.topics.find(
-        (candidate) => candidate.id === topicId,
-      );
-      return topic ? [topic.name] : [];
-    });
-    return {
       message:
-        topicNames && topicNames.length > 0
-          ? `${selected.message} Affected topics: ${topicNames.join(", ")}.`
-          : selected.message,
-      status: "error",
+        "Your interview could not be prepared. Please try again shortly.",
     };
-  }
-
   const supabase = await createClient();
+  await supabase.rpc("expire_pending_guest_interview");
+  const active = await getActiveMockInterview();
+  if (active) redirect("/interviews/" + active.id);
+  if (user.isAnonymous) {
+    const trial = await getGuestInterviewTrial();
+    if (trial.consumed) redirect("/signup");
+  }
+  const context = await getCoverageSelectionContext(user.id);
+  const selectedDifficulties = [
+    ...INTERVIEW_DIFFICULTY_RANGES[setup.data.difficultyRange],
+  ];
+  const selected = selectCoverageInterview({
+    ...context,
+    selectedDifficulties,
+    randomIndex: randomInt,
+  });
+  if (!selected.ok)
+    return {
+      status: "error",
+      message:
+        "No question is available in this range for your next topic. Try a wider difficulty range. Your trial has not been used.",
+    };
   const { data: interviewId, error } = await supabase.rpc(
     "start_mock_interview_v2",
     {
@@ -189,54 +96,87 @@ export async function startMockInterviewAction(
       p_interview_language: setup.data.interviewLanguage,
       p_problem_id: selected.problem.id,
       p_requested_difficulties: selectedDifficulties,
-      // PostgreSQL accepts null here; generated function argument types do not
-      // currently retain RPC parameter nullability.
-      p_requested_topic_id: setup.data.requestedTopicId!,
+      p_requested_topic_id: null!,
       p_selected_topic_id: selected.selectedTopicId,
       p_selection_algorithm_version: selected.metadata.algorithmVersion,
       p_selection_metadata: {
-        candidateProblemCount: selected.metadata.candidateProblemCount,
-        candidateTopicCount: selected.metadata.candidateTopicCount,
+        ...selected.metadata,
         reasons: selected.reasons.map((reason) => reason.slice(0, 240)),
-        recencyFallbackUsed: selected.metadata.recencyFallbackUsed,
-        repeatFallbackUsed: selected.metadata.repeatFallbackUsed,
       },
-      p_selection_mode: selected.mode,
+      p_selection_mode: "coverage",
     },
   );
   if (error || !interviewId) {
-    recordOperationalEvent("mock_interview_start_failed", {
-      latencyMs: Date.now() - startedAt,
-      reason: error?.code ?? "missing_interview_id",
-      selectionMode: selected.mode,
-    });
+    const current = await getActiveMockInterview();
+    if (current) redirect("/interviews/" + current.id);
+    if (error?.message.includes("trial_used")) redirect("/signup");
     return {
-      message:
-        "The mock interview could not be started. Refresh the page and try again.",
       status: "error",
+      message: error?.message.includes("practice attempt")
+        ? "You have unfinished practice. Open it to save and end it before starting an interview."
+        : "The interview could not be started. Please try again shortly.",
     };
   }
-  recordOperationalEvent("mock_interview_started", {
-    codingLanguage: setup.data.codingLanguage,
-    durationMinutes: setup.data.durationMinutes,
-    interviewId,
-    interviewerLevel: setup.data.interviewerLevel,
-    language: setup.data.interviewLanguage,
-    latencyMs: Date.now() - startedAt,
-    selectionMode: selected.mode,
-    selectionModesEnabled: rollout.selectionModesEnabled,
+  await supabase.rpc("save_interview_preferences", {
+    p_preferences: setup.data,
   });
-  redirect(`/interviews/${interviewId}`);
+  recordOperationalEvent("mock_interview_started", {
+    interviewId,
+    selectionMode: "coverage",
+    language: setup.data.interviewLanguage,
+    interviewerLevel: setup.data.interviewerLevel,
+    durationMinutes: setup.data.durationMinutes,
+  });
+  redirect("/interviews/" + interviewId);
 }
 
-function requestedDifficulties(
-  setup: MockInterviewSetup,
-): InterviewDifficulty[] {
-  if (setup.selectionMode === "learning") {
-    return ["easy", "medium", "hard"];
+export async function resumeMockInterviewAction() {
+  await requireInterviewUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("expire_pending_guest_interview");
+  if (error)
+    throw new Error("Your interview could not be restored. Please try again.");
+  const active = await getActiveMockInterview();
+  redirect(active ? "/interviews/" + active.id : "/interviews");
+}
+
+export async function finishConcludedMockInterviewAction(
+  interviewId: string,
+): Promise<MockInterviewActionResult> {
+  const id = mockInterviewIdSchema.safeParse(interviewId);
+  if (!id.success) return invalidInterviewInput();
+  const user = await requireInterviewUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("finish_concluded_mock_interview", {
+    p_mock_interview_id: id.data,
+  });
+  if (error) return saveInterviewError();
+  try {
+    await evaluateAndPersistCompletedInterview(user.id, id.data);
+  } catch {
+    recordOperationalEvent("interview_evaluation_failed", {
+      interviewId: id.data,
+      reason: "final_evaluation_unavailable",
+    });
   }
-  if (setup.selectionMode === "custom") return [setup.customDifficulty!];
-  return setup.difficulties;
+  revalidatePath("/interviews");
+  revalidatePath(`/interviews/${id.data}/scorecard`);
+  return { status: "success" };
+}
+
+export async function retryInterviewEvaluationAction(form: FormData) {
+  const id = mockInterviewIdSchema.safeParse(form.get("interviewId"));
+  if (!id.success) return;
+  const user = await requireInterviewUser();
+  try {
+    await evaluateAndPersistCompletedInterview(user.id, id.data);
+  } catch {
+    recordOperationalEvent("interview_evaluation_failed", {
+      interviewId: id.data,
+      reason: "retry_unavailable",
+    });
+  }
+  revalidatePath(`/interviews/${id.data}/scorecard`);
 }
 
 export async function advanceMockInterviewAction(
@@ -247,7 +187,7 @@ export async function advanceMockInterviewAction(
   const id = mockInterviewIdSchema.safeParse(interviewId);
   const parsed = mockInterviewAdvanceSchema.safeParse(input);
   if (!id.success || !parsed.success) return invalidInterviewInput();
-  await requireAuthenticatedUser();
+  await requireInterviewUser();
   const supabase = await createClient();
   const { error } = await supabase.rpc("advance_mock_interview", {
     p_elapsed_seconds: parsed.data.elapsedSeconds,
@@ -290,7 +230,7 @@ export async function saveMockInterviewWorkspaceAction(
       status: "error",
     };
   }
-  await requireAuthenticatedUser();
+  await requireInterviewUser();
   const supabase = await createClient();
   const { data: workspaceVersion, error } = await supabase.rpc(
     "save_mock_interview_workspace",
@@ -336,7 +276,7 @@ export async function submitMockInterviewCodeAction(
   if (!id.success || !parsed.success) {
     return { message: "The code submission is invalid.", status: "error" };
   }
-  await requireAuthenticatedUser();
+  await requireInterviewUser();
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submit_mock_interview_code", {
     p_advance_to_testing: parsed.data.advanceToTesting,
@@ -389,7 +329,7 @@ export async function completeMockInterviewAction(
   const id = mockInterviewIdSchema.safeParse(interviewId);
   const parsed = mockInterviewCompletionSchema.safeParse(input);
   if (!id.success || !parsed.success) return invalidInterviewInput();
-  const user = await requireAuthenticatedUser();
+  const user = await requireInterviewUser();
   const supabase = await createClient();
   const { error } = await supabase.rpc("complete_mock_interview", {
     p_code_quality_rating: parsed.data.codeQualityRating,
@@ -437,7 +377,7 @@ export async function completeMockInterviewAction(
 export async function abandonMockInterviewAction(formData: FormData) {
   const id = mockInterviewIdSchema.safeParse(formData.get("interviewId"));
   if (!id.success) throw new Error("The mock interview is invalid.");
-  await requireAuthenticatedUser();
+  await requireInterviewUser();
   const supabase = await createClient();
   const interview = await getOwnedActiveMockInterview(id.data);
   if (!interview) {
@@ -458,7 +398,7 @@ export async function abandonMockInterviewAction(formData: FormData) {
   );
   revalidatePath("/interviews");
   revalidatePath("/interviews/history");
-  redirect(pendingVoice ? "/interviews" : "/interviews/history");
+  redirect(pendingVoice ? "/interviews" : `/interviews/${id.data}/ended`);
 }
 
 export async function deleteMockInterviewAction(
@@ -478,7 +418,7 @@ export async function deleteMockInterviewAction(
       status: "error",
     };
   }
-  await requireAuthenticatedUser();
+  await requireInterviewUser();
   const supabase = await createClient();
   const { data: topicId, error } = await supabase.rpc(
     "delete_owned_mock_interview",

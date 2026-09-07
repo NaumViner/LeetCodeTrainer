@@ -4,6 +4,8 @@ const errors = [];
 function requireValue(name) {
   const value = environment[name]?.trim();
   if (!value) errors.push(`${name} is required.`);
+  else if (/replace-with|your-.*key|example\.(com|org|net)/i.test(value))
+    errors.push(`${name} still contains a placeholder.`);
   return value;
 }
 
@@ -45,6 +47,12 @@ requireHttps("Application URL", appUrl);
 
 const supabaseUrl = requireValue("NEXT_PUBLIC_SUPABASE_URL");
 requireHttps("NEXT_PUBLIC_SUPABASE_URL", supabaseUrl);
+enabled("AUTH_GOOGLE_ENABLED");
+enabled("AUTH_GITHUB_ENABLED");
+requireValue("SUPABASE_SERVICE_ROLE_KEY");
+const cronSecret = requireValue("CRON_SECRET");
+if (cronSecret && cronSecret.length < 32)
+  errors.push("CRON_SECRET must have at least 32 characters.");
 if (
   !environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() &&
   !environment.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
@@ -132,6 +140,20 @@ if (!interviewPromptContentEnabled) {
 const interviewCodingWorkspaceEnabled = rolloutEnabled(
   "INTERVIEW_CODING_WORKSPACE_ENABLED",
 );
+if (
+  !interviewSelectionModesEnabled ||
+  !interviewCodingWorkspaceEnabled ||
+  !rolloutEnabled("INTERVIEW_LIVE_STAGE_ENABLED") ||
+  !rolloutEnabled("INTERVIEW_FOLLOW_UP_ENABLED")
+) {
+  errors.push(
+    "The public launch requires Coverage, the coding workspace, live analysis and follow-up to remain enabled.",
+  );
+}
+if (!enabled("INTERVIEW_EVALUATOR_ENABLED"))
+  errors.push(
+    "INTERVIEW_EVALUATOR_ENABLED must be true for public-launch feedback.",
+  );
 
 if (errors.length) {
   console.error("Production environment validation failed:");

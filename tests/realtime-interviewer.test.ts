@@ -12,11 +12,16 @@ import {
   realtimeSessionRequestSchema,
   voiceActivationResultSchema,
 } from "@/features/realtime-interviews/model";
-import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
+import {
+  buildConnectionDirective,
+  buildInterviewInstructions,
+} from "@/features/realtime-interviews/instructions";
 import { parseRealtimeServerEvent } from "@/features/realtime-interviews/openai-webrtc-provider";
 import {
   buildCodeReviewMessage,
-  parsePhaseSuggestionToolArguments,
+  enabledInterviewControlTools,
+  INTERVIEW_CONTROL_TOOLS,
+  parseInterviewControlToolCall,
 } from "@/features/realtime-interviews/provider";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -77,31 +82,57 @@ describe("realtime interviewer protocol", () => {
     ).toBe(true);
   });
 
-  it("accepts only an immediate structured phase tool signal", () => {
+  it("accepts structured live stage and readiness control signals", () => {
     expect(
-      parsePhaseSuggestionToolArguments(
-        {
-          expectedCurrentPhase: "clarify",
-          reasonCode: "learner_completed_objective",
-          suggestedNextPhase: "examples",
-        },
-        "00000000-0000-4000-8000-000000000001",
-      ),
+      parseInterviewControlToolCall("report_current_stage", {
+        phase: "examples",
+        questionCycle: "primary",
+        reasonCode: "examples_now_active",
+        signal: "explicit",
+      }),
     ).toMatchObject({
-      evidenceEventIds: [],
-      expectedCurrentPhase: "clarify",
-      suggestedNextPhase: "examples",
+      input: { phase: "examples", questionCycle: "primary" },
+      name: "report_current_stage",
     });
     expect(
-      parsePhaseSuggestionToolArguments(
-        {
-          expectedCurrentPhase: "clarify",
-          reasonCode: "learner_completed_objective",
-          suggestedNextPhase: "implementation",
-        },
-        "00000000-0000-4000-8000-000000000001",
-      ),
+      parseInterviewControlToolCall("report_current_stage", {
+        phase: "not-a-stage",
+        questionCycle: "primary",
+        reasonCode: "invalid_stage",
+        signal: "explicit",
+      }),
     ).toBeNull();
+    expect(INTERVIEW_CONTROL_TOOLS.map((tool) => tool.name)).toContain(
+      "conclude_interview",
+    );
+  });
+
+  it("supports independent server-side stage and follow-up rollback", () => {
+    const names = enabledInterviewControlTools({
+      followUpEnabled: false,
+      liveStageEnabled: false,
+    }).map((tool) => tool.name);
+    expect(names).not.toContain("report_current_stage");
+    expect(names).not.toContain("request_follow_up");
+    expect(names).toContain("report_solution_readiness");
+    expect(names).toContain("complete_follow_up_question");
+    expect(names).toContain("conclude_interview");
+
+    const instructions = buildInterviewInstructions(
+      {
+        interview_language: "english",
+        interviewer_level: "faang_tough",
+        phase: "optimization",
+      },
+      "Primary prompt",
+      null,
+      { followUpEnabled: false, liveStageEnabled: false },
+    );
+    expect(instructions).toContain(
+      "Live stage reporting is temporarily disabled",
+    );
+    expect(instructions).toContain("Follow-ups are unavailable");
+    expect(instructions).toContain("conclude_interview");
   });
 
   it("parses OpenAI function arguments separately from transcript text", () => {
@@ -109,18 +140,19 @@ describe("realtime interviewer protocol", () => {
       parseRealtimeServerEvent(
         JSON.stringify({
           arguments: JSON.stringify({
-            expectedCurrentPhase: "examples",
-            reasonCode: "learner_completed_objective",
-            suggestedNextPhase: "brute_force",
+            phase: "implementation",
+            questionCycle: "primary",
+            reasonCode: "coding_started",
+            signal: "explicit",
           }),
           call_id: "call_phase_1",
-          name: "suggest_phase_transition",
+          name: "report_current_stage",
           type: "response.function_call_arguments.done",
         }),
       ).functionCall,
     ).toMatchObject({
       callId: "call_phase_1",
-      name: "suggest_phase_transition",
+      name: "report_current_stage",
     });
   });
 
@@ -159,7 +191,9 @@ describe("realtime interviewer protocol", () => {
     });
     expect(instructions).toContain("CRITICAL BLANK WALL RULE");
     expect(instructions).toContain("Give zero hints");
-    expect(instructions).toContain("Give zero validation");
+    expect(instructions).toContain("verify procedural completeness");
+    expect(instructions).toContain("Solution Readiness Gate");
+    expect(instructions).toContain("optional, never automatic");
     expect(instructions).toContain("Can we do better?");
     expect(instructions).toContain(
       "I have pasted the problem on the board. What are your clarifying questions?",
@@ -167,6 +201,48 @@ describe("realtime interviewer protocol", () => {
     expect(instructions).toContain("dry-run it step by step");
     expect(instructions).toContain("consistently in Hebrew");
     expect(instructions).toContain("never translate or rewrite source code");
+  });
+
+  it("uses a resume directive and restored state after any prior transcript", () => {
+    const snapshot = {
+      codeSnapshot: "def solve(): pass",
+      concluding: false,
+      connectionAttemptId: "9ad8d40b-879f-4ba1-b6fc-00a9f8f5f211",
+      connectionCount: 2,
+      connectionMode: "resume" as const,
+      followUpPrompt: "Return the first matching index.",
+      lifecycle: "follow_up" as const,
+      observedPhase: "implementation" as const,
+      observedPhaseEventId: "12",
+      primaryReadiness: "completed" as const,
+      questionCycle: "follow_up" as const,
+      recentTranscript: [
+        {
+          id: "12",
+          questionCycle: "follow_up" as const,
+          role: "learner" as const,
+          text: "I will adapt the loop.",
+        },
+      ],
+      remainingSeconds: 720,
+      version: 2,
+      workspaceVersion: 4,
+    };
+    const directive = buildConnectionDirective(snapshot);
+    const instructions = buildInterviewInstructions(
+      {
+        interview_language: "english",
+        interviewer_level: "faang_tough",
+        phase: "implementation",
+      },
+      "Primary prompt",
+      snapshot,
+    );
+    expect(directive).toContain("SYSTEM RESUME");
+    expect(directive).toContain("Do not greet");
+    expect(instructions).toContain("follow_up");
+    expect(instructions).toContain("Return the first matching index.");
+    expect(instructions).not.toContain("[SYSTEM START]");
   });
 
   it("passes only the question wording to the provider", () => {

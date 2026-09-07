@@ -62,6 +62,9 @@ Add the following variables in Vercel. Apply required database variables to Prod
 | `INTERVIEW_SELECTION_MODES_ENABLED`                                | Server only         | No                 | Coverage/Improvement/Custom rollout control      |
 | `INTERVIEW_PROMPT_CONTENT_ENABLED`                                 | Server only         | No                 | Embedded approved-prompt rollout control         |
 | `INTERVIEW_CODING_WORKSPACE_ENABLED`                               | Server only         | No                 | CodeMirror workspace rollout control             |
+| `INTERVIEW_LIVE_STAGE_ENABLED`                                     | Server only         | No                 | Live Guiding Star rollout control                |
+| `INTERVIEW_FOLLOW_UP_ENABLED`                                      | Server only         | No                 | New follow-up rollout control                    |
+| `INTERVIEW_REVIEW_TIMELINE_ENABLED`                                | Server only         | No                 | Conversation timeline rollout control            |
 | `REALTIME_AI_ENABLED`                                              | Server only         | No                 | Set `true` for live voice interviews             |
 | `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, `REALTIME_AI_API_KEY` | Server only         | When voice enabled | Gemini Live or OpenAI Realtime configuration     |
 | `REALTIME_AI_TRANSCRIPTION_MODEL`, `REALTIME_AI_VOICE`             | Server only         | No                 | Optional realtime overrides                      |
@@ -69,7 +72,7 @@ Add the following variables in Vercel. Apply required database variables to Prod
 
 Never prefix a provider secret with `NEXT_PUBLIC_`. Preview deployments automatically use Vercel's deployment URL for Auth redirects when `NEXT_PUBLIC_APP_URL` is not set in Preview.
 
-The production build runs `npm run env:check:production`. It rejects missing database settings, insecure production origins, malformed feature flags, and enabled AI features without their required server key. The three interview rollout controls default to enabled when omitted; set them explicitly in production so the intended release state is auditable. See [interview-rollout.md](interview-rollout.md) for staged enablement and rollback behavior.
+The production build runs `npm run env:check:production`. It rejects missing database settings, insecure production origins, malformed feature flags, and enabled AI features without their required server key. Interview rollout controls default to enabled when omitted; set them explicitly in production so the intended release state is auditable. See [interview-rollout.md](interview-rollout.md) for staged enablement and rollback behavior.
 
 ## 4. Deploy and verify
 

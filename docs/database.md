@@ -32,7 +32,7 @@ The committed catalog is generated deterministically from `data/problems.json`; 
 
 ## Practice model
 
-`attempts` stores one learner's complete practice record: problem and mode, workflow phase, status, timer state, result, highest help level, pre-attempt reasoning, confidence, code snapshot, complexity analysis, mistakes, missed edge cases, takeaway, and timestamps. A partial unique index permits only one active attempt per learner, which gives `/practice` an unambiguous resume target.
+`attempts` stores one learner's complete practice record: problem and mode, workflow phase, status, timer state, result, highest help level, pre-attempt reasoning, confidence, code snapshot, complexity analysis, mistakes, missed edge cases, takeaway, and timestamps. A partial unique index permits only one active attempt per learner, which gives `/practice` an unambiguous resume target. `abandon_practice_attempt` locks and closes only the caller's active attempt, records final elapsed time, and releases that unique active slot without producing completed-attempt evidence.
 
 `attempt_hints` stores the ordered progressive hints revealed during an attempt. A database trigger raises the parent attempt's assistance level whenever a hint is inserted, so help tracking cannot be forgotten by a UI path.
 
@@ -91,6 +91,10 @@ The table uses forced RLS and own-row reads. Direct browser inserts, updates, an
 `realtime_interview_sessions` stores one optional provider session per mock interview, including provider/model identity, connection lifecycle, a bounded completion summary, and private provider call identifier. Reconnects update that same record instead of creating competing sessions.
 
 `realtime_interview_events` stores ordered completed learner/interviewer transcript turns, phase context, code snapshots, and connection events. General events are capped at 8,000 characters and code snapshots at 50,000. Authenticated functions verify ownership and an active parent interview before starting a session or appending an event. Direct browser writes are revoked, both tables use forced RLS, and completion of the parent mock interview closes any active realtime session and creates a deterministic summary.
+
+`mock_interview_conversation_state` separates the durable primary/follow-up lifecycle from the display-only observed Guiding Star stage and evaluation evidence. A short-lived connection reservation makes the first `start` decision atomic; only a browser transport that actually opens can confirm it and increment the successful connection count. `mock_interview_conversation_events` is the append-only lifecycle/stage/reconnect ledger. Direct reads of both tables are denied while the parent interview is active and become owner-readable only after it ends.
+
+`approved_interview_follow_ups` is the single versioned source of exact repository-authored follow-up wording. Server time and locked timer state enforce the 600-second threshold and one-follow-up maximum. `mock_interview_control_receipts` privately stores bounded results keyed by provider call ID, making all live control tools replay-safe. Browser roles have no direct access to receipts or direct execution privilege on the underlying transition functions; they use the authenticated idempotent dispatcher.
 
 ## Migration workflow
 

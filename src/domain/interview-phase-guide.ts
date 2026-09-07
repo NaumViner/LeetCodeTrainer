@@ -29,7 +29,19 @@ export type InterviewPhaseGuideItem = {
 export function buildInterviewPhaseGuide(input: {
   currentPhase: MockInterviewPhase;
   events: InterviewPhaseGuideEvent[];
+  observedPhase?: Exclude<MockInterviewPhase, "completed"> | null;
 }): InterviewPhaseGuideItem[] {
+  if (input.observedPhase !== undefined) {
+    return GUIDE_PHASES.map((phase) => ({
+      objective: PHASE_OBJECTIVES[phase],
+      phase,
+      state:
+        input.observedPhase && phase === input.observedPhase
+          ? "current"
+          : "future",
+      summary: null,
+    }));
+  }
   const currentIndex = MOCK_INTERVIEW_PHASES.indexOf(input.currentPhase);
   const completedSummary = new Map(
     input.events

@@ -317,4 +317,84 @@ describe.sequential("practice attempt persistence and isolation", () => {
       takeaway: "Store each value before checking the next one.",
     });
   });
+
+  it("abandons only the owned active attempt without changing mastery", async () => {
+    const { data: masteryBefore, error: masteryBeforeError } = await learner
+      .from("topic_mastery")
+      .select("overall_score, total_attempts")
+      .single();
+    expect(masteryBeforeError).toBeNull();
+
+    const timerStartedAt = new Date(Date.now() - 5_000).toISOString();
+    const { data: activeAttempt, error: activeAttemptError } = await learner
+      .from("attempts")
+      .insert({
+        problem_id: problemId,
+        user_id: learnerId,
+      })
+      .select("id")
+      .single();
+    expect(activeAttemptError).toBeNull();
+    const { error: timerError } = await learner
+      .from("attempts")
+      .update({
+        duration_seconds: 20,
+        timer_running: true,
+        timer_started_at: timerStartedAt,
+      })
+      .eq("id", activeAttempt!.id);
+    expect(timerError).toBeNull();
+
+    expect(
+      (
+        await otherLearner.rpc("abandon_practice_attempt", {
+          p_attempt_id: activeAttempt!.id,
+        })
+      ).error,
+    ).not.toBeNull();
+
+    const { data: result, error } = await learner.rpc(
+      "abandon_practice_attempt",
+      { p_attempt_id: activeAttempt!.id },
+    );
+    expect(error).toBeNull();
+    expect(result).toMatchObject({
+      attemptId: activeAttempt!.id,
+      status: "abandoned",
+    });
+    expect(
+      (result as { durationSeconds: number }).durationSeconds,
+    ).toBeGreaterThanOrEqual(24);
+
+    const { data: abandoned } = await learner
+      .from("attempts")
+      .select(
+        "completed_at, duration_seconds, phase, result, status, timer_running, timer_started_at",
+      )
+      .eq("id", activeAttempt!.id)
+      .single();
+    expect(abandoned).toMatchObject({
+      phase: "pre_attempt",
+      result: "abandoned",
+      status: "abandoned",
+      timer_running: false,
+      timer_started_at: null,
+    });
+    expect(abandoned?.completed_at).not.toBeNull();
+
+    const { data: masteryAfter, error: masteryAfterError } = await learner
+      .from("topic_mastery")
+      .select("overall_score, total_attempts")
+      .single();
+    expect(masteryAfterError).toBeNull();
+    expect(masteryAfter).toEqual(masteryBefore);
+
+    const { data: nextAttempt, error: nextAttemptError } = await learner
+      .from("attempts")
+      .insert({ problem_id: problemId, user_id: learnerId })
+      .select("id")
+      .single();
+    expect(nextAttemptError).toBeNull();
+    expect(nextAttempt?.id).not.toBe(activeAttempt!.id);
+  });
 });

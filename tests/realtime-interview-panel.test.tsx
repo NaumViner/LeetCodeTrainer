@@ -5,13 +5,18 @@ import { RealtimeInterviewPanel } from "@/components/mock-interviews/realtime-in
 
 vi.mock("@/features/realtime-interviews/actions", () => ({
   activateVoiceMockInterviewAction: vi.fn(),
+  completeFollowUpInterviewQuestionAction: vi.fn(),
+  completePrimaryInterviewQuestionAction: vi.fn(),
+  concludeRealtimeMockInterviewAction: vi.fn(),
   endRealtimeInterviewSessionAction: vi.fn(async () => ({
     status: "success",
   })),
   heartbeatVoiceMockInterviewAction: vi.fn(async () => ({
     status: "success",
   })),
-  recordMockInterviewPhaseSuggestionAction: vi.fn(),
+  recordInterviewSolutionReadinessAction: vi.fn(),
+  recordLiveInterviewStageAction: vi.fn(),
+  requestInterviewFollowUpAction: vi.fn(),
   saveRealtimeInterviewEventAction: vi.fn(),
 }));
 
@@ -42,7 +47,9 @@ describe("realtime interview panel", () => {
         contextUpdate={null}
         interviewId="00000000-0000-4000-8000-000000000001"
         onConnectionStateChange={vi.fn()}
-        onPhaseSuggestionRecorded={vi.fn()}
+        onConversationStateChange={vi.fn()}
+        onObservedPhaseChange={vi.fn()}
+        onTrackingStatusChange={vi.fn()}
         onTranscript={vi.fn()}
         onVoiceActivated={vi.fn()}
         phase="intro"

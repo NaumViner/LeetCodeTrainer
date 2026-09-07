@@ -34,7 +34,7 @@ export async function saveProfileAction(
 
   const user = await requireAuthenticatedUser();
   const supabase = await createClient();
-  const { data: profile, error } = await supabase
+  const { error } = await supabase
     .from("profiles")
     .update({
       display_name: result.data.displayName,
@@ -58,5 +58,5 @@ export async function saveProfileAction(
     };
   }
 
-  redirect(profile.diagnostic_completed ? "/dashboard" : "/diagnostic");
+  redirect("/interviews");
 }

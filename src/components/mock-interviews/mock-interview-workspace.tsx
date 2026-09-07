@@ -28,6 +28,7 @@ import {
   abandonMockInterviewAction,
   advanceMockInterviewAction,
   completeMockInterviewAction,
+  finishConcludedMockInterviewAction,
 } from "@/features/mock-interviews/actions";
 import type { RealtimeContextUpdate } from "@/components/mock-interviews/realtime-interview-panel";
 import type { RealtimeInterviewProviderName } from "@/features/realtime-interviews/provider";
@@ -59,12 +60,23 @@ type InterviewWorkspaceInput = {
   codeSnapshot: string;
   codingLanguage: "java" | "python";
   codingWorkspaceEnabled: boolean;
+  connectionCount: number;
+  conversationLifecycle:
+    | "primary_question"
+    | "primary_completed"
+    | "follow_up"
+    | "follow_up_completed"
+    | "concluding";
   durationMinutes: number;
   effectiveElapsedSeconds: number;
   id: string;
   initialRecentTranscript: RealtimeTranscriptEntry[];
   interviewLanguage: InterviewLanguage;
+  observedPhase: Exclude<MockInterviewPhase, "completed"> | null;
+  observedPhaseEventId: string | null;
+  followUpPrompt: string | null;
   questionPrompt: string;
+  questionCycle: "primary" | "follow_up";
   realtimeEnabled: boolean;
   realtimeProvider: RealtimeInterviewProviderName | null;
   scratchpad: string;
@@ -84,8 +96,17 @@ export function MockInterviewWorkspace({
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState(interview.phase);
-  const [phaseEvents, setPhaseEvents] = useState<InterviewPhaseGuideEvent[]>(
-    [],
+  const phaseEvents: InterviewPhaseGuideEvent[] = [];
+  const [observedStage, setObservedStage] = useState({
+    eventId: interview.observedPhaseEventId,
+    phase: interview.observedPhase,
+  });
+  const [conversationLifecycle, setConversationLifecycle] = useState(
+    interview.conversationLifecycle,
+  );
+  const [questionCycle, setQuestionCycle] = useState(interview.questionCycle);
+  const [followUpPrompt, setFollowUpPrompt] = useState(
+    interview.followUpPrompt,
   );
   const [seconds, setSeconds] = useState(interview.effectiveElapsedSeconds);
   const [running, setRunning] = useState(interview.timerRunning);
@@ -94,6 +115,9 @@ export function MockInterviewWorkspace({
   const [realtimeContext, setRealtimeContext] =
     useState<RealtimeContextUpdate | null>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [trackingStatus, setTrackingStatus] = useState<
+    "available" | "reconnecting" | "unavailable"
+  >(interview.observedPhase ? "available" : "unavailable");
   const [recentTranscript, setRecentTranscript] = useState(
     interview.initialRecentTranscript.slice(-6),
   );
@@ -125,7 +149,7 @@ export function MockInterviewWorkspace({
     spaceComplexity?: string;
     timeComplexity?: string;
   }) => {
-    if (!realtimeConnected) {
+    if (!realtimeConnected && conversationLifecycle !== "concluding") {
       setMessage("Reconnect the live interviewer before continuing.");
       return;
     }
@@ -165,7 +189,7 @@ export function MockInterviewWorkspace({
   };
 
   const complete = (input: Record<string, unknown>) => {
-    if (!realtimeConnected) {
+    if (!realtimeConnected && conversationLifecycle !== "concluding") {
       setMessage(
         "Reconnect the live interviewer before completing the interview.",
       );
@@ -190,7 +214,13 @@ export function MockInterviewWorkspace({
   const remaining = targetSeconds - seconds;
   return (
     <div className="space-y-6">
-      <InterviewPhaseGuide currentPhase={phase} events={phaseEvents} />
+      <InterviewPhaseGuide
+        currentPhase={phase}
+        events={phaseEvents}
+        observedPhase={observedStage.phase}
+        questionCycle={questionCycle}
+        trackingStatus={trackingStatus}
+      />
 
       <header className="flex items-center justify-between gap-4">
         <p className="text-primary text-sm font-semibold">
@@ -212,34 +242,66 @@ export function MockInterviewWorkspace({
         </div>
       </header>
 
-      <InterviewQuestionPanel prompt={interview.questionPrompt} />
+      <InterviewQuestionPanel
+        prompt={
+          questionCycle === "follow_up" && followUpPrompt
+            ? followUpPrompt
+            : interview.questionPrompt
+        }
+      />
 
       {interview.realtimeEnabled ? (
         <RealtimeInterviewPanel
+          concluding={conversationLifecycle === "concluding"}
           contextUpdate={realtimeContext}
           interviewId={interview.id}
           onConnectionStateChange={(state) =>
             setRealtimeConnected(state === "connected")
           }
-          onPhaseSuggestionRecorded={(suggestion) => {
-            setPhaseEvents((current) =>
-              mergePhaseGuideEvents(current, [
-                {
-                  displaySummary: "",
-                  id: suggestion.eventId,
-                  phase: suggestion.expectedCurrentPhase as Exclude<
-                    MockInterviewPhase,
-                    "completed"
-                  >,
-                  suggestedPhase: suggestion.suggestedNextPhase as Exclude<
-                    MockInterviewPhase,
-                    "completed"
-                  >,
-                  transitionType: "suggested",
-                },
-              ]),
+          onConversationStateChange={(state) => {
+            setConversationLifecycle(
+              state.lifecycle as typeof conversationLifecycle,
             );
+            if (state.questionCycle) {
+              setQuestionCycle(state.questionCycle);
+              if (state.questionCycle === "follow_up") {
+                setObservedStage({ eventId: null, phase: "clarify" });
+              }
+            }
+            if (state.followUpPrompt) {
+              setFollowUpPrompt(state.followUpPrompt);
+            }
+            if (state.lifecycle === "concluding") {
+              setObservedStage({ eventId: null, phase: "retrospective" });
+              setPhase("retrospective");
+              setRunning(false);
+              if (state.remainingSeconds !== undefined) {
+                setSeconds(Math.max(0, targetSeconds - state.remainingSeconds));
+              }
+            }
           }}
+          onObservedPhaseChange={(observation) => {
+            setObservedStage((current) => {
+              const incomingId = BigInt(observation.observedPhaseEventId ?? 0);
+              const currentId = BigInt(current.eventId ?? 0);
+              return incomingId >= currentId
+                ? {
+                    eventId: observation.observedPhaseEventId,
+                    phase: observation.observedPhase,
+                  }
+                : current;
+            });
+            setPhase((current) => {
+              const currentIndex = MOCK_INTERVIEW_PHASES.indexOf(current);
+              const observedIndex = MOCK_INTERVIEW_PHASES.indexOf(
+                observation.observedPhase,
+              );
+              return questionCycle === "primary" && observedIndex > currentIndex
+                ? observation.observedPhase
+                : current;
+            });
+          }}
+          onTrackingStatusChange={setTrackingStatus}
           onTranscript={(entry) => {
             setRecentTranscript((current) =>
               [...current.filter((item) => item.id !== entry.id), entry].slice(
@@ -252,7 +314,7 @@ export function MockInterviewWorkspace({
             setSeconds(activation.elapsedSeconds);
             setRunning(activation.timerRunning);
           }}
-          phase={phase}
+          phase={observedStage.phase ?? phase}
           providerName={interview.realtimeProvider ?? "openai"}
         />
       ) : null}
@@ -280,6 +342,10 @@ export function MockInterviewWorkspace({
                 snapshotVersion: submission.snapshotVersion,
               },
             });
+            setObservedStage({
+              eventId: null,
+              phase: submission.advanceToTesting ? "testing" : "implementation",
+            });
             if (submission.advanceToTesting) {
               setPhase("testing");
             }
@@ -298,16 +364,59 @@ export function MockInterviewWorkspace({
         </p>
       ) : null}
 
-      <InterviewPhase
-        codingLanguage={interview.codingLanguage}
-        codingWorkspaceEnabled={interview.codingWorkspaceEnabled}
-        disabled={isPending || !realtimeConnected}
-        initialCode={interview.codeSnapshot}
-        onAdvance={advance}
-        onComplete={complete}
-        phase={phase}
-        textDirection={textDirection}
-      />
+      {conversationLifecycle === "concluding" ? (
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-xl font-semibold">
+              {textDirection === "rtl"
+                ? "הראיון הסתיים"
+                : "Your interview has concluded"}
+            </h2>
+            <p className="text-muted mt-2 text-sm">
+              {textDirection === "rtl"
+                ? "המשוב יתבסס על השיחה והקוד שלך."
+                : "Your feedback will use the conversation and code you submitted."}
+            </p>
+            <Button
+              className="mt-5"
+              disabled={isPending || realtimeConnected}
+              onClick={() => {
+                setMessage("");
+                runAction(async () => {
+                  const result = await finishConcludedMockInterviewAction(
+                    interview.id,
+                  );
+                  if (result.status === "error") {
+                    setMessage(result.message);
+                    return;
+                  }
+                  router.push(`/interviews/${interview.id}/scorecard`);
+                  router.refresh();
+                });
+              }}
+            >
+              {isPending
+                ? "Saving your interview…"
+                : realtimeConnected
+                  ? "Finishing the conversation…"
+                  : textDirection === "rtl"
+                    ? "צפייה במשוב ושמירת הראיון"
+                    : "View feedback & save interview"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <InterviewPhase
+          codingLanguage={interview.codingLanguage}
+          codingWorkspaceEnabled={interview.codingWorkspaceEnabled}
+          disabled={isPending || !realtimeConnected}
+          initialCode={interview.codeSnapshot}
+          onAdvance={advance}
+          onComplete={complete}
+          phase={phase}
+          textDirection={textDirection}
+        />
+      )}
 
       <Card className="shadow-none">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -336,16 +445,6 @@ export function MockInterviewWorkspace({
   );
 }
 
-function mergePhaseGuideEvents(
-  ...groups: InterviewPhaseGuideEvent[][]
-): InterviewPhaseGuideEvent[] {
-  const eventsByTransition = new Map<string, InterviewPhaseGuideEvent>();
-  for (const event of groups.flat()) {
-    eventsByTransition.set(`${event.phase}:${event.transitionType}`, event);
-  }
-  return [...eventsByTransition.values()];
-}
-
 function InterviewPhase({
   codingLanguage,
   codingWorkspaceEnabled,
@@ -369,6 +468,9 @@ function InterviewPhase({
   phase: MockInterviewPhase;
   textDirection: "auto" | "ltr" | "rtl";
 }) {
+  // Full-voice interviews advance through the live interviewer. The only
+  // learner-authored form that remains is the post-interview retrospective.
+  if (String(phase) !== "retrospective") return null;
   if (phase === "intro") {
     return (
       <Card>

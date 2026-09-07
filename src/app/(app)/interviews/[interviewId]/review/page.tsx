@@ -1,3 +1,4 @@
+import { GuestSignupInvitation } from "@/components/mock-interviews/guest-signup-invitation";
 import { Code2, MessageCircle, NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,16 +12,18 @@ import {
   normalizeInterviewLanguage,
   type MockInterviewPhase,
 } from "@/domain/mock-interview";
-import { requireAuthenticatedUser } from "@/features/auth/session";
+import { requireInterviewUser } from "@/features/auth/session";
 import { getLearnerVisibleQuestionContent } from "@/features/interview-evaluation/question-content";
 import { getMockInterview } from "@/features/mock-interviews/queries";
+import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 
 export default async function MockInterviewReviewPage({
   params,
 }: {
   params: Promise<{ interviewId: string }>;
 }) {
-  const user = await requireAuthenticatedUser();
+  const user = await requireInterviewUser();
+  const rollout = getInterviewRolloutConfig();
   const { interviewId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(interviewId)) notFound();
   const interview = await getMockInterview(user.id, interviewId);
@@ -46,6 +49,11 @@ export default async function MockInterviewReviewPage({
 
   return (
     <div className="space-y-6">
+      {user.isAnonymous ? (
+        <GuestSignupInvitation
+          hebrew={interview.interview_language === "hebrew"}
+        />
+      ) : null}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-primary text-sm font-semibold">Interview review</p>
@@ -169,6 +177,69 @@ export default async function MockInterviewReviewPage({
         </Card>
       </div>
 
+      {rollout.reviewTimelineEnabled && interview.conversationState ? (
+        <Card>
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <MessageCircle
+                aria-hidden="true"
+                className="text-primary size-5"
+              />
+              <h2 className="text-xl font-semibold">Interview flow</h2>
+              <Badge variant="neutral">
+                {interview.conversationState.question_cycle === "follow_up"
+                  ? "Follow-up cycle"
+                  : "Primary question"}
+              </Badge>
+            </div>
+            <p className="text-muted mt-2 text-sm leading-6">
+              Navigation and readiness entries document how the conversation
+              progressed. They are not score inputs or correctness verdicts.
+            </p>
+            {interview.conversationState.follow_up_prompt ? (
+              <section className="bg-surface-subtle mt-5 rounded-lg border p-4">
+                <h3 className="text-sm font-semibold">Persisted follow-up</h3>
+                <p className="mt-2 leading-7" dir="ltr">
+                  {interview.conversationState.follow_up_prompt}
+                </p>
+              </section>
+            ) : null}
+            <ol className="mt-5 space-y-3">
+              {interview.conversationEvents.length ? (
+                interview.conversationEvents.map((event) => (
+                  <li
+                    className="bg-surface-subtle flex flex-col gap-1 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    key={event.id}
+                  >
+                    <span className="text-sm font-semibold">
+                      {conversationEventLabel(event.event_type)}
+                      {event.phase
+                        ? ` · ${mockInterviewPhaseLabels[event.phase as MockInterviewPhase]}`
+                        : ""}
+                    </span>
+                    <span className="text-muted text-xs">
+                      {event.question_cycle === "follow_up"
+                        ? "Follow-up"
+                        : "Primary"}{" "}
+                      ·{" "}
+                      {new Intl.DateTimeFormat("en", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      }).format(new Date(event.created_at))}
+                    </span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-muted text-sm">
+                  This legacy interview has no structured flow timeline.
+                </li>
+              )}
+            </ol>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardContent className="p-6 sm:p-8">
           <div className="flex items-center gap-2">
@@ -190,6 +261,7 @@ export default async function MockInterviewReviewPage({
                     {event.phase
                       ? ` · ${mockInterviewPhaseLabels[event.phase as MockInterviewPhase]}`
                       : ""}
+                    {` · ${event.question_cycle === "follow_up" ? "Follow-up" : "Primary"}`}
                   </p>
                   <p className="mt-1 text-sm leading-6 whitespace-pre-wrap">
                     {event.content}
@@ -206,4 +278,21 @@ export default async function MockInterviewReviewPage({
       </Card>
     </div>
   );
+}
+
+function conversationEventLabel(eventType: string) {
+  const labels: Record<string, string> = {
+    connection_resume_failed: "Reconnect context failed",
+    connection_resumed: "Voice context restored",
+    connection_started: "Voice interview started",
+    conclusion_requested: "Interview conclusion started",
+    follow_up_completed: "Follow-up completed",
+    follow_up_rejected_time: "Follow-up skipped because time was low",
+    follow_up_requested: "Follow-up considered",
+    follow_up_started: "Follow-up started",
+    primary_completed: "Primary question completed",
+    solution_readiness_reported: "Solution readiness checked",
+    stage_observed: "Conversation stage changed",
+  };
+  return labels[eventType] ?? eventType.replaceAll("_", " ");
 }

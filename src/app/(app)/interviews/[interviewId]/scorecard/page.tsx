@@ -1,40 +1,32 @@
-import { ArrowRight, CheckCircle2, Lightbulb, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
+import { GuestSignupInvitation } from "@/components/mock-interviews/guest-signup-invitation";
 import { DeleteInterviewForm } from "@/components/mock-interviews/delete-interview-form";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ProgressBar } from "@/components/ui/progress-bar";
-import { buildInterviewPerformanceProfile } from "@/domain/interview-profile";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { requireInterviewUser } from "@/features/auth/session";
+import { getMockInterview } from "@/features/mock-interviews/queries";
+import { retryInterviewEvaluationAction } from "@/features/mock-interviews/actions";
 import {
-  interviewerLevelLabels,
-  normalizeInterviewerLevel,
-} from "@/domain/mock-interview";
-import { requireAuthenticatedUser } from "@/features/auth/session";
-import {
+  interviewEvaluationSchema,
   INTERVIEW_EVALUATION_DIMENSIONS,
   interviewEvaluationDimensionLabels,
-  interviewEvaluationSchema,
 } from "@/features/interview-evaluation/model";
-import { getInterviewPerformanceProfile } from "@/features/interview-profile/queries";
-import { getMockInterview } from "@/features/mock-interviews/queries";
 
 export default async function MockInterviewScorecardPage({
   params,
 }: {
   params: Promise<{ interviewId: string }>;
 }) {
-  const user = await requireAuthenticatedUser();
+  const user = await requireInterviewUser();
   const { interviewId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(interviewId)) notFound();
   const interview = await getMockInterview(user.id, interviewId);
   if (!interview) notFound();
-  if (interview.status === "active") redirect(`/interviews/${interview.id}`);
-  if (!interview.scorecard) redirect("/interviews/history");
-  const scorecard = interview.scorecard;
-  const evaluation = interview.evaluation
+  if (interview.status === "active") redirect("/interviews/" + interview.id);
+  if (interview.status === "abandoned")
+    redirect("/interviews/" + interview.id + "/ended");
+  const parsed = interview.evaluation
     ? interviewEvaluationSchema.safeParse({
         confidence: interview.evaluation.confidence,
         dimensions: interview.evaluation.dimensions,
@@ -46,295 +38,145 @@ export default async function MockInterviewScorecardPage({
         summary: interview.evaluation.summary,
       })
     : null;
-  const profileSnapshot = evaluation?.success
-    ? await getInterviewPerformanceProfile(user.id)
-    : null;
-  const currentProfile = profileSnapshot?.profile.allTime.overall;
-  const previousProfile = profileSnapshot
-    ? buildInterviewPerformanceProfile(
-        profileSnapshot.evidence.filter(
-          (item) => item.id !== interview.evaluation?.id,
-        ),
-        {
-          now: new Date(),
-          topicIds: profileSnapshot.topics.map((topic) => topic.id),
-          totalTopicCount: profileSnapshot.topics.length,
-        },
-      ).allTime.overall
-    : null;
-  const criteria = [
-    ["Problem understanding", scorecard.problem_understanding],
-    ["Clarification", scorecard.clarification],
-    ["Approach quality", scorecard.approach_quality],
-    ["Optimization", scorecard.optimization],
-    ["Correctness", scorecard.correctness],
-    ["Code quality", scorecard.code_quality],
-    ["Testing", scorecard.testing],
-    ["Complexity reasoning", scorecard.complexity_reasoning],
-    ["Communication", scorecard.communication],
-    ["Independence", scorecard.independence],
-  ] as const;
+  const evaluation = parsed?.success ? parsed.data : null;
+  const hebrew = interview.interview_language === "hebrew";
+  const score = evaluation?.rawScore ?? interview.scorecard?.overall_score;
   return (
-    <div className="space-y-8">
-      <div className="bg-success-soft rounded-xl border p-6 sm:p-8">
-        <Badge variant="success">
-          <CheckCircle2 aria-hidden="true" className="size-3.5" /> Interview
-          complete
-        </Badge>
-        <Badge className="ml-2">
-          {
-            interviewerLevelLabels[
-              normalizeInterviewerLevel(interview.interviewer_level)
-            ]
-          }
-        </Badge>
-        <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-muted text-sm">Overall interview score</p>
-            <p className="mt-1 text-6xl font-bold">
-              {Math.round(scorecard.overall_score)}
-            </p>
-          </div>
-          <div className="sm:text-right">
-            <p className="text-muted text-xs font-semibold tracking-wide uppercase">
-              Topic revealed
-            </p>
-            <p className="mt-1 text-xl font-semibold">
-              {interview.problem.primaryTopic.name}
-            </p>
-          </div>
-        </div>
-        <p className="text-muted mt-5 text-xs">
-          Training estimate, not a prediction of interview outcome.
+    <div className="mx-auto max-w-5xl space-y-6" dir={hebrew ? "rtl" : "ltr"}>
+      <header className="bg-success-soft rounded-2xl border p-6 sm:p-8">
+        <p className="text-sm font-semibold">
+          {hebrew ? "הראיון הושלם" : "Interview complete"}
         </p>
-        <nav
-          aria-label="Interview result views"
-          className="mt-5 flex flex-wrap gap-2"
-        >
-          <span className={buttonVariants()}>Scorecard</span>
-          <Link
-            className={buttonVariants({ variant: "secondary" })}
-            href={`/interviews/${interview.id}/review`}
-          >
-            Review interview
-          </Link>
-        </nav>
-      </div>
-      {evaluation?.success && interview.evaluation ? (
-        <Card>
-          <CardContent className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="mr-2 text-xl font-semibold">
-                Evidence-based evaluation
-              </h2>
-              <Badge
-                variant={
-                  interview.evaluation.status === "completed"
-                    ? "success"
-                    : "neutral"
-                }
-              >
-                {interview.evaluation.status === "provisional"
-                  ? "Provisional fallback"
-                  : "Provider evaluated"}
-              </Badge>
-              <Badge>
-                {Math.round(evaluation.data.confidence * 100)}% confidence
-              </Badge>
-            </div>
-            <p className="text-muted mt-4 text-sm leading-6">
-              {evaluation.data.summary}
-            </p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {INTERVIEW_EVALUATION_DIMENSIONS.map((dimension) => {
-                const result = evaluation.data.dimensions[dimension];
-                return (
-                  <div
-                    className="bg-surface-subtle rounded-lg border p-4"
-                    key={dimension}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="font-semibold">
-                        {interviewEvaluationDimensionLabels[dimension]}
-                      </h3>
-                      <Badge>
-                        {result.score}/5 · {Math.round(result.confidence * 100)}
-                        %
-                      </Badge>
-                    </div>
-                    <p className="text-muted mt-3 text-sm leading-6">
-                      {result.rationale}
-                    </p>
-                    <p className="text-muted mt-2 text-xs">
-                      Evidence:{" "}
-                      {result.evidence
-                        .map((item) => item.reference)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="bg-primary-soft mt-6 rounded-lg border p-4 text-sm">
-              <p className="font-semibold">Profile impact</p>
-              <p className="text-muted mt-1">
-                {currentProfile?.adjustedScore === null || !currentProfile
-                  ? "This interview did not produce usable profile evidence."
-                  : previousProfile?.adjustedScore === null || !previousProfile
-                    ? `Created your first interview profile at ${Math.round(currentProfile.adjustedScore)} with ${Math.round(currentProfile.confidence)}% confidence.`
-                    : `Adjusted profile ${signedDelta(currentProfile.adjustedScore - previousProfile.adjustedScore)} points to ${Math.round(currentProfile.adjustedScore)}; confidence changed ${signedDelta(currentProfile.confidence - previousProfile.confidence)} points.`}
-              </p>
-            </div>
-            <div className="mt-6">
-              <h3 className="font-semibold">Direct next actions</h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {evaluation.data.recommendedActions.map((action) => (
-                  <Link
-                    className="bg-surface-subtle hover:border-primary rounded-lg border p-4"
-                    href={evaluationActionRoute(action.actionType)}
-                    key={`${action.actionType}-${action.title}`}
-                  >
-                    <p className="font-semibold">{action.title}</p>
-                    <p className="text-muted mt-1 text-xs leading-5">
-                      {action.rationale} · {action.estimatedMinutes} min
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-            {correctnessCoverage(interview.evaluation.evidence_coverage) !==
-            "trusted_tests" ? (
-              <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                Code correctness was not verified by trusted private tests. The
-                correctness score uses bounded session evidence and reduced
-                confidence.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-      <Card>
-        <CardContent className="p-6 sm:p-8">
-          <h2 className="text-xl font-semibold">Interview rubric</h2>
-          <div className="mt-6 grid gap-5 sm:grid-cols-2">
-            {criteria.map(([label, score]) => (
-              <ProgressBar
-                key={label}
-                label={`${label} · ${score}/5`}
-                value={score * 20}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <Target aria-hidden="true" className="text-success size-5" />
-              <h2 className="text-lg font-semibold">Strengths</h2>
-            </div>
-            {scorecard.strengths.length ? (
-              <ul className="mt-4 space-y-3">
-                {scorecard.strengths.map((item) => (
-                  <li
-                    className="bg-success-soft rounded-lg border p-3 text-sm"
-                    key={item}
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted mt-4 text-sm">
-                No dimension reached the strong-evidence threshold yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <Lightbulb aria-hidden="true" className="text-primary size-5" />
-              <h2 className="text-lg font-semibold">Actionable improvements</h2>
-            </div>
-            {scorecard.improvements.length ? (
-              <ul className="mt-4 space-y-3">
-                {scorecard.improvements.map((item) => (
-                  <li
-                    className="bg-primary-soft rounded-lg border p-3 text-sm leading-6"
-                    key={item}
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted mt-4 text-sm">
-                No critical weakness was detected. Raise the difficulty or
-                reduce time next session.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      <Card>
-        <CardContent className="p-6">
-          <h2 className="font-semibold">Pattern reveal</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {interview.problem.pattern_tags.map((tag) => (
-              <Badge key={tag}>{tag}</Badge>
-            ))}
-          </div>
-          <p className="text-muted mt-5 text-sm leading-6">
-            Your interview evidence has updated this topic’s mastery and will
-            influence later adaptive recommendations.
+        <h1 className="mt-3 text-3xl font-semibold">
+          {hebrew ? "המשוב על הראיון שלך" : "Your interview feedback"}
+        </h1>
+        {score !== undefined ? (
+          <p className="mt-5 text-5xl font-semibold">
+            {Math.round(score)}
+            <span className="text-muted text-base"> / 100</span>
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link className={buttonVariants()} href="/interviews">
-              Start another interview{" "}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
-            <Link
-              className={buttonVariants({ variant: "secondary" })}
-              href="/interviews/history"
-            >
-              View interview history
-            </Link>
-            <Link
-              className={buttonVariants({ variant: "secondary" })}
-              href="/interview-profile"
-            >
-              Open interview profile
-            </Link>
-            <DeleteInterviewForm interviewId={interview.id} />
+        ) : null}
+        <p className="text-muted mt-3 text-sm">
+          {interview.problem.primaryTopic.name} · {interview.duration_minutes}{" "}
+          min ·{" "}
+          {interview.interviewer_level === "faang_tough"
+            ? "Tough"
+            : "Comfortable"}
+        </p>
+        <p className="text-muted mt-2 text-xs">
+          {hebrew
+            ? "הערכה לצורך תרגול, שאינה מבטיחה תוצאה בראיון עבודה."
+            : "A training estimate, not a prediction of interview outcome."}
+        </p>
+      </header>
+      {user.isAnonymous ? <GuestSignupInvitation hebrew={hebrew} /> : null}
+      <nav className="flex flex-wrap gap-3" aria-label="Interview result views">
+        <Link
+          className={buttonVariants({ variant: "secondary" })}
+          href={"/interviews/" + interview.id + "/review"}
+        >
+          {hebrew ? "צפייה בשיחה ובקוד" : "Review interview"}
+        </Link>
+        <Link className={buttonVariants()} href="/interviews">
+          {hebrew ? "ראיון נוסף" : "Next interview"}
+        </Link>
+      </nav>
+      {evaluation ? (
+        <>
+          <section className="bg-surface rounded-xl border p-6">
+            <h2 className="text-xl font-semibold">
+              {hebrew ? "סיכום" : "Summary"}
+            </h2>
+            <p className="text-muted mt-2 text-xs">
+              {interview.evaluation?.status === "completed"
+                ? "AI evaluation"
+                : "Provisional fallback"}{" "}
+              · {Math.round(evaluation.confidence * 100)}% confidence
+            </p>
+            <p className="mt-4 leading-7">{evaluation.summary}</p>
+          </section>
+          <section
+            className="grid gap-4 sm:grid-cols-2"
+            aria-label="Interview rubric"
+          >
+            {INTERVIEW_EVALUATION_DIMENSIONS.map((dimension) => {
+              const result = evaluation.dimensions[dimension];
+              return (
+                <article
+                  className="bg-surface rounded-xl border p-5"
+                  key={dimension}
+                >
+                  <h2 className="font-semibold">
+                    {interviewEvaluationDimensionLabels[dimension]}
+                  </h2>
+                  <p className="text-primary mt-2 font-semibold">
+                    {result.confidence > 0
+                      ? result.score + "/5"
+                      : "Not assessed"}
+                  </p>
+                  <p className="text-muted mt-3 text-sm leading-6">
+                    {result.rationale}
+                  </p>
+                </article>
+              );
+            })}
+          </section>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <section className="bg-surface rounded-xl border p-5">
+              <h2 className="font-semibold">
+                {hebrew ? "חוזקות" : "Strengths"}
+              </h2>
+              <ul className="mt-3 list-inside list-disc space-y-2 text-sm">
+                {evaluation.strengths.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
+            <section className="bg-surface rounded-xl border p-5">
+              <h2 className="font-semibold">
+                {hebrew ? "מה לשפר" : "What to improve"}
+              </h2>
+              <ul className="mt-3 list-inside list-disc space-y-2 text-sm">
+                {evaluation.improvements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-muted text-xs leading-5">
+            {hebrew
+              ? "נכונות הקוד מבוססת על ראיות מהראיון. הקוד לא הורץ בבדיקות אוטומטיות."
+              : "Code correctness is based on interview evidence. Code was not executed against automated tests."}
+          </p>
+        </>
+      ) : (
+        <section className="bg-surface rounded-xl border p-6">
+          <h2 className="text-xl font-semibold">
+            {hebrew ? "הראיון נשמר" : "Your interview is saved"}
+          </h2>
+          <p className="text-muted mt-3 text-sm">
+            {hebrew
+              ? "המשוב המפורט עדיין אינו זמין. אפשר לשמור את הראיון בחשבון ולנסות שוב."
+              : "Detailed feedback is not available yet. You can still save the interview to your account and try again."}
+          </p>
+          <form action={retryInterviewEvaluationAction} className="mt-4">
+            <input name="interviewId" type="hidden" value={interview.id} />
+            <SubmitButton
+              label="Check feedback again"
+              pendingLabel="Preparing feedback…"
+            />
+          </form>
+        </section>
+      )}
+      {!user.isAnonymous ? (
+        <Link
+          className="text-primary block text-sm underline"
+          href="/diagnostic"
+        >
+          Optional skills assessment
+        </Link>
+      ) : null}
+      <DeleteInterviewForm interviewId={interview.id} />
     </div>
   );
-}
-
-function signedDelta(value: number) {
-  const rounded = Math.round(value * 10) / 10;
-  return `${rounded > 0 ? "+" : ""}${rounded}`;
-}
-
-function correctnessCoverage(value: unknown) {
-  if (
-    value &&
-    typeof value === "object" &&
-    "semanticCorrectness" in value &&
-    value.semanticCorrectness === "trusted_tests"
-  ) {
-    return "trusted_tests";
-  }
-  return "unsupported";
-}
-
-function evaluationActionRoute(actionType: string) {
-  if (actionType === "next_interview") return "/interviews";
-  if (actionType === "lesson") return "/learn";
-  if (actionType === "review") return "/review";
-  return "/practice";
 }

@@ -1,12 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
+import { randomUUID } from "node:crypto";
 
 import { getAuthenticatedUser } from "@/features/auth/session";
 import { getActiveInterviewQuestionPrompt } from "@/features/interview-evaluation/question-content";
 import { getOwnedActiveMockInterview } from "@/features/mock-interviews/queries";
 import { getInterviewRolloutConfig } from "@/features/mock-interviews/rollout";
 import { getRealtimeInterviewConfig } from "@/features/realtime-interviews/config";
-import { buildInterviewInstructions } from "@/features/realtime-interviews/instructions";
+import {
+  buildConnectionDirective,
+  buildInterviewInstructions,
+} from "@/features/realtime-interviews/instructions";
 import { geminiRealtimeSessionRequestSchema } from "@/features/realtime-interviews/model";
+import { enabledInterviewControlTools } from "@/features/realtime-interviews/provider";
+import { prepareRealtimeInterviewConnection } from "@/features/realtime-interviews/session-context";
 import { createClient } from "@/lib/supabase/server";
 import { recordOperationalEvent } from "@/lib/operational-events";
 
@@ -48,7 +54,9 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
-  const questionPrompt = getInterviewRolloutConfig().promptContentEnabled
+  const rollout = getInterviewRolloutConfig();
+  const controlTools = enabledInterviewControlTools(rollout);
+  const questionPrompt = rollout.promptContentEnabled
     ? getActiveInterviewQuestionPrompt(
         interview.questionContentKey,
         interview.questionContentVersion,
@@ -57,6 +65,22 @@ export async function POST(request: Request) {
   if (!questionPrompt) {
     return Response.json(
       { message: "The approved interview prompt is unavailable." },
+      { status: 409 },
+    );
+  }
+  const connectionAttemptId = randomUUID();
+  const snapshot = await prepareRealtimeInterviewConnection(
+    interview.id,
+    connectionAttemptId,
+  );
+  if (!snapshot) {
+    await cancelConnectionAttempt(
+      interview.id,
+      connectionAttemptId,
+      "snapshot_failed",
+    );
+    return Response.json(
+      { message: "The interview state could not be restored securely." },
       { status: 409 },
     );
   }
@@ -77,6 +101,11 @@ export async function POST(request: Request) {
     })
     .catch(() => null);
   if (!token?.name) {
+    await cancelConnectionAttempt(
+      interview.id,
+      connectionAttemptId,
+      "provider_token_failed",
+    );
     recordOperationalEvent("realtime_connection_failed", {
       latencyMs: Date.now() - startedAt,
       provider: "gemini",
@@ -90,31 +119,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("begin_realtime_interview_session", {
-    p_mock_interview_id: interview.id,
-    p_model: config.model,
-    p_provider: config.provider,
-  });
-  if (error) {
-    recordOperationalEvent("realtime_connection_failed", {
-      interviewId: interview.id,
-      latencyMs: Date.now() - startedAt,
-      provider: config.provider,
-    });
-    return Response.json(
-      { message: "The voice session could not be recorded securely." },
-      { status: 502 },
-    );
-  }
-
-  recordOperationalEvent("realtime_connection_succeeded", {
+  recordOperationalEvent("realtime_connection_prepared", {
     interviewId: interview.id,
     latencyMs: Date.now() - startedAt,
     provider: config.provider,
   });
 
   return Response.json({
+    connectionAttemptId: snapshot.connectionAttemptId,
+    connectionDirective: buildConnectionDirective(snapshot),
+    connectionMode: snapshot.connectionMode,
     expiresAt,
     instructions: buildInterviewInstructions(
       {
@@ -123,9 +137,25 @@ export async function POST(request: Request) {
         phase: interview.phase,
       },
       questionPrompt,
+      snapshot,
+      rollout,
     ),
     model: config.model,
     token: token.name,
+    toolNames: controlTools.map((tool) => tool.name),
     voice: config.voice,
+  });
+}
+
+async function cancelConnectionAttempt(
+  interviewId: string,
+  connectionAttemptId: string,
+  reasonCode: string,
+) {
+  const supabase = await createClient();
+  await supabase.rpc("cancel_realtime_interview_connection", {
+    p_connection_attempt_id: connectionAttemptId,
+    p_mock_interview_id: interviewId,
+    p_reason_code: reasonCode,
   });
 }

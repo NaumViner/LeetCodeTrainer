@@ -1,5 +1,23 @@
 import "server-only";
 
+import { getProblemCatalog } from "@/features/problems/queries";
+
+export async function getCoverageSelectionContext(userId: string) {
+  const [coverage, catalog, completedProblemIds] = await Promise.all([
+    getInterviewTopicCoverage(userId),
+    getProblemCatalog(),
+    getCompletedInterviewProblemIds(userId),
+  ]);
+  return {
+    coverage,
+    collectionProblemIds: new Set(
+      coverage.memberships.map((item) => item.problemId),
+    ),
+    completedProblemIds,
+    catalog: catalog.map(toSelectionProblem),
+  };
+}
+
 import {
   rankImprovementTopics,
   selectLearningInterview,
