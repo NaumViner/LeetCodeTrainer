@@ -17,6 +17,10 @@ describe("interview-first route boundaries", () => {
       expect(interviewRouteAccess(route)).toBe("member");
   });
   it("does not accept external, encoded or onboarding callback destinations", () => {
+    expect(safeAuthNextPath("/reset-password")).toBe("/reset-password");
+    expect(safeAuthNextPath("/reset-password?next=//evil.example")).toBe(
+      "/interviews",
+    );
     for (const route of [
       "//evil.example",
       "/\\evil.example",

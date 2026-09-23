@@ -25,12 +25,15 @@ In **Authentication → URL Configuration** set:
 
 - Site URL: `https://<production-domain>`
 - Redirect URL: `https://<production-domain>/auth/callback`
+- Password recovery redirect: `https://<production-domain>/auth/callback?next=/reset-password`
 - Optional local development redirect: `http://localhost:3000/auth/callback`
 - Optional Vercel preview pattern: `https://*-<vercel-team-slug>.vercel.app/**`
 
 Use an exact production callback. Wildcards are only for preview environments.
 
 Email/password sign-in needs a production SMTP provider before public launch if email confirmation or password recovery is enabled.
+
+The owner selected InterviewMe as the product name and Resend for transactional email. See [InterviewMe hosted setup](interviewme-hosted-setup.md) for confirmed decisions, remaining inputs and SMTP settings. The support contact is not the automated sender address.
 
 For Google or GitHub sign-in, create a separate production OAuth application in that provider's console. The provider callback is Supabase—not the Next.js callback:
 
@@ -46,29 +49,30 @@ Import `NaumViner/LeetCodeTrainer`. This Git checkout is already the application
 
 Add the following variables in Vercel. Apply required database variables to Production and Preview; keep provider keys encrypted and server-only.
 
-| Variable                                                           | Scope               | Required           | Purpose                                          |
-| ------------------------------------------------------------------ | ------------------- | ------------------ | ------------------------------------------------ |
-| `NEXT_PUBLIC_APP_URL`                                              | Production          | Yes                | Canonical HTTPS origin, without a trailing slash |
-| `NEXT_PUBLIC_SUPABASE_URL`                                         | Production, Preview | Yes                | Hosted Supabase project API URL                  |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                             | Production, Preview | Yes                | Browser-safe publishable key                     |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                    | Production, Preview | Legacy only        | Alternative to the publishable key               |
-| `SUPABASE_SERVICE_ROLE_KEY`                                        | Server only         | No                 | Not required by this application                 |
-| `GEMINI_API_KEY`                                                   | Server only         | With Gemini AI     | Shared Gemini coach, evaluator, and Live key     |
-| `AI_COACH_ENABLED`                                                 | Server only         | No                 | Set `true` to enable the learning coach          |
-| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`                            | Server only         | When coach enabled | Gemini or OpenAI coach configuration             |
-| `INTERVIEW_EVALUATOR_ENABLED`                                      | Server only         | No                 | Enables post-interview structured evaluation     |
-| `INTERVIEW_EVALUATOR_PROVIDER`, `INTERVIEW_EVALUATOR_MODEL`        | Server only         | When enabled       | Gemini evaluator configuration                   |
-| `INTERVIEW_EVALUATOR_API_KEY`                                      | Server only         | Optional           | Gemini override when shared key is not used      |
-| `INTERVIEW_SELECTION_MODES_ENABLED`                                | Server only         | No                 | Coverage/Improvement/Custom rollout control      |
-| `INTERVIEW_PROMPT_CONTENT_ENABLED`                                 | Server only         | No                 | Embedded approved-prompt rollout control         |
-| `INTERVIEW_CODING_WORKSPACE_ENABLED`                               | Server only         | No                 | CodeMirror workspace rollout control             |
-| `INTERVIEW_LIVE_STAGE_ENABLED`                                     | Server only         | No                 | Live Guiding Star rollout control                |
-| `INTERVIEW_FOLLOW_UP_ENABLED`                                      | Server only         | No                 | New follow-up rollout control                    |
-| `INTERVIEW_REVIEW_TIMELINE_ENABLED`                                | Server only         | No                 | Conversation timeline rollout control            |
-| `REALTIME_AI_ENABLED`                                              | Server only         | No                 | Set `true` for live voice interviews             |
-| `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, `REALTIME_AI_API_KEY` | Server only         | When voice enabled | Gemini Live or OpenAI Realtime configuration     |
-| `REALTIME_AI_TRANSCRIPTION_MODEL`, `REALTIME_AI_VOICE`             | Server only         | No                 | Optional realtime overrides                      |
-| `ANALYTICS_PROVIDER`                                               | Server only         | No                 | Reserved analytics setting                       |
+| Variable                                                           | Scope               | Required           | Purpose                                                 |
+| ------------------------------------------------------------------ | ------------------- | ------------------ | ------------------------------------------------------- |
+| `NEXT_PUBLIC_APP_URL`                                              | Production          | Yes                | Canonical HTTPS origin, without a trailing slash        |
+| `NEXT_PUBLIC_SUPABASE_URL`                                         | Production, Preview | Yes                | Hosted Supabase project API URL                         |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                             | Production, Preview | Yes                | Browser-safe publishable key                            |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                    | Production, Preview | Legacy only        | Alternative to the publishable key                      |
+| `SUPABASE_SERVICE_ROLE_KEY`                                        | Server only         | Yes                | Administrative guest cleanup; never expose to browsers  |
+| `CRON_SECRET`                                                      | Server only         | Yes                | At least 32 characters; authenticates scheduled cleanup |
+| `GEMINI_API_KEY`                                                   | Server only         | With Gemini AI     | Shared Gemini coach, evaluator, and Live key            |
+| `AI_COACH_ENABLED`                                                 | Server only         | No                 | Set `true` to enable the learning coach                 |
+| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`                            | Server only         | When coach enabled | Gemini or OpenAI coach configuration                    |
+| `INTERVIEW_EVALUATOR_ENABLED`                                      | Server only         | No                 | Enables post-interview structured evaluation            |
+| `INTERVIEW_EVALUATOR_PROVIDER`, `INTERVIEW_EVALUATOR_MODEL`        | Server only         | When enabled       | Gemini evaluator configuration                          |
+| `INTERVIEW_EVALUATOR_API_KEY`                                      | Server only         | Optional           | Gemini override when shared key is not used             |
+| `INTERVIEW_SELECTION_MODES_ENABLED`                                | Server only         | No                 | Coverage/Improvement/Custom rollout control             |
+| `INTERVIEW_PROMPT_CONTENT_ENABLED`                                 | Server only         | No                 | Embedded approved-prompt rollout control                |
+| `INTERVIEW_CODING_WORKSPACE_ENABLED`                               | Server only         | No                 | CodeMirror workspace rollout control                    |
+| `INTERVIEW_LIVE_STAGE_ENABLED`                                     | Server only         | No                 | Live Guiding Star rollout control                       |
+| `INTERVIEW_FOLLOW_UP_ENABLED`                                      | Server only         | No                 | New follow-up rollout control                           |
+| `INTERVIEW_REVIEW_TIMELINE_ENABLED`                                | Server only         | No                 | Conversation timeline rollout control                   |
+| `REALTIME_AI_ENABLED`                                              | Server only         | No                 | Set `true` for live voice interviews                    |
+| `REALTIME_AI_PROVIDER`, `REALTIME_AI_MODEL`, `REALTIME_AI_API_KEY` | Server only         | When voice enabled | Gemini Live or OpenAI Realtime configuration            |
+| `REALTIME_AI_TRANSCRIPTION_MODEL`, `REALTIME_AI_VOICE`             | Server only         | No                 | Optional realtime overrides                             |
+| `ANALYTICS_PROVIDER`                                               | Server only         | No                 | Reserved analytics setting                              |
 
 Never prefix a provider secret with `NEXT_PUBLIC_`. Preview deployments automatically use Vercel's deployment URL for Auth redirects when `NEXT_PUBLIC_APP_URL` is not set in Preview.
 

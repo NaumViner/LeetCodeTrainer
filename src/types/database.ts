@@ -97,7 +97,7 @@ export type Database = {
           {
             foreignKeyName: "approved_interview_follow_ups_problem_id_fkey";
             columns: ["problem_id"];
-            isOneToOne: true;
+            isOneToOne: false;
             referencedRelation: "problems";
             referencedColumns: ["id"];
           },
@@ -2272,6 +2272,16 @@ export type Database = {
       save_interview_preferences: {
         Args: { p_preferences: Json };
         Returns: undefined;
+      };
+      retry_mock_interview_evaluation: {
+        Args: {
+          p_evaluation_version: number;
+          p_evidence_version: number;
+          p_mock_interview_id: string;
+          p_model: string;
+          p_provider: string;
+        };
+        Returns: Json;
       };
       save_mock_interview_workspace: {
         Args: {

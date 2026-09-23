@@ -69,6 +69,7 @@ export function InterviewCodingWorkspace({
   );
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submissionNeedsRetry, setSubmissionNeedsRetry] = useState(false);
   const latestRef = useRef<WorkspaceSnapshot>({
     code: startingCode,
     scratchpad: initialScratchpad,
@@ -79,50 +80,110 @@ export function InterviewCodingWorkspace({
   });
   const workspaceVersionRef = useRef(initialWorkspaceVersion);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const submittingRef = useRef(false);
+  const conflictRef = useRef(false);
+  const mountedRef = useRef(true);
+  const uncertainSaveRef = useRef<
+    (WorkspaceSnapshot & { expectedVersion: number }) | null
+  >(null);
+  const uncertainSubmissionRef = useRef<{
+    snapshot: WorkspaceSnapshot;
+    expectedVersion: number;
+    advanceToTesting: boolean;
+    elapsedSeconds: number;
+  } | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const persistLatest = useCallback(async () => {
+    if (
+      submittingRef.current ||
+      uncertainSubmissionRef.current ||
+      conflictRef.current
+    )
+      return false;
     while (true) {
+      if (!mountedRef.current || submittingRef.current || conflictRef.current)
+        return false;
       if (savePromiseRef.current) {
         const pendingSucceeded = await savePromiseRef.current;
         if (!pendingSucceeded) return false;
         continue;
       }
-      if (sameSnapshot(latestRef.current, persistedRef.current)) {
+      if (
+        !uncertainSaveRef.current &&
+        sameSnapshot(latestRef.current, persistedRef.current)
+      ) {
         setSaveState("saved");
         return true;
       }
 
-      const snapshot = { ...latestRef.current };
-      setSaveState("saving");
-      const request = saveMockInterviewWorkspaceAction(interviewId, {
-        codeSnapshot: snapshot.code,
+      const pending = uncertainSaveRef.current ?? {
+        ...latestRef.current,
         expectedVersion: workspaceVersionRef.current,
-        scratchpad: snapshot.scratchpad,
-      }).then((result) => {
-        if (result.status === "success") {
-          workspaceVersionRef.current = result.workspaceVersion;
-          persistedRef.current = snapshot;
-          setSaveState(
-            sameSnapshot(latestRef.current, snapshot) ? "saved" : "unsaved",
+      };
+      const snapshot = { code: pending.code, scratchpad: pending.scratchpad };
+      setSaveState("saving");
+      const request = Promise.resolve()
+        .then(() =>
+          saveMockInterviewWorkspaceAction(interviewId, {
+            codeSnapshot: snapshot.code,
+            expectedVersion: pending.expectedVersion,
+            scratchpad: snapshot.scratchpad,
+          }),
+        )
+        .then((result) => {
+          uncertainSaveRef.current = null;
+          if (result.status === "success") {
+            workspaceVersionRef.current = result.workspaceVersion;
+            persistedRef.current = snapshot;
+            setMessage("");
+            setSaveState(
+              sameSnapshot(latestRef.current, snapshot) ? "saved" : "unsaved",
+            );
+            return true;
+          }
+          setMessage(result.message);
+          conflictRef.current = result.status === "conflict";
+          setSaveState(result.status);
+          return false;
+        })
+        .catch(() => {
+          uncertainSaveRef.current = pending;
+          setMessage(
+            "The save could not be confirmed. Your edits are still here. Check your connection and choose Save now to retry.",
           );
-          return true;
-        }
-        setMessage(result.message);
-        setSaveState(result.status);
-        return false;
-      });
+          setSaveState("error");
+          return false;
+        });
       savePromiseRef.current = request;
-      const succeeded = await request;
-      if (savePromiseRef.current === request) savePromiseRef.current = null;
+      let succeeded: boolean;
+      try {
+        succeeded = await request;
+      } finally {
+        if (savePromiseRef.current === request) savePromiseRef.current = null;
+      }
       if (!succeeded) return false;
     }
   }, [interviewId]);
 
   useEffect(() => {
-    if (sameSnapshot(latestRef.current, persistedRef.current)) return;
+    if (
+      submitting ||
+      uncertainSubmissionRef.current ||
+      uncertainSaveRef.current ||
+      conflictRef.current ||
+      sameSnapshot(latestRef.current, persistedRef.current)
+    )
+      return;
     const timer = window.setTimeout(() => void persistLatest(), 900);
     return () => window.clearTimeout(timer);
-  }, [code, persistLatest, scratchpad]);
+  }, [code, persistLatest, scratchpad, submitting]);
 
   const changeCode = (value: string) => {
     if (value.length > MAX_CODE_CHARS) {
@@ -131,64 +192,96 @@ export function InterviewCodingWorkspace({
     }
     setCode(value);
     latestRef.current = { ...latestRef.current, code: value };
-    setMessage("");
-    setSaveState("unsaved");
+    if (!conflictRef.current) {
+      if (!uncertainSaveRef.current && !uncertainSubmissionRef.current)
+        setMessage("");
+      setSaveState("unsaved");
+    }
   };
 
   const changeScratchpad = (value: string) => {
     setScratchpad(value);
     latestRef.current = { ...latestRef.current, scratchpad: value };
-    setMessage("");
-    setSaveState("unsaved");
+    if (!conflictRef.current) {
+      if (!uncertainSaveRef.current && !uncertainSubmissionRef.current)
+        setMessage("");
+      setSaveState("unsaved");
+    }
   };
 
   const submitCode = async (advanceToTesting: boolean) => {
-    if (submitting) return;
+    if (submittingRef.current || conflictRef.current) return;
+    // Resolve an uncertain save before a submission changes the version again.
+    if (uncertainSaveRef.current && !(await persistLatest())) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setMessage("");
-    if (savePromiseRef.current && !(await savePromiseRef.current)) {
-      setSubmitting(false);
-      return;
-    }
-    const snapshot = { ...latestRef.current };
-    const result = await submitMockInterviewCodeAction(interviewId, {
-      advanceToTesting,
-      codeSnapshot: snapshot.code,
-      elapsedSeconds: Math.min(
-        14_400,
-        Math.max(
-          elapsedSeconds,
-          Math.floor((Date.now() - new Date(startedAt).getTime()) / 1_000),
+    try {
+      if (savePromiseRef.current && !(await savePromiseRef.current)) {
+        return;
+      }
+      const pending = uncertainSubmissionRef.current ?? {
+        snapshot: { ...latestRef.current },
+        advanceToTesting,
+        expectedVersion: workspaceVersionRef.current,
+        elapsedSeconds: Math.min(
+          14_400,
+          Math.max(
+            elapsedSeconds,
+            Math.floor((Date.now() - new Date(startedAt).getTime()) / 1_000),
+          ),
         ),
-      ),
-      expectedVersion: workspaceVersionRef.current,
-      scratchpad: snapshot.scratchpad,
-    });
-    setSubmitting(false);
-    if (result.status !== "success") {
-      setMessage(result.message);
-      setSaveState(result.status);
-      return;
+      };
+      const { snapshot } = pending;
+      uncertainSubmissionRef.current = pending;
+      const result = await submitMockInterviewCodeAction(interviewId, {
+        advanceToTesting: pending.advanceToTesting,
+        codeSnapshot: snapshot.code,
+        elapsedSeconds: pending.elapsedSeconds,
+        expectedVersion: pending.expectedVersion,
+        scratchpad: snapshot.scratchpad,
+      });
+      uncertainSubmissionRef.current = null;
+      setSubmissionNeedsRetry(false);
+      if (result.status !== "success") {
+        setMessage(result.message);
+        conflictRef.current = result.status === "conflict";
+        setSaveState(result.status);
+        return;
+      }
+      workspaceVersionRef.current = result.workspaceVersion;
+      persistedRef.current = snapshot;
+      setSaveState(
+        sameSnapshot(latestRef.current, snapshot) ? "saved" : "unsaved",
+      );
+      setMessage(
+        interviewerConnected
+          ? result.advancedToTesting
+            ? "Code sent for interviewer review. You are now in Testing."
+            : "Code sent for interviewer review. It was not executed."
+          : result.advancedToTesting
+            ? "Code saved. You are now in Testing; AI review is unavailable."
+            : "Code saved. AI review is unavailable in this interview.",
+      );
+      if (mountedRef.current)
+        onSubmitted({
+          advanceToTesting: result.advancedToTesting,
+          code: snapshot.code,
+          language: codingLanguage,
+          snapshotVersion: result.workspaceVersion,
+          submissionId: result.submissionId,
+        });
+    } catch {
+      setSubmissionNeedsRetry(uncertainSubmissionRef.current !== null);
+      setMessage(
+        "The submission could not be confirmed. Your edits are still here. Choose a code-review action again to safely retry the same submitted snapshot.",
+      );
+      setSaveState("error");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-    workspaceVersionRef.current = result.workspaceVersion;
-    persistedRef.current = snapshot;
-    setSaveState("saved");
-    setMessage(
-      interviewerConnected
-        ? advanceToTesting
-          ? "Code sent for interviewer review. You are now in Testing."
-          : "Code sent for interviewer review. It was not executed."
-        : advanceToTesting
-          ? "Code saved. You are now in Testing; AI review is unavailable."
-          : "Code saved. AI review is unavailable in this interview.",
-    );
-    onSubmitted({
-      advanceToTesting,
-      code: snapshot.code,
-      language: codingLanguage,
-      snapshotVersion: result.workspaceVersion,
-      submissionId: result.submissionId,
-    });
   };
 
   const implementationActive = phase === "implementation";
@@ -288,6 +381,18 @@ export function InterviewCodingWorkspace({
         ) : null}
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
+          {submissionNeedsRetry ? (
+            <Button
+              disabled={submitting}
+              onClick={() =>
+                void submitCode(
+                  uncertainSubmissionRef.current!.advanceToTesting,
+                )
+              }
+            >
+              Retry code submission
+            </Button>
+          ) : null}
           <Button
             disabled={saveState === "conflict" || submitting}
             onClick={() => void persistLatest()}

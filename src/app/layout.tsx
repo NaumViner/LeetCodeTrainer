@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
+import { productName } from "@/lib/product";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "AI Mock Interview",
-    template: "%s | AI Mock Interview",
+    default: productName,
+    template: `%s | ${productName}`,
   },
   description:
     "Start a real AI coding interview without signup. English or Hebrew, live conversation, and evidence-based feedback.",

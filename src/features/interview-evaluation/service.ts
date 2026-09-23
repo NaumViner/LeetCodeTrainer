@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { recordOperationalEvent } from "@/lib/operational-events";
 import type { Json } from "@/types/database";
 
-export const INTERVIEW_EVALUATION_VERSION = 1;
+export const INTERVIEW_EVALUATION_VERSION = 2;
 
 const evaluationReservationSchema = z
   .object({
@@ -45,6 +45,7 @@ export async function evaluateCompletedInterview(
 export async function evaluateAndPersistCompletedInterview(
   userId: string,
   interviewId: string,
+  options: { retry?: boolean } = {},
 ): Promise<InterviewEvaluationRun | null> {
   const startedAt = Date.now();
   recordOperationalEvent("interview_evaluation_requested", { interviewId });
@@ -54,17 +55,23 @@ export async function evaluateAndPersistCompletedInterview(
       interviewId,
     );
     const provider = createInterviewEvaluatorProvider();
+    if (options.retry && !provider) return null;
     const providerName = provider?.name ?? "deterministic";
     const providerModel = provider?.model ?? "deterministic-v1";
     const supabase = await createClient();
     const { data: reservationValue, error: reservationError } =
-      await supabase.rpc("reserve_mock_interview_evaluation", {
-        p_evaluation_version: INTERVIEW_EVALUATION_VERSION,
-        p_evidence_version: INTERVIEW_EVIDENCE_VERSION,
-        p_mock_interview_id: interviewId,
-        p_model: providerModel,
-        p_provider: providerName,
-      });
+      await supabase.rpc(
+        options.retry
+          ? "retry_mock_interview_evaluation"
+          : "reserve_mock_interview_evaluation",
+        {
+          p_evaluation_version: INTERVIEW_EVALUATION_VERSION,
+          p_evidence_version: INTERVIEW_EVIDENCE_VERSION,
+          p_mock_interview_id: interviewId,
+          p_model: providerModel,
+          p_provider: providerName,
+        },
+      );
     if (reservationError) {
       throw new Error("Interview evaluation could not be reserved.");
     }
@@ -115,7 +122,16 @@ async function persistEvaluationResult(
     p_dimensions: run.evaluation.dimensions as Json,
     p_error_code: run.errorCode ?? "",
     p_evaluation_id: evaluationId,
-    p_evidence_coverage: evidence.coverage as Json,
+    p_evidence_coverage: {
+      ...evidence.coverage,
+      referenceContentVersion:
+        evidence.problem.questionContent?.contentVersion ?? null,
+      referenceErratum: evidence.problem.questionContent?.prompt.includes(
+        "Evaluator erratum:",
+      )
+        ? "stock-profit-v1"
+        : null,
+    } as Json,
     p_improvements: run.evaluation.improvements,
     p_input_tokens: run.usage.inputTokens,
     p_output_tokens: run.usage.outputTokens,

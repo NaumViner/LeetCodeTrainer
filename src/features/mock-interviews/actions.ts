@@ -85,7 +85,7 @@ export async function startMockInterviewAction(
     return {
       status: "error",
       message:
-        "No question is available in this range for your next topic. Try a wider difficulty range. Your trial has not been used.",
+        "No approved question is available in this difficulty range. Choose another range and try again. Your trial has not been used.",
     };
   const { data: interviewId, error } = await supabase.rpc(
     "start_mock_interview_v2",
@@ -168,15 +168,26 @@ export async function retryInterviewEvaluationAction(form: FormData) {
   const id = mockInterviewIdSchema.safeParse(form.get("interviewId"));
   if (!id.success) return;
   const user = await requireInterviewUser();
+  let notice = "feedback_wait";
   try {
-    await evaluateAndPersistCompletedInterview(user.id, id.data);
+    const result = await evaluateAndPersistCompletedInterview(
+      user.id,
+      id.data,
+      {
+        retry: true,
+      },
+    );
+    if (result?.status === "completed") notice = "feedback_updated";
+    else if (result) notice = "feedback_unavailable";
   } catch {
+    notice = "feedback_unavailable";
     recordOperationalEvent("interview_evaluation_failed", {
       interviewId: id.data,
       reason: "retry_unavailable",
     });
   }
   revalidatePath(`/interviews/${id.data}/scorecard`);
+  redirect(`/interviews/${id.data}/scorecard?notice=${notice}`);
 }
 
 export async function advanceMockInterviewAction(
@@ -248,7 +259,7 @@ export async function saveMockInterviewWorkspaceAction(
     });
     return {
       message:
-        "This interview changed in another tab. Refresh before continuing.",
+        "This interview changed in another tab. Your edits are still here. Copy your code and notes before refreshing to load the latest saved version.",
       status: "conflict",
     };
   }
@@ -293,7 +304,7 @@ export async function submitMockInterviewCodeAction(
     });
     return {
       message:
-        "This interview changed in another tab. Refresh before submitting.",
+        "This interview changed in another tab. Your edits are still here. Copy your code and notes before refreshing to load the latest saved version.",
       status: "conflict",
     };
   }

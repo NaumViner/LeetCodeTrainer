@@ -15,7 +15,7 @@ export function getInterviewEvaluatorConfig(): InterviewEvaluatorConfig | null {
   if (!isConfiguredServerSecret(apiKey)) return null;
   return {
     apiKey,
-    model: env.INTERVIEW_EVALUATOR_MODEL ?? "gemini-3.5-flash",
+    model: env.INTERVIEW_EVALUATOR_MODEL ?? "gemini-3.1-flash-lite",
     provider: "gemini",
   };
 }

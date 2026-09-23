@@ -82,9 +82,11 @@ describe("quick interview setup", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "We couldn't open your interview",
     );
-    expect(
-      screen.getByRole("button", { name: "Start interview" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Start interview" }),
+      ).toBeEnabled(),
+    );
   });
   it("stops waiting when another tab holds the start lock", async () => {
     vi.useFakeTimers();

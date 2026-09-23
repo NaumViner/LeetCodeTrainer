@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { buildInterviewCoverage } from "@/domain/interview-coverage";
 import {
-  NEETCODE_150_EXPECTED_PROBLEM_COUNT,
-  NEETCODE_150_EXPECTED_TOPIC_COUNT,
-} from "@/domain/neetcode-150";
+  NEETCODE_250_EXPECTED_PROBLEM_COUNT,
+  NEETCODE_250_EXPECTED_TOPIC_COUNT,
+} from "@/domain/neetcode-250";
 
 describe("interview topic coverage", () => {
   it("tracks distinct covered topics instead of total interviews", () => {
@@ -77,8 +77,8 @@ describe("interview topic coverage", () => {
   });
 
   it("documents the current canonical collection size", () => {
-    expect(NEETCODE_150_EXPECTED_PROBLEM_COUNT).toBe(150);
-    expect(NEETCODE_150_EXPECTED_TOPIC_COUNT).toBe(18);
+    expect(NEETCODE_250_EXPECTED_PROBLEM_COUNT).toBe(250);
+    expect(NEETCODE_250_EXPECTED_TOPIC_COUNT).toBe(18);
   });
 });
 

@@ -433,13 +433,28 @@ describe.sequential(
       const before = sql(
         `select (to_jsonb(e) - 'user_id')::text from public.mock_interview_evaluations e where mock_interview_id = '${id}'`,
       );
+      const retry = await other.rpc("retry_mock_interview_evaluation", {
+        p_mock_interview_id: id,
+        p_provider: "test",
+        p_model: "test",
+        p_evaluation_version: 2,
+        p_evidence_version: 2,
+      });
+      expect(retry.error).toBeNull();
+      expect(
+        (await member.rpc("claim_guest_interview", { p_token: prepared.data! }))
+          .error?.code,
+      ).toBe("55P03");
+      sql(
+        `update public.mock_interview_evaluations set created_at = now() - interval '4 minutes' where mock_interview_id = '${id}' and status = 'pending'`,
+      );
       expect(
         (await member.rpc("claim_guest_interview", { p_token: prepared.data! }))
           .error,
       ).toBeNull();
       expect(
         sql(
-          `select (to_jsonb(e) - 'user_id')::text from public.mock_interview_evaluations e where mock_interview_id = '${id}'`,
+          `select (to_jsonb(e) - 'user_id')::text from public.mock_interview_evaluations e where mock_interview_id = '${id}' and is_current`,
         ),
       ).toBe(before);
       expect(
@@ -448,9 +463,20 @@ describe.sequential(
             .from("mock_interview_evaluations")
             .select("user_id")
             .eq("mock_interview_id", id)
+            .eq("is_current", true)
             .single()
         ).data?.user_id,
       ).toBe(memberId);
+      expect(
+        sql(
+          `select count(*) from public.mock_interview_evaluations where mock_interview_id = '${id}' and user_id = '${memberId}'`,
+        ),
+      ).toBe("2");
+      expect(
+        sql(
+          `select error_code from public.mock_interview_evaluations where mock_interview_id = '${id}' and version = 2`,
+        ),
+      ).toBe("lease_expired");
     });
 
     it("counts parallel pending voice allocations before any transport activates", async () => {

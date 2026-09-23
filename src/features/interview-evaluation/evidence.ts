@@ -5,7 +5,7 @@ import {
   type InterviewEvidencePackage,
   type TrustedTestResults,
 } from "@/features/interview-evaluation/evidence-model";
-import { getFirstPartyQuestionContent } from "@/features/interview-evaluation/question-content";
+import { getEvaluationQuestionContent } from "@/features/interview-evaluation/question-content";
 import { getMockInterview } from "@/features/mock-interviews/queries";
 
 export async function assembleInterviewEvidencePackage(
@@ -22,7 +22,7 @@ export async function assembleInterviewEvidencePackage(
     assembledAt: new Date(),
     interview,
     problem: interview.problem,
-    questionContent: getFirstPartyQuestionContent(
+    questionContent: getEvaluationQuestionContent(
       interview.problem.slug,
       interview.question_content_version,
     ),

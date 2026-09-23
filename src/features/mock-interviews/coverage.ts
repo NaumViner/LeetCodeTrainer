@@ -2,10 +2,10 @@ import "server-only";
 
 import { buildInterviewCoverage } from "@/domain/interview-coverage";
 import {
-  NEETCODE_150_COLLECTION_SLUG,
-  NEETCODE_150_EXPECTED_PROBLEM_COUNT,
-  NEETCODE_150_EXPECTED_TOPIC_COUNT,
-} from "@/domain/neetcode-150";
+  NEETCODE_250_COLLECTION_SLUG,
+  NEETCODE_250_EXPECTED_PROBLEM_COUNT,
+  NEETCODE_250_EXPECTED_TOPIC_COUNT,
+} from "@/domain/neetcode-250";
 import { createClient } from "@/lib/supabase/server";
 
 export async function getInterviewTopicCoverage(userId: string) {
@@ -13,7 +13,7 @@ export async function getInterviewTopicCoverage(userId: string) {
   const { data: collection, error: collectionError } = await supabase
     .from("problem_collections")
     .select("*")
-    .eq("slug", NEETCODE_150_COLLECTION_SLUG)
+    .eq("slug", NEETCODE_250_COLLECTION_SLUG)
     .eq("active", true)
     .order("version", { ascending: false })
     .limit(1)
@@ -64,9 +64,9 @@ export async function getInterviewTopicCoverage(userId: string) {
   });
 
   if (
-    collection.expected_problem_count !== NEETCODE_150_EXPECTED_PROBLEM_COUNT ||
+    collection.expected_problem_count !== NEETCODE_250_EXPECTED_PROBLEM_COUNT ||
     collection.expected_primary_topic_count !==
-      NEETCODE_150_EXPECTED_TOPIC_COUNT ||
+      NEETCODE_250_EXPECTED_TOPIC_COUNT ||
     (membershipResult.data ?? []).length !==
       collection.expected_problem_count ||
     coverage.totalTopicCount !== collection.expected_primary_topic_count

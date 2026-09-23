@@ -1,7 +1,7 @@
 import type { InterviewCoverage } from "@/domain/interview-coverage";
 import type { ScoredRecommendation } from "@/domain/recommendation";
 
-export const INTERVIEW_SELECTION_ALGORITHM_VERSION = 1;
+export const INTERVIEW_SELECTION_ALGORITHM_VERSION = 2;
 
 export type InterviewDifficulty = "easy" | "medium" | "hard";
 export type InterviewSelectionMode =
@@ -44,6 +44,7 @@ export type InterviewSelectionErrorCode =
 
 export type InterviewSelectionMetadata = {
   algorithmVersion: number;
+  coverageFallbackUsed?: boolean;
   candidateProblemCount: number;
   candidateTopicCount: number;
   recencyFallbackUsed: boolean;
@@ -105,13 +106,19 @@ export function selectCoverageInterview<
     readyCollection,
     input.selectedDifficulties,
   );
-  const targetTopics = input.coverage.complete
-    ? leastCoveredTopicsWithInventory(input.coverage, selectedDifficultyPool)
-    : input.coverage.missingTopics.filter((topic) =>
-        selectedDifficultyPool.some(
-          (problem) => problem.primaryTopicId === topic.id,
-        ),
-      );
+  const uncoveredEligibleTopics = input.coverage.missingTopics.filter((topic) =>
+    selectedDifficultyPool.some(
+      (problem) => problem.primaryTopicId === topic.id,
+    ),
+  );
+  const coverageFallbackUsed =
+    !input.coverage.complete &&
+    uncoveredEligibleTopics.length === 0 &&
+    selectedDifficultyPool.length > 0;
+  const targetTopics =
+    uncoveredEligibleTopics.length > 0
+      ? uncoveredEligibleTopics
+      : leastCoveredTopicsWithInventory(input.coverage, selectedDifficultyPool);
 
   if (targetTopics.length === 0) {
     const desiredTopics = input.coverage.complete
@@ -126,8 +133,8 @@ export function selectCoverageInterview<
         ? "difficulty_excludes_uncovered_topics"
         : "no_interview_ready_inventory",
       hasReadyInventory
-        ? "The selected difficulties exclude every topic that Coverage needs next."
-        : "No interview-ready problems are available for the topics that Coverage needs next.",
+        ? "No approved interview questions are available in this difficulty range. Choose another range and try again."
+        : "No approved interview questions are available. Please try again later.",
       {
         difficulties: [...input.selectedDifficulties],
         topicIds: desiredTopics.map((topic) => topic.id),
@@ -160,13 +167,16 @@ export function selectCoverageInterview<
     {
       candidateProblemCount: problemPool.length,
       candidateTopicCount: targetTopics.length,
+      coverageFallbackUsed,
       recencyFallbackUsed,
       repeatFallbackUsed: problemSelection.repeatFallbackUsed,
     },
     [
-      input.coverage.complete
-        ? "Selected randomly from the least-covered topics."
-        : "Selected randomly from topics without a completed interview.",
+      coverageFallbackUsed
+        ? "All uncovered topics are outside the selected difficulty range; continued within that range without changing overall coverage."
+        : input.coverage.complete
+          ? "Selected randomly from the least-covered topics."
+          : "Selected randomly from topics without a completed interview.",
       recencyFallbackUsed
         ? "Recent-topic avoidance was relaxed because every eligible topic was recent."
         : "Your two most recent interview topics were avoided when possible.",

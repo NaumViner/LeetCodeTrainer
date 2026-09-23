@@ -10,6 +10,9 @@ test("the application foundation is responsive and navigable", async ({
   );
   await expect(page.getByRole("combobox")).toHaveCount(4);
   await expect(
+    page.getByText("250 questions across 18 topics.", { exact: false }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("button", { name: "Start interview" }),
   ).toBeEnabled();
   await expect(

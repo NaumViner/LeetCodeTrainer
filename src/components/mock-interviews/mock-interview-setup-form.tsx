@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useId, useRef, useState, useTransition } from "react";
 import { unstable_rethrow } from "next/navigation";
 import { ArrowRight, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export function MockInterviewSetupForm({
   isGuest?: boolean;
 }) {
   const [preferences, setPreferences] = useState(defaults);
+  const inventoryDescriptionId = useId();
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
@@ -125,6 +127,8 @@ export function MockInterviewSetupForm({
           </span>
           <Select
             name="difficultyRange"
+            aria-label={hebrew ? "טווח קושי" : "Difficulty range"}
+            aria-describedby={inventoryDescriptionId}
             value={preferences.difficultyRange}
             disabled={pending}
             onChange={(e) =>
@@ -143,6 +147,14 @@ export function MockInterviewSetupForm({
               ),
             )}
           </Select>
+          <span
+            id={inventoryDescriptionId}
+            className="text-muted block text-xs font-normal"
+          >
+            {hebrew
+              ? "250 שאלות ב־18 נושאים. שאלות עשויות לחזור, תמיד בטווח הקושי שבחרת."
+              : "250 questions across 18 topics. Questions may repeat, always within your selected difficulty range."}
+          </span>
         </label>
         <label className="space-y-2 text-sm font-medium">
           <span className="block">
@@ -245,7 +257,13 @@ export function MockInterviewSetupForm({
       <p className="text-muted text-center text-xs leading-5">
         {hebrew
           ? "הקול מועבר לספק AI לצורך הראיון. הקוד והתמלול נשמרים לצורך המשוב."
-          : "Audio is sent to the AI provider for your interview. Code and transcript are saved for your feedback."}
+          : "Audio is sent to the AI provider for your interview. Code and transcript are saved for your feedback."}{" "}
+        <Link
+          className="underline"
+          href={hebrew ? "/privacy?lang=he" : "/privacy"}
+        >
+          {hebrew ? "מידע על פרטיות" : "Privacy details"}
+        </Link>
       </p>
     </form>
   );

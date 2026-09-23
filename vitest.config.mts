@@ -13,6 +13,7 @@ export default defineConfig({
       "academy-bootstrap/**",
       "tests/e2e/**",
       "tests/integration/**",
+      "tests/live/**",
     ],
     setupFiles: ["./tests/setup.ts"],
   },

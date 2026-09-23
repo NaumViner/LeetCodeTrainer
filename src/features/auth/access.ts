@@ -31,6 +31,7 @@ export function interviewRouteAccess(
 }
 
 export function safeAuthNextPath(value: string | null | undefined) {
+  if (value === "/reset-password") return value;
   // Only known application destinations; backslashes and encoded origins cannot
   // turn an auth callback into an external redirect.
   return value &&

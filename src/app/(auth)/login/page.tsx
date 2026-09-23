@@ -43,6 +43,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <span className="bg-border h-px flex-1" />
       </div>
       <AuthForm action={loginAction} configured={configured} mode="login" />
+      <Link
+        href="/forgot-password"
+        className="text-primary mt-4 block text-sm underline"
+      >
+        Forgot password?
+      </Link>
       <p className="text-muted mt-6 text-center text-sm">
         New here?{" "}
         <Link

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HelpLinks } from "@/components/navigation/help-links";
 import { notFound, redirect } from "next/navigation";
 import { GuestSignupInvitation } from "@/components/mock-interviews/guest-signup-invitation";
 import { DeleteInterviewForm } from "@/components/mock-interviews/delete-interview-form";
@@ -15,8 +16,10 @@ import {
 
 export default async function MockInterviewScorecardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ interviewId: string }>;
+  searchParams: Promise<{ notice?: string }>;
 }) {
   const user = await requireInterviewUser();
   const { interviewId } = await params;
@@ -40,9 +43,23 @@ export default async function MockInterviewScorecardPage({
     : null;
   const evaluation = parsed?.success ? parsed.data : null;
   const hebrew = interview.interview_language === "hebrew";
+  const { notice } = await searchParams;
   const score = evaluation?.rawScore ?? interview.scorecard?.overall_score;
   return (
     <div className="mx-auto max-w-5xl space-y-6" dir={hebrew ? "rtl" : "ltr"}>
+      {notice === "feedback_updated" ||
+      notice === "feedback_wait" ||
+      notice === "feedback_unavailable" ? (
+        <p role="status" className="bg-surface rounded-xl border p-4 text-sm">
+          {notice === "feedback_updated"
+            ? hebrew
+              ? "המשוב עודכן."
+              : "Your feedback has been updated."
+            : hebrew
+              ? "לא התקבל משוב חדש. ייתכן שניסיון כבר פועל, שהשירות אינו זמין או שמכסת הניסיונות מוצתה. הראיון והמשוב הקודם נשמרו."
+              : "No new feedback was accepted. An attempt may already be running, the provider may be unavailable, or the attempt limit may have been reached. Your interview and previous feedback remain saved."}
+        </p>
+      ) : null}
       <header className="bg-success-soft rounded-2xl border p-6 sm:p-8">
         <p className="text-sm font-semibold">
           {hebrew ? "הראיון הושלם" : "Interview complete"}
@@ -81,6 +98,7 @@ export default async function MockInterviewScorecardPage({
           {hebrew ? "ראיון נוסף" : "Next interview"}
         </Link>
       </nav>
+      <HelpLinks hebrew={hebrew} />
       {evaluation ? (
         <>
           <section className="bg-surface rounded-xl border p-6">
@@ -175,6 +193,23 @@ export default async function MockInterviewScorecardPage({
         >
           Optional skills assessment
         </Link>
+      ) : null}
+      {evaluation && interview.evaluation?.status === "provisional" ? (
+        <form
+          action={retryInterviewEvaluationAction}
+          className="rounded-xl border p-6"
+        >
+          <input name="interviewId" type="hidden" value={interview.id} />
+          <p className="text-muted mb-4 text-sm">
+            {hebrew
+              ? "זהו משוב זמני. אפשר לנסות שוב; המשוב הקיים יישמר עד שהערכה חדשה תצליח. מספר הניסיונות מוגבל."
+              : "This feedback is provisional. You can retry; the current feedback stays available until a new evaluation succeeds. Attempts are limited."}
+          </p>
+          <SubmitButton
+            label={hebrew ? "ניסיון נוסף לקבלת משוב" : "Retry AI feedback"}
+            pendingLabel={hebrew ? "מכין משוב…" : "Preparing feedback…"}
+          />
+        </form>
       ) : null}
       <DeleteInterviewForm interviewId={interview.id} />
     </div>

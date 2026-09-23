@@ -2,6 +2,15 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { sequenceQuestions } from "./content/sequences";
+import { structureQuestions } from "./content/structures";
+import { searchQuestions } from "./content/search";
+import { dynamicQuestions } from "./content/dynamic-programming";
+import { miscellaneousQuestions } from "./content/miscellaneous";
+import { extendedSequenceQuestions } from "./content/neetcode250-sequences";
+import { extendedGraphQuestions } from "./content/neetcode250-graphs";
+import { extendedStructureQuestions } from "./content/neetcode250-structures";
+import { extendedDynamicQuestions } from "./content/neetcode250-dynamic";
 
 import {
   firstPartyQuestionContentSchema,
@@ -23,7 +32,7 @@ type QuestionDraft = Omit<
   "contentVersion" | "provenance" | "reviewStatus"
 >;
 
-const approvedQuestions = {
+const versionOneQuestions = {
   "binary-search": question({
     constraints: [
       "1 <= nums.length <= 100,000",
@@ -430,13 +439,132 @@ const approvedQuestions = {
   }),
 } satisfies Record<string, ApprovedInterviewQuestion>;
 
+const expandedQuestions = {
+  ...extendedSequenceQuestions,
+  ...extendedGraphQuestions,
+  ...extendedStructureQuestions,
+  ...extendedDynamicQuestions,
+  ...sequenceQuestions,
+  ...structureQuestions,
+  ...searchQuestions,
+  ...dynamicQuestions,
+  ...miscellaneousQuestions,
+};
+
+// Retain published versions so an existing interview can resolve its snapshot.
+const approvedQuestions = {
+  ...Object.fromEntries(
+    Object.entries(expandedQuestions).map(([slug, content]) => [
+      slug,
+      question(content),
+    ]),
+  ),
+  ...versionOneQuestions,
+  "median-of-two-sorted-arrays": question({
+    prompt:
+      "Two integer arrays are each sorted in nondecreasing order. Return the median of their combined values without changing either input. For an even total length, return the average of the two middle values. At least one array is non-empty. Aim for O(log(m + n)) time, where m and n are the array lengths.",
+    constraints: [
+      "0 <= m, n <= 100,000; 1 <= m + n <= 200,000.",
+      "Each array is sorted in nondecreasing order; duplicates are allowed.",
+      "Each integer is between -1,000,000 and 1,000,000.",
+    ],
+    examples: [
+      {
+        input: "left = [1,4], right = [2,3]",
+        output: "2.5",
+        explanation: "The middle values are 2 and 3.",
+      },
+      {
+        input: "left = [], right = [-3,-1,2]",
+        output: "-1",
+        explanation: null,
+      },
+    ],
+    expectedInvariants: [
+      "The combined left partition has half the values, rounded up.",
+      "Every left-partition value is no greater than every right-partition value.",
+      "Empty partitions use explicit boundary handling rather than invalid array accesses.",
+    ],
+  }),
+  "merge-k-sorted-lists": question({
+    prompt:
+      "You receive a list of heads of sorted singly linked lists. Merge their nodes into one list sorted in nondecreasing order and return its head. Reuse the existing nodes, preserving every node exactly once. The collection may be empty and individual heads may be null. The inputs are acyclic and share no nodes. Explain how your running time depends on the total number of nodes and the number of lists.",
+    constraints: [
+      "0 <= number of lists <= 10,000; 0 <= total number of nodes <= 100,000.",
+      "Each list is sorted in nondecreasing order; duplicates are allowed.",
+      "Node values fit in a signed 32-bit integer.",
+    ],
+    examples: [
+      {
+        input: "lists = [[-2,4,8],[],[-2,3],[1,7]]",
+        output: "[-2,-2,1,3,4,7,8]",
+        explanation:
+          "An empty list contributes no nodes; both occurrences of -2 remain.",
+      },
+      { input: "lists = []", output: "[]", explanation: "Return a null head." },
+    ],
+    expectedInvariants: [
+      "The output prefix is sorted and contains only nodes removed from the input lists.",
+      "Every unmerged node remains reachable until selected, and every node is emitted exactly once.",
+      "The last emitted node does not create a cycle.",
+    ],
+  }),
+  "kth-largest-element-in-a-stream": question(
+    {
+      ...versionOneQuestions["kth-largest-element-in-a-stream"],
+      prompt:
+        versionOneQuestions["kth-largest-element-in-a-stream"].prompt +
+        " At least k values are guaranteed to have been observed after each add call; the initial collection may contain fewer than k values. Duplicates count as separate values.",
+      constraints: [
+        "k >= 1; at least k values have been supplied after each add call.",
+        ...versionOneQuestions[
+          "kth-largest-element-in-a-stream"
+        ].constraints.slice(1),
+      ],
+      expectedInvariants: [
+        "The retained candidates are the min(k, values seen) largest values observed so far.",
+        "After an add call, the smallest retained candidate is the current kth-largest value.",
+      ],
+    },
+    2,
+  ),
+  "best-time-to-buy-and-sell-stock": question(
+    {
+      ...versionOneQuestions["best-time-to-buy-and-sell-stock"],
+      examples: [
+        {
+          explanation: "Buy at 1 and sell later at 8.",
+          input: "prices = [7, 2, 5, 1, 8, 4]",
+          output: "7",
+        },
+        versionOneQuestions["best-time-to-buy-and-sell-stock"].examples[1]!,
+      ],
+    },
+    2,
+  ),
+};
+
 type ApprovedQuestionSlug = keyof typeof approvedQuestions;
+
+const publishedVersions = new Map<
+  string,
+  Map<number, ApprovedInterviewQuestion>
+>();
+for (const [slug, content] of [
+  ...Object.entries(versionOneQuestions),
+  ...Object.entries(approvedQuestions),
+]) {
+  const versions = publishedVersions.get(slug) ?? new Map();
+  versions.set(content.contentVersion, content);
+  publishedVersions.set(slug, versions);
+}
 
 export const APPROVED_INTERVIEW_QUESTION_SLUGS = Object.freeze(
   Object.keys(approvedQuestions),
 );
 
 export function getApprovedInterviewQuestion(problemSlug: string) {
+  if (!Object.hasOwn(approvedQuestions, problemSlug)) return null;
   const question = approvedQuestions[problemSlug as ApprovedQuestionSlug];
   return question ? approvedInterviewQuestionSchema.parse(question) : null;
 }
@@ -449,10 +577,13 @@ export function getFirstPartyQuestionContent(
   problemSlug: string,
   contentVersion?: number | null,
 ): FirstPartyQuestionContent | null {
-  const question = getApprovedInterviewQuestion(problemSlug);
+  const question =
+    contentVersion == null
+      ? getApprovedInterviewQuestion(problemSlug)
+      : publishedVersions.get(problemSlug)?.get(contentVersion);
   if (
     !question ||
-    (contentVersion && question.contentVersion !== contentVersion)
+    (contentVersion != null && question.contentVersion !== contentVersion)
   ) {
     return null;
   }
@@ -473,6 +604,24 @@ export function getLearnerVisibleQuestionContent(
   return learnerVisibleQuestionContentSchema.parse(learnerVisible);
 }
 
+// A new evaluation may correct a known reference error, but must explicitly
+// describe what the learner saw. Never mutate the historical interview prompt.
+export function getEvaluationQuestionContent(
+  problemSlug: string,
+  contentVersion?: number | null,
+) {
+  if (
+    problemSlug === "best-time-to-buy-and-sell-stock" &&
+    contentVersion === 1
+  ) {
+    const corrected = getFirstPartyQuestionContent(problemSlug, 2)!;
+    corrected.prompt +=
+      "\nEvaluator erratum: this interview originally displayed content version 1, whose example incorrectly claimed a profit of 6 for [7, 2, 5, 1, 8, 4]. The corrected version-2 reference gives 7 (buy at 1, sell at 8). Do not penalize the learner for relying on or questioning the erroneous original example. Historical interview content has not been changed.";
+    return corrected;
+  }
+  return getFirstPartyQuestionContent(problemSlug, contentVersion);
+}
+
 const activeQuestionSlugByContentKey = new Map(
   Object.keys(approvedQuestions).map((slug) => [
     activeInterviewContentKey(slug),
@@ -486,7 +635,21 @@ export function getActiveInterviewQuestionPrompt(
 ) {
   const slug = activeQuestionSlugByContentKey.get(contentKey);
   if (!slug) return null;
-  return getLearnerVisibleQuestionContent(slug, contentVersion)?.prompt ?? null;
+  const content = getLearnerVisibleQuestionContent(slug, contentVersion);
+  if (!content) return null;
+  // Newly published questions include their full public contract in both the
+  // active workspace and voice context. Historical prompts keep their wording.
+  if (!Object.hasOwn(expandedQuestions, slug)) return content.prompt;
+  return [
+    content.prompt,
+    "Constraints:",
+    ...content.constraints.map((constraint) => `- ${constraint}`),
+    "Examples (JSON display notation; choose an appropriate Python or Java signature):",
+    ...content.examples.map(
+      (example, index) =>
+        `Example ${index + 1}\nInput: ${example.input}\nOutput: ${example.output}`,
+    ),
+  ].join("\n\n");
 }
 
 function activeInterviewContentKey(problemSlug: string) {
@@ -495,10 +658,13 @@ function activeInterviewContentKey(problemSlug: string) {
     .digest("hex");
 }
 
-function question(content: QuestionDraft): ApprovedInterviewQuestion {
+function question(
+  content: QuestionDraft,
+  contentVersion = 1,
+): ApprovedInterviewQuestion {
   return approvedInterviewQuestionSchema.parse({
     ...content,
-    contentVersion: 1,
+    contentVersion,
     provenance: "first_party",
     reviewStatus: "approved",
   });

@@ -1,4 +1,5 @@
 import { ProfileForm } from "@/components/profile/profile-form";
+import { HelpLinks } from "@/components/navigation/help-links";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireAuthenticatedUser } from "@/features/auth/session";
@@ -24,6 +25,7 @@ export default async function ProfileSettingsPage() {
           <ProfileForm profile={profile} submitLabel="Save profile" />
         </CardContent>
       </Card>
+      <HelpLinks />
     </div>
   );
 }

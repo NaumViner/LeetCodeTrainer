@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { productName } from "@/lib/product";
+import { HelpLinks } from "@/components/navigation/help-links";
 import { Brand } from "@/components/navigation/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
@@ -36,7 +38,7 @@ export async function InterviewEntry({
     <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-16">
       <div className="mb-8 text-center">
         <p className="text-primary text-sm font-semibold tracking-wide">
-          AI MOCK INTERVIEW
+          {productName}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
           Your next interview starts here.
@@ -112,6 +114,7 @@ export async function InterviewEntry({
           </Link>
         </div>
       ) : null}
+      <HelpLinks hebrew={defaults.interviewLanguage === "hebrew"} />
     </div>
   );
   if (!standalone) return content;

@@ -3,11 +3,46 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
+import {
+  APPROVED_INTERVIEW_QUESTION_SLUGS,
+  getApprovedQuestionContentVersion,
+  getActiveInterviewQuestionPrompt,
+  getApprovedInterviewQuestion,
+} from "../../src/features/interview-evaluation/question-content";
 
 import { buildInterviewEvidencePackage } from "../../src/features/interview-evaluation/evidence-model";
+import { INTERVIEW_SELECTION_ALGORITHM_VERSION } from "../../src/domain/interview-selection";
 import type { Problem } from "../../src/features/problems/model";
 import type { Database, Json } from "../../src/types/database";
+import originalFollowUpContent from "../../data/interview-follow-ups.json";
+import extendedFollowUpContent from "../../data/neetcode250-follow-ups.json";
+const followUpContent = {
+  ...originalFollowUpContent,
+  ...extendedFollowUpContent,
+};
+
+function fixtureSql(query: string) {
+  return execFileSync(
+    "docker",
+    [
+      "exec",
+      "supabase_db_faang-interview-academy",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      query,
+    ],
+    { encoding: "utf8" },
+  ).trim();
+}
 
 type LocalStatus = {
   API_URL: string;
@@ -80,6 +115,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
   let lastAbandonedInterviewId = "";
   let masteryBeforeCompletedInterview: number | null = null;
   let realtimeSessionId = "";
+  let unreadyFixtureId = "";
 
   beforeAll(async () => {
     const status = localStatus();
@@ -145,17 +181,17 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     }
   });
 
-  it("publishes the canonical NeetCode 150 collection", async () => {
+  it("publishes the canonical NeetCode 250 collection", async () => {
     const { data: collection, error } = await anonymous
       .from("problem_collections")
       .select("*")
-      .eq("slug", "neetcode-150")
+      .eq("slug", "neetcode-250")
       .eq("active", true)
       .single();
     expect(error).toBeNull();
     expect(collection).toMatchObject({
       expected_primary_topic_count: 18,
-      expected_problem_count: 150,
+      expected_problem_count: 250,
       version: 1,
     });
 
@@ -168,7 +204,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       .select("primary_topic_id", { count: "exact" })
       .eq("collection_id", collection!.id);
     expect(membershipError).toBeNull();
-    expect(count).toBe(150);
+    expect(count).toBe(250);
     expect(
       new Set((memberships ?? []).map((item) => item.primary_topic_id)).size,
     ).toBe(18);
@@ -180,7 +216,15 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       )
       .eq("interview_ready", true);
     expect(readyError).toBeNull();
-    expect(readyProblems).toHaveLength(18);
+    expect(readyProblems?.map((problem) => problem.slug).sort()).toEqual(
+      [...APPROVED_INTERVIEW_QUESTION_SLUGS].sort(),
+    );
+    for (const problem of readyProblems ?? []) {
+      expect(problem.interview_content_version, problem.slug).toBe(
+        getApprovedQuestionContentVersion(problem.slug),
+      );
+      expect(problem.interview_content_provenance).toBe("first_party");
+    }
     expect(
       new Set((readyProblems ?? []).map((item) => item.primary_topic_id)).size,
     ).toBe(18);
@@ -192,6 +236,23 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         }),
       ]),
     );
+    // Private follow-up content must cover every active version, without
+    // exposing its table through the public API merely for test convenience.
+    const followUps = JSON.parse(
+      fixtureSql(
+        `select coalesce(json_agg(json_build_object('slug',p.slug,'version',f.content_version,'prompt',f.prompt)), '[]') from public.problems p join public.approved_interview_follow_ups f on f.problem_id=p.id and f.content_version=p.interview_content_version and f.active where p.interview_ready`,
+      ),
+    ) as { slug: string; version: number; prompt: string }[];
+    expect(followUps.map((f) => f.slug).sort()).toEqual(
+      [...APPROVED_INTERVIEW_QUESTION_SLUGS].sort(),
+    );
+    for (const [slug, prompt] of Object.entries(followUpContent))
+      expect(followUps.find((f) => f.slug === slug)?.prompt).toBe(prompt);
+    expect(
+      fixtureSql(
+        "select count(*) from public.approved_interview_follow_ups f join public.problems p on p.id=f.problem_id where p.slug in ('best-time-to-buy-and-sell-stock','kth-largest-element-in-a-stream') and f.content_version=1",
+      ),
+    ).toBe("2");
   });
 
   afterAll(async () => {
@@ -200,6 +261,12 @@ describe.sequential("mock interview lifecycle and isolation", () => {
         .filter(Boolean)
         .map((id) => admin.auth.admin.deleteUser(id)),
     );
+    if (unreadyFixtureId) {
+      expect(unreadyFixtureId).toMatch(/^[0-9a-f-]{36}$/i);
+      fixtureSql(
+        `delete from public.problem_collection_memberships where problem_id='${unreadyFixtureId}'; delete from public.problems where id='${unreadyFixtureId}' and source='custom'`,
+      );
+    }
   });
 
   it("accepts every difficulty, duration, and interviewer-level combination", async () => {
@@ -238,10 +305,74 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     }
   });
 
+  it("opens every new NeetCode 250 question with either interviewer and the full candidate count", async () => {
+    const { data: problems, error } = await anonymous
+      .from("problems")
+      .select("id,slug,primary_topic_id,difficulty")
+      .in("slug", Object.keys(extendedFollowUpContent));
+    expect(error).toBeNull();
+    expect(problems).toHaveLength(100);
+    for (const p of problems!)
+      for (const level of ["beginner", "faang_tough"] as const) {
+        const { data: id, error: startError } = await learner.rpc(
+          "start_mock_interview_v2",
+          {
+            p_coding_language: level === "beginner" ? "python" : "java",
+            p_duration_minutes: 45,
+            p_interview_language: level === "beginner" ? "english" : "hebrew",
+            p_interviewer_level: level,
+            p_problem_id: p.id,
+            p_requested_difficulties: ["easy", "medium", "hard"],
+            p_requested_topic_id: null!,
+            p_selected_topic_id: p.primary_topic_id,
+            p_selection_algorithm_version:
+              INTERVIEW_SELECTION_ALGORITHM_VERSION,
+            p_selection_mode: "coverage",
+            p_selection_metadata: {
+              candidateProblemCount: 250,
+              candidateTopicCount: 18,
+              coverageFallbackUsed: false,
+              reasons: ["Catalog availability verification."],
+              recencyFallbackUsed: false,
+              repeatFallbackUsed: false,
+            },
+          },
+        );
+        expect(startError, `${p.slug}/${level}`).toBeNull();
+        try {
+          const { data: snapshot, error: snapshotError } = await learner.rpc(
+            "get_owned_active_mock_interview",
+            { p_mock_interview_id: id! },
+          );
+          expect(snapshotError).toBeNull();
+          const active = snapshot as {
+            questionContentKey: string;
+            questionContentVersion: number;
+          };
+          expect(active.questionContentVersion).toBe(1);
+          expect(
+            getActiveInterviewQuestionPrompt(active.questionContentKey, 1),
+          ).toContain(getApprovedInterviewQuestion(p.slug)!.prompt);
+        } finally {
+          const { error: cleanupError } = await learner.rpc(
+            "abandon_mock_interview",
+            { p_mock_interview_id: id! },
+          );
+          expect(cleanupError).toBeNull();
+        }
+      }
+    expect(
+      fixtureSql(
+        "select count(*) from public.problem_collection_memberships m join public.problem_collections c on c.id=m.collection_id where c.slug='neetcode-150' and c.version=1",
+      ),
+    ).toBe("150");
+  }, 60_000);
+
   it("validates selection and returns only a sanitized active snapshot", async () => {
     const metadata = {
       candidateProblemCount: 4,
       candidateTopicCount: 2,
+      coverageFallbackUsed: false,
       reasons: ["Selected from an uncovered topic."],
       recencyFallbackUsed: false,
       repeatFallbackUsed: false,
@@ -255,7 +386,7 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       p_requested_difficulties: ["easy", "medium"],
       p_requested_topic_id: null!,
       p_selected_topic_id: problemTopicId,
-      p_selection_algorithm_version: 1,
+      p_selection_algorithm_version: INTERVIEW_SELECTION_ALGORITHM_VERSION,
       p_selection_metadata: metadata,
       p_selection_mode: "coverage",
     });
@@ -304,12 +435,18 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       ).error,
     ).not.toBeNull();
 
+    // All catalog entries are ready now. Use an isolated unapproved fixture
+    // instead of disabling a real question or dropping the rejection check.
+    unreadyFixtureId = randomUUID();
+    expect(problemId).toMatch(/^[0-9a-f-]{36}$/i);
+    fixtureSql(`insert into public.problems (id,source,slug,title,difficulty,primary_topic_id,pattern_tags,recognition_signals,estimated_minutes,curriculum_level,dataset_order)
+      select '${unreadyFixtureId}', 'custom', 'unready-test-${unreadyFixtureId}', 'Unapproved test fixture', difficulty, primary_topic_id, pattern_tags, recognition_signals, estimated_minutes, curriculum_level, (select max(dataset_order)+1 from public.problems) from public.problems where id='${problemId}';
+      insert into public.problem_collection_memberships(collection_id,problem_id,primary_topic_id,ordinal)
+      select collection_id,'${unreadyFixtureId}',primary_topic_id,(select max(m.ordinal)+1 from public.problem_collection_memberships m where m.collection_id=original.collection_id) from public.problem_collection_memberships original where problem_id='${problemId}'`);
     const { data: unreadyProblem, error: unreadyReadError } = await learner
       .from("problems")
       .select("difficulty, id, primary_topic_id")
-      .eq("active", true)
-      .eq("interview_ready", false)
-      .limit(1)
+      .eq("id", unreadyFixtureId)
       .single();
     expect(unreadyReadError).toBeNull();
     expect(
@@ -654,6 +791,14 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       });
     expect(workspaceError).toBeNull();
     expect(firstWorkspaceVersion).toBe(1);
+    const repeatedSave = await learner.rpc("save_mock_interview_workspace", {
+      p_code_snapshot: "# first Python draft",
+      p_expected_version: 0,
+      p_mock_interview_id: interviewId,
+      p_scratchpad: "Trace: input -> state -> output",
+    });
+    expect(repeatedSave.error).toBeNull();
+    expect(repeatedSave.data).toBe(1);
     expect(
       (
         await learner.rpc("save_mock_interview_workspace", {
@@ -760,6 +905,56 @@ describe.sequential("mock interview lifecycle and isolation", () => {
       advancedToTesting: true,
       workspaceVersion: 4,
     });
+    const finalRequest = {
+      p_advance_to_testing: true,
+      p_code_snapshot: finalCode,
+      p_elapsed_seconds: 301,
+      p_expected_version: 3,
+      p_mock_interview_id: interviewId,
+      p_scratchpad: "Empty and ordinary cases are covered.",
+    };
+    const replays = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        learner.rpc("submit_mock_interview_code", finalRequest),
+      ),
+    );
+    for (const replay of replays) {
+      expect(replay.error).toBeNull();
+      expect(replay.data).toEqual(finalSubmission);
+    }
+    expect(
+      (await other.rpc("submit_mock_interview_code", finalRequest)).error,
+    ).not.toBeNull();
+    expect(
+      (
+        await learner.rpc("submit_mock_interview_code", {
+          ...finalRequest,
+          p_code_snapshot: "different code",
+        })
+      ).error,
+    ).not.toBeNull();
+    // This evidence table deliberately denies direct API reads, even to the
+    // service role. Inspect only the disposable local test interview via SQL.
+    expect(interviewId).toMatch(/^[0-9a-f-]{36}$/i);
+    const submissionCount = execFileSync(
+      "docker",
+      [
+        "exec",
+        "supabase_db_faang-interview-academy",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-At",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        `select count(*) from public.mock_interview_code_submissions where mock_interview_id = '${interviewId}'::uuid`,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(Number(submissionCount.trim())).toBe(2);
     for (const [target, payload, elapsed] of [
       ["complexity", { notes: "Test empty and ordinary input" }, 302],
       [
@@ -1030,6 +1225,196 @@ describe.sequential("mock interview lifecycle and isolation", () => {
     expect(
       (await other.from("mock_interview_evaluations").select("*")).data,
     ).toEqual([]);
+  });
+
+  it("retries immutable feedback without hiding it, duplicating work, or accepting expired results", async () => {
+    const read = () =>
+      learner
+        .from("mock_interview_evaluations")
+        .select("*")
+        .eq("mock_interview_id", interviewId)
+        .order("version");
+    const original = (await read()).data![0]!;
+    const args = {
+      p_mock_interview_id: interviewId,
+      p_provider: "gemini",
+      p_model: "gemini-3.1-flash-lite",
+      p_evaluation_version: 2,
+      p_evidence_version: 2,
+    };
+    expect(
+      (await other.rpc("retry_mock_interview_evaluation", args)).error,
+    ).not.toBeNull();
+    const retries = await Promise.all([
+      learner.rpc("retry_mock_interview_evaluation", args),
+      learner.rpc("retry_mock_interview_evaluation", args),
+    ]);
+    for (const retry of retries) expect(retry.error).toBeNull();
+    expect(retries[0]!.data).toEqual(retries[1]!.data);
+    const attempt = retries[0]!.data as {
+      evaluationId: string;
+      version: number;
+    };
+    expect(attempt.version).toBe(2);
+    expect((await read()).data!.find((e) => e.is_current)).toEqual(original);
+    const leases = await Promise.all([
+      learner.rpc("reserve_interview_evaluation_request", {
+        p_evaluation_id: attempt.evaluationId,
+      }),
+      learner.rpc("reserve_interview_evaluation_request", {
+        p_evaluation_id: attempt.evaluationId,
+      }),
+    ]);
+    expect(leases.map((l) => l.data).sort()).toEqual([false, true]);
+    const finish = (id: string, status: string) =>
+      learner.rpc("finalize_mock_interview_evaluation", {
+        p_evaluation_id: id,
+        p_status: status,
+        p_confidence: original.confidence!,
+        p_dimensions: original.dimensions!,
+        p_error_code: "",
+        p_evidence_coverage: original.evidence_coverage!,
+        p_improvements: original.improvements,
+        p_input_tokens: 100,
+        p_output_tokens: 100,
+        p_raw_score: original.raw_score!,
+        p_recommended_actions: original.recommended_actions!,
+        p_recurring_signals: original.recurring_signals,
+        p_strengths: original.strengths,
+        p_summary: original.summary!,
+        p_total_tokens: 200,
+      });
+    expect(attempt.evaluationId).toMatch(/^[0-9a-f-]{36}$/i);
+    execFileSync(
+      "docker",
+      [
+        "exec",
+        "supabase_db_faang-interview-academy",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        `update public.mock_interview_evaluations set created_at = now() - interval '4 minutes' where id = '${attempt.evaluationId}'::uuid`,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(
+      (await finish(attempt.evaluationId, "completed")).error,
+    ).not.toBeNull();
+    const next = await learner.rpc("retry_mock_interview_evaluation", args);
+    expect(next.error).toBeNull();
+    const nextAttempt = next.data as { evaluationId: string; version: number };
+    expect(nextAttempt.version).toBe(3);
+    const pendingRows = (await read()).data!;
+    expect(pendingRows[1]!.status).toBe("failed");
+    expect(pendingRows.find((e) => e.is_current)).toEqual(original);
+    expect(
+      (
+        await learner.rpc("reserve_interview_evaluation_request", {
+          p_evaluation_id: nextAttempt.evaluationId,
+        })
+      ).data,
+    ).toBe(true);
+    expect(
+      (await finish(nextAttempt.evaluationId, "completed")).error,
+    ).toBeNull();
+    const finalRows = (await read()).data!;
+    expect(finalRows.filter((e) => e.is_current)).toHaveLength(1);
+    expect(finalRows.find((e) => e.is_current)?.id).toBe(
+      nextAttempt.evaluationId,
+    );
+    expect(finalRows[0]).toEqual({ ...original, is_current: false });
+    expect(
+      (await finish(attempt.evaluationId, "completed")).error,
+    ).not.toBeNull();
+    const exhausted = await learner.rpc(
+      "retry_mock_interview_evaluation",
+      args,
+    );
+    expect(exhausted.data).toMatchObject({ shouldEvaluate: false, version: 3 });
+    expect((await read()).data).toHaveLength(3);
+  });
+
+  it("does not reset the attempt budget when failed retries receive new IDs", async () => {
+    const copyId = randomUUID();
+    expect(interviewId).toMatch(/^[0-9a-f-]{36}$/i);
+    execFileSync(
+      "docker",
+      [
+        "exec",
+        "supabase_db_faang-interview-academy",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        `insert into public.mock_interviews select (jsonb_populate_record(null::public.mock_interviews, to_jsonb(i) || jsonb_build_object('id','${copyId}'))).* from public.mock_interviews i where id = '${interviewId}';
+       insert into public.mock_interview_evaluations select (jsonb_populate_record(null::public.mock_interview_evaluations, to_jsonb(e) || jsonb_build_object('id','${randomUUID()}','mock_interview_id','${copyId}','is_current',true))).* from public.mock_interview_evaluations e where mock_interview_id = '${interviewId}' and version = 1;`,
+      ],
+      { encoding: "utf8" },
+    );
+    const args = {
+      p_mock_interview_id: copyId,
+      p_provider: "test",
+      p_model: "test",
+      p_evaluation_version: 2,
+      p_evidence_version: 2,
+    };
+    for (const version of [2, 3]) {
+      const attempt = await learner.rpc(
+        "retry_mock_interview_evaluation",
+        args,
+      );
+      expect(attempt.error).toBeNull();
+      expect(attempt.data).toMatchObject({ version, shouldEvaluate: true });
+      const id = (attempt.data as { evaluationId: string }).evaluationId;
+      expect(
+        (
+          await learner.rpc("reserve_interview_evaluation_request", {
+            p_evaluation_id: id,
+          })
+        ).data,
+      ).toBe(true);
+      expect(
+        (
+          await learner.rpc("finalize_mock_interview_evaluation", {
+            p_evaluation_id: id,
+            p_status: "failed",
+            p_error_code: "provider_error",
+            p_raw_score: 0,
+            p_confidence: 0,
+            p_summary: "",
+            p_dimensions: {},
+            p_evidence_coverage: {},
+            p_improvements: [],
+            p_strengths: [],
+            p_recurring_signals: [],
+            p_recommended_actions: [],
+            p_input_tokens: 0,
+            p_output_tokens: 0,
+            p_total_tokens: 0,
+          })
+        ).error,
+      ).toBeNull();
+    }
+    expect(
+      (await learner.rpc("retry_mock_interview_evaluation", args)).data,
+    ).toMatchObject({ shouldEvaluate: false, status: "failed", version: 3 });
+    const rows = await learner
+      .from("mock_interview_evaluations")
+      .select("version,is_current,status")
+      .eq("mock_interview_id", copyId);
+    expect(rows.data).toHaveLength(3);
+    expect(rows.data!.filter((e) => e.is_current)).toEqual([
+      { version: 1, is_current: true, status: "provisional" },
+    ]);
   });
 
   it("assembles canonical evidence from completed learner-owned rows", async () => {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HelpLinks } from "@/components/navigation/help-links";
 import { notFound, redirect } from "next/navigation";
 import { requireInterviewUser } from "@/features/auth/session";
 import { getMockInterview } from "@/features/mock-interviews/queries";
@@ -35,6 +36,7 @@ export default async function EndedInterviewPage({
           Start another interview
         </Link>
       )}
+      <HelpLinks hebrew={hebrew} />
       {interview.code_snapshot ? (
         <section className="bg-surface rounded-xl border p-5">
           <h2 className="mb-3 font-semibold">

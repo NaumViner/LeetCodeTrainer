@@ -67,7 +67,7 @@ describe.sequential("problem library dataset and policies", () => {
     }
   });
 
-  it("publishes exactly 150 complete metadata records across 18 topics", async () => {
+  it("publishes exactly 250 complete metadata records across 18 topics", async () => {
     const [problemsResult, topicsResult, secondaryResult, prerequisitesResult] =
       await Promise.all([
         anonymous
@@ -85,16 +85,16 @@ describe.sequential("problem library dataset and policies", () => {
     expect(topicsResult.error).toBeNull();
     expect(secondaryResult.error).toBeNull();
     expect(prerequisitesResult.error).toBeNull();
-    expect(problemsResult.data).toHaveLength(150);
+    expect(problemsResult.data).toHaveLength(250);
     expect(
       new Set(problemsResult.data?.map((problem) => problem.external_id)).size,
-    ).toBe(150);
+    ).toBe(250);
     expect(
       new Set(problemsResult.data?.map((problem) => problem.primary_topic_id))
         .size,
     ).toBe(18);
     expect(secondaryResult.data?.length).toBeGreaterThan(10);
-    expect(prerequisitesResult.data?.length).toBeGreaterThan(150);
+    expect(prerequisitesResult.data?.length).toBeGreaterThan(250);
     expect(
       problemsResult.data?.every(
         (problem, index) =>
@@ -117,7 +117,7 @@ describe.sequential("problem library dataset and policies", () => {
       ),
     );
 
-    expect(counts.map((result) => result.count)).toEqual([28, 101, 21]);
+    expect(counts.map((result) => result.count)).toEqual([60, 155, 35]);
   });
 
   it("allows reads but denies browser-role problem mutations", async () => {
