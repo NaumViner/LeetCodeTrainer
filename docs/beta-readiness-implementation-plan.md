@@ -16,16 +16,16 @@ No new cloud accounts, domain purchase, or production secrets are required to be
 
 ### What the owner must provide before hosted verification and release
 
-| Requirement | Purpose | Owner action and timing |
-| --- | --- | --- |
-| Vercel account and selected project/team | Host the application and its server routes | Create an account or identify the existing one before hosted setup; connect the intended repository/project |
-| Supabase account and selected projects | Hosted database, authentication, and guest account linking | Create an account or identify existing projects before hosted setup; keep staging and production isolated as specified below |
-| Access to the remote Git repository | Deploy the intended release and enable CI | Authorize the chosen hosting integration; reuse the existing repository rather than creating a duplicate unnecessarily |
-| Gemini API project/key with appropriate model access and quota | Real voice interviews and AI feedback | Reuse working existing credentials if suitable; supply them through private service settings before live AI tests |
-| SMTP service and verified sender | Verification and password-recovery emails for external users | Choose or reuse a service, configure it in Supabase, and validate delivery before external account tests |
-| Budget and operational contact | Bound paid usage and receive failure/support reports | Specify a spending limit/alert policy and a real contact before enabling paid external usage |
-| A usable test email and a person for real microphone tests | Confirm delivery, spoken interview quality, and the complete account journey | Participate at the hosted acceptance phase; automated mocks do not replace these checks |
-| Optional custom domain and DNS access | Branded public address | Optional for an initial beta using a stable HTTPS hosting URL; a mail provider may separately require a verified sending domain |
+| Requirement                                                    | Purpose                                                                      | Owner action and timing                                                                                                         |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Vercel account and selected project/team                       | Host the application and its server routes                                   | Create an account or identify the existing one before hosted setup; connect the intended repository/project                     |
+| Supabase account and selected projects                         | Hosted database, authentication, and guest account linking                   | Create an account or identify existing projects before hosted setup; keep staging and production isolated as specified below    |
+| Access to the remote Git repository                            | Deploy the intended release and enable CI                                    | Authorize the chosen hosting integration; reuse the existing repository rather than creating a duplicate unnecessarily          |
+| Gemini API project/key with appropriate model access and quota | Real voice interviews and AI feedback                                        | Reuse working existing credentials if suitable; supply them through private service settings before live AI tests               |
+| SMTP service and verified sender                               | Verification and password-recovery emails for external users                 | Choose or reuse a service, configure it in Supabase, and validate delivery before external account tests                        |
+| Budget and operational contact                                 | Bound paid usage and receive failure/support reports                         | Specify a spending limit/alert policy and a real contact before enabling paid external usage                                    |
+| A usable test email and a person for real microphone tests     | Confirm delivery, spoken interview quality, and the complete account journey | Participate at the hosted acceptance phase; automated mocks do not replace these checks                                         |
+| Optional custom domain and DNS access                          | Branded public address                                                       | Optional for an initial beta using a stable HTTPS hosting URL; a mail provider may separately require a verified sending domain |
 
 Do not require the owner to paste passwords, administrative keys, or API secrets into chat. Help them enter secrets directly into the appropriate service settings. Check which accounts and credentials already exist before requesting new ones. A working local Gemini key, if present, is not automatically evidence that its project, quotas, or billing are suitable for external users.
 
